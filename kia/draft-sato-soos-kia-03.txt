@@ -1,0 +1,1340 @@
+Internet Engineering Task Force                              T. Sato
+Internet-Draft                                       MyAuberge K.K.
+Intended Status: Standards Track                         4 July 2026
+Expires: 4 January 2027
+
+       Kernel Identity and Attestation for Governing Enforcement Components
+                       draft-sato-soos-kia-03
+
+Abstract
+
+   This document specifies the Kernel Identity and Attestation (KIA)
+   protocol for the Sovereign Object OS (SOOS) governance architecture.
+   KIA defines the cryptographic identity of the GEC, the trust
+   chain anchoring kernel authority from hardware root through operator
+   root keypair to every signed Event Log entry, the GEC Manifest
+   schema for runtime state attestation, and the Revocation Registry
+   maintenance requirements.  KIA is the Layer 0 signing and
+   attestation component on which the audit trail guarantees of
+   draft-sato-soos-gar, the mandate enforcement guarantees of
+   draft-sato-soos-mjwt, and the multi-agent delegation chain of
+   draft-sato-soos-mad all depend.
+
+   Version -03 adds FROST threshold signing for high-availability GEC
+   keypair deployments, the Cross-Principal Identifier (XPID) for
+   cross-instance federation audit correlation, the XPID cross-
+   instance trust model, and four new Security Considerations
+   (Sections 14.8 through 14.11) addressing FROST nonce reuse, XPID
+   revocation gap, identity takeover via claimed identifier (CVE-2025-
+   13609 class), and attestation channel binding (CVE-2026-33697 class).
+
+   This document is the reference specification for the KIA RATS WG
+   presentation at IETF 126 Vienna.  The XPID primitive and the
+   CVE-2026-33697 attestation channel binding defense are the primary
+   novel contributions presented to the RATS WG.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 4 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Terminology
+   3.  Trust Chain Architecture
+       3.1.  Chain Overview
+       3.2.  Hardware Root
+       3.3.  Operator Root Keypair
+       3.4.  GEC Attestation Certificate
+       3.5.  The Kernel Is Below Cedar
+   4.  KIA Responsibilities
+       4.1.  Keypair Generation and Management  [UPDATED in -03]
+       4.2.  GEC Manifest Issuance
+       4.3.  Event Log Signing
+       4.4.  Revocation Registry Maintenance
+       4.5.  Agent-Kernel Mutual Authentication
+       4.6.  Federation Attestation
+   5.  GEC Manifest  [UPDATED in -03]
+       5.1.  Purpose
+       5.2.  Schema
+       5.3.  Issuance Triggers
+       5.4.  Staleness
+       5.5.  PTD Consistency Requirement
+   6.  XPID: Cross-Principal Identifier  [NEW in -03]
+       6.1.  Purpose and Design
+       6.2.  Derivation Procedure
+       6.3.  Cross-Instance Trust Model
+       6.4.  Revocation Gap (OQ-S-XPID-REV)
+       6.5.  CAEP Propagation for Revocation
+   7.  Event Log Signing (INV-9)
+       7.1.  Scope
+       7.2.  Canonical Form
+       7.3.  Signed Event Classes
+   8.  Revocation Registry (INV-11)
+       8.1.  Structure
+       8.2.  Rebuild on Restart
+       8.3.  Revocation Authority
+       8.4.  Agent Revocation Prohibition
+   9.  Policy Change Attestation (INV-10)
+  10.  Federation and Cross-Instance Verification
+  11.  GEC as RATS Attester
+  12.  Relationship to WIMSE
+  13.  Conformance
+  14.  Open Issues
+      14.1.  OQ-S-18: Deployment Topology
+      14.2.  OQ-S-19: Agent Runtime Attestation Profile
+      14.3.  OQ-S-XPID-REV: XPID Revocation Gap  [NEW in -03]
+  15.  Security Considerations
+      15.1.  Private Key Extraction
+      15.2.  GEC Manifest Forgery
+      15.3.  Policy Hash Manipulation
+      15.4.  Revocation Registry Incompleteness
+      15.5.  Cascade Revocation Race
+      15.6.  Implementation Degradation
+      15.7.  Agent Session Revocation
+      15.8.  FROST Nonce Reuse Risk  [NEW in -03]
+      15.9.  XPID Revocation Gap (Known Open Issue)  [NEW in -03]
+      15.10. Identity Takeover via Claimed Identifier --
+             CVE-2025-13609 Class Defense  [NEW in -03]
+      15.11. Attestation Channel Binding --
+             CVE-2026-33697 Class Defense  [NEW in -03]
+  16.  IANA Considerations  [UPDATED in -03]
+  17.  Normative References  [UPDATED in -03]
+  18.  Informative References  [UPDATED in -03]
+  Appendix B.  Related Work
+      B.1.  RATS Architecture (RFC 9334)
+      B.2.  WIMSE
+      B.3.  SPIFFE / SPIRE
+      B.4.  SCITT
+      B.5.  TCG TPM and Hardware Attestation
+      B.6.  SOOS Companion Drafts  [UPDATED in -03]
+  Appendix C.  Vibe Coding Assets  [UPDATED in -03]
+  Acknowledgements
+  Author's Address
+
+
+1.  Introduction
+
+   Every GEC event -- every state transition, every mandate
+   revocation, every human escalation and resolution, every session
+   boundary -- is signed by the GEC keypair.  Without this signing,
+   there is no audit trail integrity: any party with write access to
+   the Event Log could inject or modify events without detection.
+   Without the trust chain anchoring that keypair to a hardware root
+   and operator identity, there is no basis for a verifying party
+   to trust the signed entries.
+
+   A Governing Enforcement Component (GEC) is the enforcement kernel
+   in a governed agentic AI system: the component that evaluates Cedar
+   policies, executes XState state machines, and commits every state
+   transition to an append-only, signed Event Log.  The GEC is the
+   enforcement physics of the system.  KIA defines what it means for
+   a GEC to have a verifiable cryptographic identity.
+
+   The Sovereign Object OS (SOOS) is the reference implementation of
+   the GEC pattern; all normative examples in this document use SOOS
+   terminology.  Any implementation conforming to the Cedar + XState
+   + append-only Event Log pattern MAY claim KIA conformance.
+
+   This document specifies three things:
+
+   (1)  The KIA trust chain: from hardware root to operator root
+        keypair to GEC Attestation Certificate to GEC keypair to
+        Event Log signatures.
+
+   (2)  The GEC Manifest: a signed attestation of the GEC's runtime
+        state, issued at deployment and reissued on every policy
+        change (INV-10).
+
+   (3)  The Revocation Registry maintenance requirements (INV-11):
+        the kernel-maintained index of revoked mandate JWT IDs.
+
+   The GEC is a RATS Attester as defined in [RFC9334].  This is a
+   normative declaration: KIA implements the RATS Attester role for
+   governance execution kernels.  The GEC Manifest is RATS Evidence
+   extended with SOOS-specific fields (Section 5.2).
+
+   A critical architectural principle governs KIA's position in the
+   SOOS stack: the GEC is not above Cedar -- it is below Cedar.
+   Cedar is one of the tools the kernel uses.  KIA grounds the kernel's
+   identity anchor in the operator root keypair and the hardware
+   attestation layer beneath it.
+
+   Version -02 completed the GEC Manifest schema with five RATS
+   Evidence extension fields, the PTD Consistency Requirement
+   (CONF-KIA-15), and the PTD endpoint discovery mechanism.
+
+   Version -03 adds FROST threshold signing for high-availability GEC
+   keypair deployments (Section 4.1); the Cross-Principal Identifier
+   (XPID) for cross-instance federation audit correlation (Section 6);
+   the XPID cross-instance trust model including the revocation gap
+   open issue OQ-S-XPID-REV (Section 6.4); and four new Security
+   Considerations (Sections 15.8 through 15.11): FROST nonce reuse
+   risk, XPID revocation gap, CVE-2025-13609 class defense (identity
+   takeover via claimed identifier), and CVE-2026-33697 class defense
+   (attestation channel binding).
+
+   This document is the reference specification for the KIA
+   presentation to the RATS WG at IETF 126 Vienna (July 18-24, 2026).
+   The XPID primitive (Section 6) and the CVE-2026-33697 attestation
+   channel binding defense (Section 15.11) are the primary novel
+   contributions presented.  The RATS WG speaking request references
+   this document as the SOOS KIA + GAR architecture overview
+   (coordination with Ned Smith).
+
+   Further information: https://soosproject.ai/drafts/kia
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in
+   this document are to be interpreted as described in BCP 14
+   [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals.
+
+
+2.  Terminology
+
+   [Section 2 carried forward from draft-sato-soos-kia-02 unchanged,
+   with the following additions:]
+
+   FROST:
+      Flexible Round-Optimized Schnorr Threshold Signatures
+      [FROST].  A threshold signing protocol that allows a cluster
+      of t-of-n participants to produce an Ed25519-compatible
+      Schnorr signature without any single participant holding the
+      full private key.  In SOOS, FROST enables high-availability
+      GEC deployments where no single node holds the complete
+      GEC signing key.
+
+   XPID (Cross-Principal Identifier):
+      A UUID-v5 value derived deterministically from the GEC's FROST
+      threshold key material (or, in non-FROST deployments, the GEC's
+      Ed25519 public key) and the agent's Party Registry entry.
+      The XPID is a stable, globally unique identifier for an agent
+      across multiple GEC instances in a federation.  It enables
+      bilateral audit correlation across trust boundaries without
+      a trusted third party.  See Section 6.
+
+   Threshold Keypair:
+      In FROST deployments, the GEC signing key is held as t-of-n
+      secret shares distributed across a signing cluster.  No single
+      node holds the full private key.  The corresponding public key
+      is a single Ed25519-compatible point.  All existing SOOS
+      signing requirements apply to the threshold keypair; the
+      distinction is in how the private key is held, not how
+      signatures are produced or verified.
+
+   Signing Cluster:
+      The set of n GEC signing participants that collectively hold
+      the threshold keypair.  The signing cluster must reach quorum
+      (t participants) to produce a valid signature.
+
+
+3.  Trust Chain Architecture
+
+   [Section 3 carried forward from draft-sato-soos-kia-02 in full.
+   The FROST threshold keypair fits within the existing chain at
+   the "Operator root keypair -> GEC Attestation Certificate ->
+   GEC keypair" link: in FROST deployments, the "GEC keypair"
+   is the threshold public key derived from the FROST signing
+   cluster.  The trust chain structure is otherwise unchanged.]
+
+   3.1 through 3.5 are unchanged.  For the FROST case, Section 4.1
+   specifies how the GEC keypair layer of the trust chain is
+   realized as a threshold keypair.
+
+
+4.  KIA Responsibilities
+
+4.1.  Keypair Generation and Management  [UPDATED in -03]
+
+   Standard (non-FROST) deployments:
+
+   At deployment initialisation, KIA MUST:
+
+   (a)  Generate an Ed25519 keypair.
+   (b)  Store the private key in a hardware secure element where
+        available.  The private key MUST NOT be exported from the
+        secure element under any circumstances.
+   (c)  Register the public key fingerprint (SHA-256) with the
+        operator for inclusion in the GEC Attestation Certificate.
+   (d)  Issue the initial GEC Manifest once the GEC Attestation
+        Certificate has been received from the operator.
+
+   FROST threshold deployments (HA option):  [NEW in -03]
+
+   As an alternative to single-keypair deployments, KIA-03
+   normatively supports FROST threshold signing [FROST] for high-
+   availability (HA) deployments where the GEC keypair must survive
+   individual signing node failures.
+
+   In a FROST deployment:
+
+   (a)  A FROST key generation ceremony MUST be conducted by the
+        n signing cluster participants.  The ceremony produces n
+        secret shares (one per participant) and a single threshold
+        public key.  No single participant, including the ceremony
+        coordinator, learns the full private key.
+
+   (b)  Each participant's secret share MUST be stored in a hardware
+        secure element on that participant's signing node.  Secret
+        shares MUST NOT be exported from their respective secure
+        elements.
+
+   (c)  The threshold public key is registered with the operator
+        as the GEC keypair.  The GEC Attestation Certificate is
+        issued over the threshold public key fingerprint, not over
+        any individual share.
+
+   (d)  The GEC Manifest is signed by the FROST threshold signing
+        cluster.  The resulting signature is a single Ed25519-
+        compatible Schnorr signature verifiable against the threshold
+        public key.  External verifiers are not required to know
+        whether the deployment is FROST or single-key.
+
+   FROST nonce generation requirements:
+
+   CONF-KIA-16:  In FROST deployments, each signing participant MUST
+   generate a fresh cryptographically secure nonce for every signing
+   operation.  Nonces MUST NOT be reused across signing operations.
+
+   CONF-KIA-17:  Implementations using FROST MUST comply with the
+   nonce generation procedure specified in Section 5 of [FROST].
+   Implementations MUST NOT cache or pre-generate nonce sets for
+   batch signing.
+
+   Quorum failure behavior:
+
+   CONF-KIA-18:  If the FROST signing cluster falls below quorum
+   (fewer than t participants are available), the GEC MUST refuse
+   to sign any Event Log entry, GEC Manifest, or other KIA artifact.
+   The GEC MUST NOT degrade to single-signer operation.
+
+   CONF-KIA-19:  When a quorum failure occurs, the GEC MUST emit
+   a KERNEL_AUDIT_ANOMALY alert in the GAR system and MUST surface
+   the quorum failure condition to the operator through the
+   designated notification channel.
+
+   CONF-KIA-20:  A reduced quorum resulting from signing cluster
+   partial failure MUST NOT reduce the threshold parameter (t)
+   below the value established at the initial FROST key generation
+   ceremony.  Threshold reduction requires a new key generation
+   ceremony and a new GEC Attestation Certificate.
+
+   XPID derivation in FROST deployments:
+
+   In FROST deployments, the XPID (Section 6.2) is derived from
+   the threshold public key fingerprint, not from any individual
+   participant's share.  This ensures that the XPID is stable
+   across signing cluster membership changes within the same
+   threshold keypair lifecycle.
+
+   GEC Manifest declaration for FROST:
+
+   FROST deployments MUST declare their threshold configuration
+   in the deployment_constraints[] field of the GEC Manifest
+   (Section 5.2):
+
+      "frost:t-of-n:<t>-<n>"
+
+   where t is the signing threshold and n is the total number
+   of participants.  Example: "frost:t-of-n:3-5" declares a
+   3-of-5 FROST signing cluster.
+
+   The hardware_backed field MUST be true if all n participants'
+   secret shares are stored in hardware secure elements.  If any
+   participant uses software key storage, hardware_backed MUST
+   be false.
+
+4.2.  GEC Manifest Issuance
+4.3.  Event Log Signing
+4.4.  Revocation Registry Maintenance
+4.5.  Agent-Kernel Mutual Authentication
+4.6.  Federation Attestation
+
+   [Sections 4.2 through 4.6 carried forward from
+   draft-sato-soos-kia-02 without modification.]
+
+
+5.  GEC Manifest
+
+5.1.  Purpose
+
+   [Carried forward from -02 without modification.]
+
+5.2.  Schema  [UPDATED in -03]
+
+   The GEC Manifest schema from -02 is carried forward in full.
+   The following field is added:  [NEW in -03]
+
+     xpid_derivation_version
+        String (semver).  The version of the XPID derivation
+        algorithm (Section 6.2) implemented by this GEC instance.
+        REQUIRED.  Current normative value: "1.0".  External
+        parties computing the XPID for federation or audit
+        correlation MUST use the algorithm version declared in
+        this field.  A GEC that does not implement XPID MUST
+        set this field to "none".
+
+   The kernel_keypair_fingerprint field (defined in -02) is
+   normatively clarified as follows:  [CLARIFIED in -03]
+
+     kernel_keypair_fingerprint
+        SHA-256 of the GEC's Ed25519 public key (non-FROST) or
+        FROST threshold public key (FROST deployments).  This
+        field is the primary GEC instance identifier used by:
+
+        (a)  MJWT aud claim binding: the MJWT aud claim MUST
+             equal this fingerprint.  External systems constructing
+             MJWTs MUST retrieve this value from the GEC Manifest
+             via the kernel API endpoint.
+
+        (b)  XPID derivation (Section 6.2): the XPID is derived
+             from this fingerprint concatenated with the agent's
+             Party Registry entry hash.
+
+        (c)  Event Log signing verification: verifiers of
+             Event Log entries use this field as the key
+             fingerprint against which kernel_signature fields
+             are verified.
+
+        (d)  GAR audit record correlation: every GAR audit record
+             entry carries this fingerprint as the soos.governance.
+             kernel_id attribute, enabling cross-session audit
+             record assembly.
+
+5.3.  Issuance Triggers
+5.4.  Staleness
+5.5.  PTD Consistency Requirement
+
+   [Sections 5.3 through 5.5 carried forward from -02 without
+   modification.]
+
+
+6.  XPID: Cross-Principal Identifier  [NEW in -03]
+
+6.1.  Purpose and Design
+
+   The Cross-Principal Identifier (XPID) is a UUID-v5 value that
+   provides a stable, cross-instance identifier for an agent within
+   a KIA-governed federation.  The XPID solves the following problem:
+
+   When an agent with a valid mandate operates across multiple GEC
+   instances -- for example, in a federated deployment where an agent
+   session migrates from one kernel instance to another, or where a
+   monitoring kernel and an execution kernel both govern the same
+   agent -- the agent's identity needs to be correlated across
+   kernel boundaries without requiring direct inter-kernel
+   communication or a trusted third party.
+
+   The XPID provides this correlation.  It is derived deterministically
+   from inputs available to any GEC instance that has verified the
+   agent's Party Registry entry and the GEC's own identity.
+
+   Design properties:
+
+   (a)  Deterministic: any GEC with the inputs can compute the XPID.
+        No coordination between GEC instances is required.
+
+   (b)  Stable: the XPID does not change within the lifetime of
+        the agent's Party Registry entry and the GEC deployment's
+        keypair.
+
+   (c)  Immutable: once derived, the XPID cannot be modified by
+        the agent, by the operator, or by any external party without
+        invalidating the derivation.
+
+   (d)  Non-forgeable without key material: an attacker cannot
+        construct a valid XPID for an agent without possessing
+        either the GEC's FROST key shares or the agent's
+        Party Registry private key.  See Section 15.10 for the
+        CVE-2025-13609 class defense analysis.
+
+   The XPID is recorded in GAR audit entries as the soos.governance.
+   xpid attribute.  It enables regulators and auditors to follow an
+   agent's governance trail across GEC instance boundaries without
+   requiring the kernel to expose the full Session Audit Record
+   to cross-instance parties.
+
+6.2.  Derivation Procedure
+
+   XPID derivation version 1.0 uses UUID version 5 (name-based,
+   SHA-1 namespace) as defined in [RFC9562] Section 5.5.
+
+   The derivation inputs are:
+
+   (a)  namespace: the KIA XPID namespace UUID:
+        "6ba7b814-9dad-11d1-80b4-00c04fd430c8" (the standard
+        DNS UUID namespace, used here as a stable domain).
+
+   (b)  name: the concatenation of:
+        - kernel_keypair_fingerprint (the GEC's Ed25519 or FROST
+          threshold public key SHA-256 fingerprint, as a hex string)
+        - ":" (separator)
+        - party_registry_entry_hash (SHA-256 of the agent's canonical
+          Party Registry entry, as a hex string)
+
+   Procedure:
+
+   XPID = UUID5(namespace, kernel_keypair_fingerprint + ":" +
+                party_registry_entry_hash)
+
+   The party_registry_entry_hash is computed over the canonical
+   JSON of the agent's Party Registry entry, using the same
+   canonical JSON rules as for Event Log signing (Section 7.2).
+
+   CONF-KIA-21:  A GEC MUST derive the XPID using the procedure
+   specified in this section.  Implementations MUST NOT accept a
+   client-supplied XPID as authoritative.  The XPID MUST be derived
+   or verified by the issuing GEC's signing layer.
+
+   CONF-KIA-22:  A GEC MUST record the XPID in every GAR audit
+   entry for the agent session for which it was derived.  The XPID
+   MUST appear as the soos.governance.xpid attribute in every
+   governance span.
+
+6.3.  Cross-Instance Trust Model
+
+   When a receiving GEC instance encounters a GAR audit entry
+   carrying an XPID from a presenting GEC instance:
+
+   (a)  The receiving GEC MUST obtain the presenting GEC's kernel_
+        keypair_fingerprint from the presenting GEC's verified
+        GEC Manifest (per Section 4.6 federation attestation).
+
+   (b)  The receiving GEC MUST obtain the agent's Party Registry
+        entry from the presenting GEC's Party Registry (via the
+        operator-provisioned federation channel) or from a shared
+        Party Registry if one is deployed.
+
+   (c)  The receiving GEC MUST recompute the XPID using the
+        procedure in Section 6.2 and verify that the result
+        matches the XPID in the received GAR audit entry.
+
+   (d)  A XPID that does not verify MUST be treated as an
+        invalid audit entry.  The receiving GEC MUST log
+        XPID_VERIFICATION_FAILED in its own Event Log.
+
+   CONF-KIA-23:  Federated kernels MUST validate the mandate JWT
+   jti against their local Revocation Registry (not solely the
+   XPID) before accepting cross-instance agent events.  The XPID
+   is a correlation identifier, not a trust assertion: a valid XPID
+   does not imply a non-revoked mandate.
+
+6.4.  Revocation Gap (OQ-S-XPID-REV)  [NEW in -03]
+
+   A known open issue exists regarding XPID revocation.  When an
+   agent's mandate is revoked via the MAD session revocation
+   procedure [SOOS-MAD], the XPID value itself is not invalidated --
+   only the mandate JWT jti is added to the Revocation Registry
+   (Section 8).  In a multi-kernel federation where XPID values are
+   shared across kernel boundaries, a revoked agent's XPID may still
+   be presented to a receiving kernel that has not yet received the
+   revocation signal.
+
+   This gap is acknowledged as a known open issue (OQ-S-XPID-REV).
+   See also Section 14.3 and Section 15.9.
+
+   Interim mitigations available in the current architecture:
+
+   (a)  Revocation Registry precedence.  Federated kernels MUST
+        validate the mandate JWT jti against their local Revocation
+        Registry before accepting any cross-instance agent events.
+        A stale XPID from a revoked agent carries a revoked jti;
+        the jti check catches the revocation even if the XPID
+        check cannot.  CONF-KIA-23 enforces this requirement.
+
+   (b)  CAEP revocation stream subscription.  Federated kernels
+        SHOULD subscribe to the originating kernel's CAEP
+        revocation signal stream [SOOS-MAD] to receive propagated
+        revocation events in near-real time.  Section 6.5 specifies
+        the CAEP propagation model.
+
+   (c)  GEC Manifest staleness bounds.  GEC Manifest staleness
+        limits (Section 5.4, recommended maximum staleness 86400
+        seconds) bound the window during which a stale cross-
+        instance trust relationship can be exploited.  A receiving
+        kernel MUST NOT accept federation events from a presenting
+        kernel whose GEC Manifest has exceeded the staleness limit.
+
+   Resolution of OQ-S-XPID-REV is deferred to a KIA successor
+   document addressing the federated revocation protocol.
+
+6.5.  CAEP Propagation for Revocation
+
+   When a mandate revocation event occurs on a presenting GEC
+   instance, the presenting GEC SHOULD propagate the revocation
+   signal to all subscribed receiving GEC instances via the
+   Continuous Access Evaluation Protocol (CAEP) [CAEP] over
+   the Shared Signals Framework (SSF) [RFC9672].
+
+   The CAEP revocation event for XPID-bearing mandates MUST include:
+
+   {
+     "event_type": "mandate_revoked",
+     "subject": {
+       "format": "xpid",
+       "xpid": "<XPID value>"
+     },
+     "jti_revoked": "<revoked mandate JWT jti>",
+     "revocation_scope": "THIS_MANDATE_ONLY" |
+                         "CASCADE_TO_DESCENDANTS",
+     "originating_kernel": "<kernel_keypair_fingerprint>",
+     "revoked_at": "<ISO-8601 UTC>"
+   }
+
+   Receiving kernels that subscribe to the CAEP stream MUST
+   process mandate_revoked events immediately and add the
+   revoked jti to their local Revocation Registry.
+
+   This is an informative model.  The full federated revocation
+   protocol is deferred to a KIA successor document.
+
+
+7.  Event Log Signing (INV-9)
+
+   [Carried forward from draft-sato-soos-kia-02 Section 6 without
+   modification.  Section renumbered 7 to accommodate new Section 6
+   (XPID).]
+
+
+8.  Revocation Registry (INV-11)
+
+   [Carried forward from draft-sato-soos-kia-02 Section 7 without
+   modification.  Section renumbered 8.]
+
+   The following addition applies:  [NEW in -03]
+
+   The XPID does not replace jti-based revocation.  CONF-KIA-23
+   (Section 6.3) requires that federated kernels validate the mandate
+   jti against the local Revocation Registry independently of XPID
+   verification.  This requirement is an interim mitigation for
+   OQ-S-XPID-REV (Section 6.4) and is normative.
+
+
+9.  Policy Change Attestation (INV-10)
+
+   [Carried forward from draft-sato-soos-kia-02 Section 8 without
+   modification.  Section renumbered 9.]
+
+
+10.  Federation and Cross-Instance Verification
+
+   [Carried forward from draft-sato-soos-kia-02 Section 9 without
+   modification.  Section renumbered 10.  The XPID cross-instance
+   verification procedure in Section 6.3 supplements but does not
+   replace the federation attestation requirements in this section.]
+
+
+11.  GEC as RATS Attester
+
+   [Carried forward from draft-sato-soos-kia-02 Section 10 without
+   modification.  Section renumbered 11.]
+
+   RATS WG Note (Vienna presentation):  [NEW in -03]
+
+   KIA-03 presents two novel RATS contributions at IETF 126 Vienna:
+
+   (a)  XPID (Section 6): a derivation-based cross-instance
+        identifier that extends the RATS Attester identity model
+        to multi-kernel federation without requiring a trusted
+        third party.  The XPID addresses the gap identified in
+        the RATS architecture where no standard mechanism exists
+        for correlating Attester-signed artifacts across federation
+        boundaries when the Relying Party domain changes.
+
+   (b)  Attestation channel binding defense (Section 15.11):
+        demonstration that KIA's architecture structurally prevents
+        the CVE-2026-33697 class of relay attack (attestation
+        evidence bound to transport key rather than durable identity
+        anchor) through the GEC keypair independence property.
+        This is presented as a concrete case study for the RATS WG
+        of how the attester architecture can defend against
+        attestation relay.
+
+
+12.  Relationship to WIMSE
+
+   [Carried forward from draft-sato-soos-kia-02 Section 11 without
+   modification.  Section renumbered 12.]
+
+   WIMSE Note (Vienna):  [NEW in -03]
+
+   The XPID (Section 6) addresses a WIMSE gap: no existing WIMSE
+   specification provides a mechanism for correlating workload
+   identity claims across independent trust domains where no shared
+   identity provider exists.  The XPID provides this correlation
+   using only the KIA identity infrastructure already present in
+   both kernels.  This is a natural WIMSE WG discussion point.
+
+
+13.  Conformance
+
+   [Sections CONF-KIA-01 through CONF-KIA-15 carried forward from
+   draft-sato-soos-kia-02 Section 12 without modification.]
+
+   The following conformance requirements are added in -03:
+
+   CONF-KIA-16:  In FROST deployments, each signing participant
+   MUST generate a fresh cryptographically secure nonce for every
+   signing operation.  Nonces MUST NOT be reused across signing
+   operations.  (Section 4.1)
+
+   CONF-KIA-17:  FROST implementations MUST comply with the nonce
+   generation procedure in Section 5 of [FROST].  Implementations
+   MUST NOT cache or pre-generate nonce sets for batch signing.
+
+   CONF-KIA-18:  If the FROST signing cluster falls below quorum,
+   the GEC MUST refuse to sign any KIA artifact.  The GEC MUST NOT
+   degrade to single-signer operation.
+
+   CONF-KIA-19:  On quorum failure, the GEC MUST emit a
+   KERNEL_AUDIT_ANOMALY alert and notify the operator.
+
+   CONF-KIA-20:  FROST threshold reduction below the initial t
+   parameter MUST NOT occur without a new key generation ceremony
+   and new GEC Attestation Certificate.
+
+   CONF-KIA-21:  A GEC MUST derive the XPID using the procedure
+   in Section 6.2.  Implementations MUST NOT accept a client-
+   supplied XPID as authoritative.
+
+   CONF-KIA-22:  A GEC MUST record the XPID in every GAR audit
+   entry for the governed agent session, as the
+   soos.governance.xpid attribute.
+
+   CONF-KIA-23:  Federated kernels MUST validate the mandate JWT
+   jti against their local Revocation Registry before accepting
+   any cross-instance agent events, independently of XPID
+   verification.
+
+
+14.  Open Issues
+
+14.1.  OQ-S-18: Deployment Topology
+
+   [Carried forward from -02 without modification.]
+
+14.2.  OQ-S-19: Agent Runtime Attestation Profile
+
+   [Carried forward from -02 without modification.]
+
+14.3.  OQ-S-XPID-REV: XPID Revocation Gap  [NEW in -03]
+
+   When an agent's mandate is revoked, the XPID derived from that
+   agent's Party Registry entry is not invalidated -- only the jti
+   is added to the Revocation Registry.  In multi-kernel federation,
+   a revoked agent's XPID may be presented to a receiving kernel
+   that has not yet received the revocation signal.
+
+   Three interim mitigations are specified in Section 6.4.  A
+   normative federated revocation protocol that invalidates XPID
+   values on mandate revocation is deferred to a KIA successor
+   document.
+
+   OQ-S-XPID-REV is tracked as HIGH priority for the KIA-04 or
+   successor document.  The CAEP-based propagation model in
+   Section 6.5 is the current candidate mechanism.
+
+
+15.  Security Considerations
+
+15.1.  Private Key Extraction
+
+   The security of the entire SOOS audit trail depends on the kernel
+   keypair private key remaining inside the secure element.  An
+   attacker who extracts the private key can forge any Event Log entry
+   for any SO.  Implementations MUST use hardware-backed key storage
+   wherever available and MUST document the absence of hardware backing
+   as a deployment constraint.
+
+   In FROST deployments (Section 4.1), the private key is distributed
+   as t-of-n secret shares.  An attacker must extract shares from at
+   least t participants to forge signatures.  The security of the
+   FROST deployment is therefore bounded by the security of the t
+   weakest participants' secure elements.  Operators MUST ensure that
+   all n participants' secure elements meet the same hardware security
+   standard.
+
+15.2.  GEC Manifest Forgery
+
+   [Carried forward from -02 without modification.]
+
+15.3.  Policy Hash Manipulation
+
+   [Carried forward from -02 without modification.]
+
+15.4.  Revocation Registry Incompleteness
+
+   [Carried forward from -02 without modification.]
+
+15.5.  Cascade Revocation Race
+
+   [Carried forward from -02 without modification.]
+
+15.6.  Implementation Degradation
+
+   [Carried forward from -02 without modification.]
+
+   Additional consideration for FROST deployments:
+
+   FROST cluster degradation is a distinct form of implementation
+   degradation.  A signing cluster that has lost participants may
+   attempt to operate with a reduced quorum by re-running a FROST
+   threshold reduction.  Section 4.1 (CONF-KIA-20) prohibits this:
+   threshold reduction requires a new key generation ceremony.
+   Operators SHOULD monitor signing cluster participant count and
+   alert before quorum failure becomes imminent.
+
+15.7.  Agent Session Revocation
+
+   [Carried forward from -02 without modification.]
+
+
+15.8.  FROST Nonce Reuse Risk  [NEW in -03]
+
+   KIA-03 introduces FROST threshold signing (Section 4.1) for high-
+   availability GEC keypair deployments.  FROST threshold signatures
+   require each signing participant to generate a fresh nonce for
+   every signing operation.  Nonce reuse in FROST is a critical
+   security failure: two signing operations using the same nonce
+   value from the same participant expose that participant's secret
+   share, enabling an attacker to reconstruct the private key share.
+   If an attacker reconstructs t secret shares, they can forge
+   threshold signatures.
+
+   Attack vector:
+
+   An implementation that caches nonces for performance (pre-
+   generating nonce batches to avoid cryptographic overhead per
+   signing operation) creates a systematic nonce reuse risk.  If
+   the nonce cache is not consumed atomically -- for example, if
+   the signing process crashes mid-batch and the nonce state is
+   restored from a checkpoint -- the same nonce may be reused in
+   a subsequent signing operation.
+
+   Normative defense requirements:
+
+   CONF-KIA-16 (no nonce reuse) and CONF-KIA-17 (FROST nonce
+   procedure compliance) address the protocol-level requirement.
+   The following implementation requirements also apply:
+
+   (a)  Nonce generation state MUST NOT be checkpointed or
+        persisted to storage.  Nonces MUST be generated fresh
+        at signing time, not loaded from stored state.
+
+   (b)  Each FROST signing participant MUST independently generate
+        its own nonce.  Nonces MUST NOT be generated centrally and
+        distributed to participants.
+
+   (c)  Signing operations MUST be serialized within each
+        participant to prevent concurrent nonce generation paths
+        that could produce collisions.
+
+   (d)  If a signing participant crashes during an operation and
+        restarts, the restart MUST NOT resume with any in-progress
+        nonce state.  The participant MUST generate a new nonce
+        for any resumed signing operation.
+
+   Residual risk:
+
+   Hardware-level nonce generation failures (entropy exhaustion in
+   the secure element's RNG) cannot be fully prevented by protocol
+   requirements.  Implementations SHOULD monitor RNG health in
+   FROST signing nodes and alert before entropy exhaustion.
+
+   The normative reference for FROST nonce generation requirements
+   is Section 5 of [FROST].  Implementations MUST comply with the
+   nonce generation procedure specified therein.
+
+   In deployment environments where the FROST signing cluster
+   experiences partial failure and falls back to a reduced quorum,
+   implementations MUST NOT reduce the threshold below the security
+   parameter (t) established at deployment (CONF-KIA-20).  A signing
+   cluster that cannot meet the quorum threshold MUST refuse to sign
+   and MUST emit a KERNEL_AUDIT_ANOMALY alert (CONF-KIA-18, CONF-KIA-19)
+   rather than degrade to single-signer operation.
+
+
+15.9.  XPID Revocation Gap (Known Open Issue)  [NEW in -03]
+
+   The Cross-Principal Identifier (XPID) introduced in Section 6
+   is a UUID-v5 value derived deterministically from the FROST
+   threshold key material of the issuing GEC and the agent's Party
+   Registry entry.  An XPID issued to an agent is bound to that
+   agent's Party Registry entry for the operational lifetime of the
+   mandate.
+
+   A known open issue exists regarding XPID revocation: when an
+   agent's mandate is revoked via the MAD session revocation procedure
+   [SOOS-MAD], the XPID value itself is not invalidated -- only the
+   mandate JWT jti is added to the Revocation Registry (Section 8).
+   In a multi-kernel federation where XPID values are shared across
+   kernel boundaries (Section 6.3), a revoked agent's XPID may still
+   be presented to a receiving kernel that has not yet received the
+   revocation signal.
+
+   This gap is acknowledged as a known open issue (OQ-S-XPID-REV,
+   Section 14.3).  Mitigations available in the current architecture:
+
+   (a)  Federated kernels MUST validate the mandate JWT jti against
+        their local Revocation Registry, not solely the XPID, before
+        accepting cross-instance agent events (CONF-KIA-23).
+
+   (b)  Federated kernels SHOULD subscribe to the originating
+        kernel's CAEP revocation signal stream [SOOS-MAD] to
+        receive propagated revocation events in near-real time
+        (Section 6.5).
+
+   (c)  GEC Manifest staleness limits (Section 5.4) bound the
+        window during which a stale cross-instance trust
+        relationship can be exploited.
+
+   Resolution of this open issue is deferred to a KIA successor
+   document addressing the federated revocation protocol.
+
+
+15.10.  Identity Takeover via Claimed Identifier --
+         CVE-2025-13609 Class Defense  [NEW in -03]
+
+   Systems that accept agent identity via self-asserted identifiers
+   are vulnerable to identity takeover through duplicate registration,
+   a class demonstrated by CVE-2025-13609 (CVSS 8.2, High) in which
+   an attacker registered a new agent using a different TPM device
+   while claiming an existing agent's UUID, overwriting the legitimate
+   agent's identity and enabling impersonation.
+
+   KIA's XPID design structurally prevents this attack class.  The
+   XPID is not an asserted value -- it is derived deterministically
+   from the GEC's FROST threshold key material and the agent's Party
+   Registry entry.  An attacker cannot claim an existing XPID without:
+
+   (a)  Possessing the original FROST key shares used to derive it
+        (specifically, the threshold public key whose fingerprint
+        is the kernel_keypair_fingerprint used in the derivation),
+        OR
+
+   (b)  Compromising the Party Registry entry to which the XPID is
+        bound (substituting a different party_registry_entry_hash
+        in the derivation would produce a different XPID).
+
+   Either condition requires a more fundamental compromise than
+   duplicate identifier registration.  The structural prevention
+   holds because:
+
+   (i)   The XPID derivation inputs (kernel_keypair_fingerprint and
+         party_registry_entry_hash) are both verifiable by any party
+         with access to the GEC Manifest and the Party Registry.
+
+   (ii)  An attacker who presents a fabricated XPID that does not
+         match the derivation from the verified inputs is immediately
+         detectable by any receiving kernel performing XPID
+         verification (Section 6.3).
+
+   (iii) The GEC Manifest signature (over kernel_keypair_fingerprint)
+         is hardware-rooted and operator-certified.  Substituting a
+         different kernel_keypair_fingerprint requires forging the
+         GEC Manifest -- which requires the operator root keypair
+         or the GEC's signing key.
+
+   Implementations MUST NOT accept a client-supplied XPID as
+   authoritative (CONF-KIA-21).  The XPID MUST be derived or
+   verified by the issuing GEC's signing layer, not taken from
+   agent-supplied metadata.
+
+   This structural property is the positive differentiator KIA
+   provides over attestation systems that validate identity at
+   registration time but do not cryptographically bind the identifier
+   to the hardware or key material that generated it.
+
+
+15.11.  Attestation Channel Binding --
+         CVE-2026-33697 Class Defense  [NEW in -03]
+
+   Attestation systems that bind attestation evidence to a transport
+   key rather than to a durable identity anchor are vulnerable to
+   relay attacks when the transport key can be extracted.
+   CVE-2026-33697 (Cocos AI, High) demonstrated this class:
+   attestation evidence was bound to an ephemeral TLS key but not
+   to the TLS channel itself, enabling an attacker who could extract
+   the ephemeral key to relay or divert the attested TLS session while
+   impersonating the legitimate attested service.
+
+   KIA prevents this attack class structurally.  KIA identity is
+   anchored to the GEC's Ed25519 keypair (or FROST threshold keypair)
+   held in the secure element -- not to any transport-layer key.
+   The GEC Manifest carries the kernel_keypair_fingerprint as a
+   durable, hardware-backed identity anchor.  An attacker who
+   intercepts a transport session cannot forge the kernel_signature
+   on Event Log entries, because that signature is produced by the
+   secure-element-held GEC keypair, not by any key material visible
+   at the transport layer.
+
+   Specifically:
+
+   (a)  All Event Log entries are signed by the GEC keypair (INV-9),
+        which is independent of any TLS or transport session.  Event
+        Log integrity does not depend on transport channel integrity.
+
+   (b)  The GEC Manifest is signed by the GEC keypair and carries
+        the attestation_certificate issued by the operator root
+        keypair.  Verifiers authenticate the GEC Manifest through
+        the operator trust chain (Section 3), not through the
+        transport session.  A relay attacker who intercepts the GEC
+        Manifest delivery cannot produce a valid manifest_signature
+        over a modified manifest without the GEC keypair.
+
+   (c)  In FROST deployments (Section 4.1), the identity anchor is
+        the FROST signing cluster's threshold public key -- a
+        distributed secret across n participants' secure elements.
+        A relay attacker would need to extract t-of-n secret shares
+        to forge the identity anchor.
+
+   (d)  The XPID (Section 6.2) is derived from the kernel_keypair_
+        fingerprint -- itself a hash of the hardware-backed public
+        key.  An attacker cannot forge a valid XPID for a session
+        without the GEC keypair.
+
+   Implementations MUST NOT use transport-layer keys (TLS session
+   keys, ephemeral ECDH values) as the binding for attestation
+   evidence.  Attestation MUST be anchored to the hardware-backed
+   GEC keypair through the KIA trust chain (Section 3).
+
+   This is the structural defense that KIA's design provides against
+   the CVE-2026-33697 attack class.  KIA-03 presents this as a
+   concrete case study for the RATS WG of how the attester
+   architecture can defend against attestation relay attacks when
+   the identity anchor is hardware-rooted and transport-independent.
+
+
+16.  IANA Considerations  [UPDATED in -03]
+
+   The IANA Considerations section from -02 is updated as follows.
+
+   This document requests the creation of the following IANA registry:
+
+   Registry Name:
+      SOOS GEC Manifest Extension Fields
+
+   Registration Procedure:
+      Specification Required [RFC8126]
+
+   Initial Values:
+
+   +-----------------------------+--------+---------------------------+
+   | Field Name                  | Type   | Description               |
+   +-----------------------------+--------+---------------------------+
+   | xpid_derivation_version     | string | XPID algorithm version    |
+   |                             |        | (Section 6.2); "1.0" or   |
+   |                             |        | "none"                    |
+   +-----------------------------+--------+---------------------------+
+
+   This document also requests registration of the following XPID
+   event type in the GAR ALE Type Registry [I-D.sato-soos-gar]:
+
+   +--------------------+-------------------------------------------+
+   | ALE Name           | Description                               |
+   +--------------------+-------------------------------------------+
+   | XPID_DERIVED       | XPID derived for agent in session; fired  |
+   |                    | at session initialization. Required fields:|
+   |                    | session_id, agent_party_id,               |
+   |                    | kernel_keypair_fingerprint, xpid,         |
+   |                    | derivation_version, derived_at.           |
+   |                    |                                           |
+   | XPID_VERIFICATION_ | XPID verification failed in cross-        |
+   | FAILED             | instance federation. Required fields:     |
+   |                    | session_id, received_xpid,                |
+   |                    | expected_xpid, receiving_kernel_id,       |
+   |                    | presenting_kernel_id, detected_at.        |
+   +--------------------+-------------------------------------------+
+
+   This document requests registration of the following CAEP event
+   type [CAEP]:
+
+   +--------------------+-------------------------------------------+
+   | Event Type         | Description                               |
+   +--------------------+-------------------------------------------+
+   | mandate_revoked    | Mandate JWT revocation with XPID subject  |
+   |                    | (Section 6.5). Subject format: "xpid".    |
+   +--------------------+-------------------------------------------+
+
+
+17.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017,
+              <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC9334]  Birkholz, H., Thaler, D., Richardson, M., Smith, N.,
+              and W. Pan, "Remote ATtestation procedureS (RATS)
+              Architecture", RFC 9334, DOI 10.17487/RFC9334,
+              January 2023,
+              <https://www.rfc-editor.org/rfc/rfc9334>.
+
+   [RFC9562]  Davis, K., Peabody, B., and P. Leach, "Universally
+              Unique IDentifiers (UUIDs)", RFC 9562, May 2024,
+              <https://www.rfc-editor.org/rfc/rfc9562>.
+
+   [FROST]    Komlo, C. and Goldberg, I., "FROST: Flexible Round-
+              Optimized Schnorr Threshold Signatures",
+              draft-irtf-cfrg-frost, Work in Progress, 2026.
+              [NEW in -03]
+
+   [WIMSE-ARCH]
+              Salomoni, D. et al., "WIMSE Architecture",
+              draft-ietf-wimse-arch-07, Work in Progress, March 2026.
+
+   [SOOS-AEP]  Sato, T., "Agent Execution Protocol",
+               draft-sato-soos-aep-02, Work in Progress, June 2026.
+
+   [SOOS-CAP]  Sato, T., "Constitutional AI Protocol",
+               draft-sato-soos-cap-04, Work in Progress, June 2026.
+               [UPDATED version ref]
+
+   [SOOS-GAR]  Sato, T., "Governance Audit Record",
+               draft-sato-soos-gar-03, June 2026.
+               [UPDATED version ref]
+
+   [SOOS-HEM]  Sato, T., "Human Escalation Mechanism",
+               draft-sato-soos-hem-05, Work in Progress, July 2026.
+               [UPDATED version ref]
+
+   [SOOS-MAD]  Sato, T., "Multi-Agent Delegation",
+               draft-sato-soos-mad-03, Work in Progress, June 2026.
+
+   [SOOS-MJWT] Sato, T., "Mandate JWT",
+               draft-sato-soos-mjwt-02, July 2026.
+               [UPDATED version ref]
+
+   [SOOS-SOV]  Sato, T., "Sovereign Object",
+               draft-sato-soos-sov-02, June 2026.
+
+
+18.  Informative References
+
+   [SOOS-IDP]  Sato, T., "Intent Declaration Primitive",
+               draft-sato-soos-idp-05, June 2026.
+
+   [RFC8037]  Liusvaara, I., "CFRG Elliptic Curve Diffie-Hellman
+              (ECDH) and Signatures in JSON Object Signing and
+              Encryption (JOSE)", RFC 8037, DOI 10.17487/RFC8037,
+              January 2017.
+
+   [RATS-CORIM]
+               Birkholz, H. et al., "Concise Reference Integrity
+               Manifest (CoRIM)", Work in Progress, 2026.
+
+   [SPIFFE-ID]
+               SPIFFE Project, "Secure Production Identity Framework
+               for Everyone (SPIFFE)", Work in Progress,
+               draft-ietf-spiffe-spiffe-id, 2026.
+
+   [SCITT-ARCH]
+               Birkholz, H. et al., "An Architecture for Trustworthy
+               and Transparent Digital Supply Chains",
+               draft-ietf-scitt-architecture, Work in Progress, 2026.
+
+   [CAEP]     Cappalli, T. and Tschofenig, H., "OpenID Continuous
+               Access Evaluation Profile 1.0", OpenID Foundation,
+               2022.
+
+   [RFC9672]  Backman, A., et al., "Shared Signals: A Secure
+               Webhooks Framework", RFC 9672, November 2024.
+
+   [CVE-2025-13609]
+               Red Hat, "CVE-2025-13609: Keylime registrar allows
+               identity takeover via duplicate UUID registration",
+               CVSS 8.2, November 2025.
+               <https://access.redhat.com/security/cve/CVE-2025-13609>
+               [NEW in -03]
+
+   [CVE-2026-33697]
+               "CVE-2026-33697: Relay attack vulnerability in
+               Cocos AI attested TLS implementation", High, 2026.
+               [NEW in -03]
+
+
+Appendix B.  Related Work
+
+B.1.  RATS Architecture (RFC 9334)
+
+   [Carried forward from -02 without modification.]
+
+B.2.  WIMSE
+
+   [Carried forward from -02 without modification.]
+
+B.3.  SPIFFE / SPIRE
+
+   [Carried forward from -02 without modification.]
+
+B.4.  SCITT
+
+   [Carried forward from -02 without modification.]
+
+B.5.  TCG TPM and Hardware Attestation
+
+   [Carried forward from -02 without modification.]
+
+B.6.  SOOS Companion Drafts  [UPDATED in -03]
+
+   KIA is one of twelve SOOS IETF individual submissions.  The drafts
+   that directly depend on KIA are:
+
+   draft-sato-soos-gar-03   Governance Audit Record.  Submits KIA-
+                            signed Event Log entries to a SCITT
+                            transparency service.  GAR-03 adds
+                            ALE-NEW-01 through ALE-NEW-04 (Section
+                            21.3 of [SOOS-GAR]) and the soos.gar.*
+                            OTel attribute namespace.  XPID is
+                            recorded as soos.governance.xpid in
+                            every GAR governance span.
+
+   draft-sato-soos-mad-03   Multi-Agent Delegation.  All cluster
+                            events are signed by KIA.  MAD is also
+                            the source of the CAEP revocation stream
+                            used by XPID revocation propagation
+                            (Section 6.5).
+
+   draft-sato-soos-hem-05   Human Escalation Mechanism.  HEM events
+                            are KIA-signed (CONF-KIA-10).  INV-HEM-01
+                            (The Surfacing Obligation) references the
+                            L1/L2/L3 conformance levels defined in KIA.
+
+   draft-sato-soos-aep-02   Agent Execution Protocol.  AEP session
+                            events are KIA-signed.
+
+   draft-sato-soos-mjwt-02  Mandate JWT.  The MJWT aud claim MUST
+                            be bound to the kernel_keypair_fingerprint
+                            from the GEC Manifest.  MJWT-02 adds the
+                            consent_scope claim; KIA-03 XPID is an
+                            additional MJWT-resolvable identity
+                            correlation primitive.
+
+   draft-sato-soos-cap-04   Constitutional AI Protocol.  CAP Violation
+                            Records are signed by the GIK.  BIOMETRIC_
+                            SIGNAL_INFERENCE Tier 0-A violation
+                            detection uses the consent_scope in the
+                            session MJWT, which is aud-bound to the
+                            kernel_keypair_fingerprint.
+
+
+Appendix C.  Vibe Coding Assets  [UPDATED in -03]
+
+C.1.  Protocol Summary
+
+   Protocol: Kernel Identity and Attestation (KIA)
+   Version:  draft-sato-soos-kia-03
+   Family:   SOOS protocol suite
+   Role:     Layer 0 signing and attestation -- GEC keypair management
+             (including FROST threshold option), GEC Manifest issuance,
+             XPID derivation, Event Log signing (INV-9), and Revocation
+             Registry maintenance (INV-11)
+   Status:   Standards Track
+   Stack position: Below Cedar and all other SOOS protocols.
+                   Depended upon by GAR, MJWT, MAD, HEM, AEP, CAP.
+   Vienna note: Reference spec for RATS WG + WIMSE WG presentations.
+
+C.2.  Key Identifiers
+
+   Trust chain: Hardware Root -> Operator Root Keypair ->
+     GEC Attestation Certificate -> GEC Keypair (or FROST
+     threshold keypair) -> Event Log entries -> Cedar evaluations
+     -> Sovereign Objects
+
+   New in -03:
+     XPID = UUID5("6ba7b814-...", kernel_keypair_fingerprint +
+                  ":" + party_registry_entry_hash)
+     FROST deployment marker: deployment_constraints[] entry
+       "frost:t-of-n:<t>-<n>"
+     xpid_derivation_version: "1.0" (normative) or "none"
+
+   GEC Manifest fields (RATS Evidence extension):
+     loaded_policy_ids[], cedar_policy_hash, kernel_version,
+     attestation_timestamp, deployment_constraints[],
+     xpid_derivation_version  [NEW in -03]
+
+   Conformance identifiers: CONF-KIA-01 through CONF-KIA-23
+   Invariants: INV-9 (Event Log signing), INV-10 (policy change
+     attestation), INV-11 (Revocation Registry)
+
+   Open issues: OQ-S-18 (deployment topology), OQ-S-19 (agent
+     runtime attestation profile), OQ-S-XPID-REV (XPID revocation
+     gap) [NEW in -03]
+
+   CVE defenses: CVE-2025-13609 class (§15.10),
+                 CVE-2026-33697 class (§15.11) [NEW in -03]
+
+C.3.  Canonical Reference
+
+   Specification:  https://soosproject.ai/drafts/kia
+   Datatracker:    https://datatracker.ietf.org/doc/draft-sato-soos-kia/
+   Stack overview: https://soosproject.ai/stack
+
+
+Acknowledgements
+
+   The KIA trust chain architecture is modelled on the RATS
+   architecture defined in RFC 9334 and the SPIFFE identity framework.
+   The hardware attestation model follows TCG TPM 2.0 specifications.
+   The SCITT integration in Appendix B.4 builds on the
+   draft-ietf-scitt-architecture design.
+
+   FROST threshold signing support (Section 4.1) was added in -03
+   following the SOOS UpgradeSprint Day 8 security pass (July 1, 2026,
+   DR-DAY8-SEC-01).  The FROST nonce reuse risk analysis (Section 15.8)
+   and the implementation requirements are sourced from that session.
+
+   The XPID design (Section 6) was developed during the SOOS
+   UpgradeSprint (June 23 -- July 1, 2026) as the cross-instance
+   identity correlation primitive.  The CVE-2025-13609 class defense
+   analysis (Section 15.10) and the CVE-2026-33697 class defense
+   analysis (Section 15.11) were developed as part of the Day 8
+   security pass and are presented as RATS WG case studies at IETF 126
+   Vienna.
+
+   The authors thank the RATS Working Group, the WIMSE Working Group,
+   and the SCITT community for foundational work that made KIA's
+   design possible.  The RATS WG speaking request for Vienna is
+   coordinated with Ned Smith.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/kia
+
