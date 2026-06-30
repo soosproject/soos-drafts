@@ -1,0 +1,1276 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Informational                          30 June 2026
+Expires: 30 December 2026
+
+
+       Cross-Principal Agent Communication — PEER Transaction Record
+                      draft-sato-soos-peer-00
+
+Abstract
+
+   When two independently-principaled AI agents transact with each
+   other, each operates under its own mandate root, its own Governed
+   Execution Context (GEC), and its own audit chain.  No shared kernel
+   exists to mediate the exchange.  Existing SOOS orchestration
+   primitives (MAD, SACR) govern sub-agent relationships within one
+   mandate tree; they do not address the peer case.
+
+   This document defines the PEER protocol: a problem statement and
+   architecture for cross-principal agent communication.  PEER
+   introduces the PEER Transaction Record (PTR) as a new first-class
+   SOOS primitive providing a jointly-derived correlation artifact
+   (ptxn_id) that links the two independent audit chains produced by a
+   cross-principal transaction — without requiring a neutral third
+   party, shared kernel state, or cross-principal constitutional layer.
+
+   This document is a problem statement and architecture draft.
+   Normative ALE schemas, dispute resolution procedures, and full PTR
+   field specifications are deferred to draft-sato-soos-peer-01
+   (post-Vienna).
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as
+   reference material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 30 December 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . .   4
+     1.1.  The Problem: Two Agents, Two Roots, One Transaction . .  4
+     1.2.  Empirical Motivation: The Provenance Paradox  . . . . .  5
+     1.3.  The Solution Model  . . . . . . . . . . . . . . . . . .  6
+     1.4.  Relationship to Adjacent Work . . . . . . . . . . . . .  6
+   2.  Conventions and Definitions . . . . . . . . . . . . . . . .  7
+   3.  What PEER Is and Is Not . . . . . . . . . . . . . . . . . .  9
+     3.1.  What PEER Does  . . . . . . . . . . . . . . . . . . . .  9
+     3.2.  What PEER Does Not Do . . . . . . . . . . . . . . . . .  9
+     3.3.  Boundary Against MAD / Sub-Agent Architecture . . . . . 10
+     3.4.  Boundary Against ACD  . . . . . . . . . . . . . . . . . 10
+   4.  Architecture Overview . . . . . . . . . . . . . . . . . . . 11
+     4.1.  Two-GEC Model . . . . . . . . . . . . . . . . . . . . . 11
+     4.2.  Mutual Attestation Handshake  . . . . . . . . . . . . . 12
+     4.3.  Pre-Call Gates: RGP and ACD . . . . . . . . . . . . . . 13
+     4.4.  Transport Layer Composability: AIP IBCT . . . . . . . . 13
+   5.  PEER Transaction Record (PTR)  . . . . . . . . . . . . . . 14
+     5.1.  ptxn_id Derivation  . . . . . . . . . . . . . . . . . . 14
+     5.2.  PTR Candidate Schema  . . . . . . . . . . . . . . . . . 15
+     5.3.  PTR Placement in the Stack  . . . . . . . . . . . . . . 16
+     5.4.  GAR Integration . . . . . . . . . . . . . . . . . . . . 17
+   6.  Relationship to Kuehlewind/Birkholz Audit Architecture  . . 17
+     6.1.  SOOS GAR as WI-1/WI-4/WI-5/WI-6 Implementation  . . .  18
+     6.2.  PEER as the Cross-Domain Open Case  . . . . . . . . . . 18
+   7.  Open Issues . . . . . . . . . . . . . . . . . . . . . . . . 19
+   8.  Security Considerations . . . . . . . . . . . . . . . . . . 20
+   9.  Privacy Considerations  . . . . . . . . . . . . . . . . . . 22
+   10. IANA Considerations . . . . . . . . . . . . . . . . . . . . 22
+   11. References  . . . . . . . . . . . . . . . . . . . . . . . . 23
+     11.1.  Normative References . . . . . . . . . . . . . . . . . 23
+     11.2.  Informative References . . . . . . . . . . . . . . . . 23
+   Appendix A.  Worked Example: Booking Request Across Two Operators 25
+   Appendix B.  Related Work . . . . . . . . . . . . . . . . . . . 27
+     B.1.  Existing Frameworks and IETF Drafts . . . . . . . . . . 27
+     B.2.  SOOS Companion Drafts . . . . . . . . . . . . . . . . . 28
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . 29
+
+
+1.  Introduction
+
+1.1.  The Problem: Two Agents, Two Roots, One Transaction
+
+   Every hotel reservation, freight booking, and financial settlement
+   made by an AI agent on behalf of a human principal will, eventually,
+   require that agent to call another agent — one that it does not
+   own, did not spawn, and whose mandate it cannot inspect.
+
+   This is not a sub-agent case.  When Agent A (a travel booking
+   agent, operating under a mandate issued by a travel platform) sends
+   a booking request to Agent B (a property management agent, operating
+   under a mandate issued by a hotel group), neither agent has
+   authority over the other.  There is no shared mission, no shared
+   GEC, no shared audit chain.  The two agents meet at a transaction
+   boundary — and existing SOOS primitives stop exactly there.
+
+   The Sovereign Object OS (SOOS) protocol suite governs agentic AI
+   systems through a layered stack: constitutional prohibitions (CAP),
+   mandate issuance (MJWT), sub-agent orchestration (MAD/SACR), action
+   endorsement (AEP), and audit logging (GAR).  Each of these operates
+   within one mandate tree, under one root principal, governed by one
+   GEC.  None specifies what happens when two independently-rooted
+   GECs must transact with each other.
+
+   The failure mode is not hypothetical.  Without a cross-principal
+   correlation primitive:
+
+   o  An auditor reconstructing a disputed transaction has no
+      mechanism to link Agent A's GAR record to Agent B's GAR record.
+      Each record references an action; neither references the same
+      transaction.
+
+   o  Regulators examining a multi-party AI system cannot establish
+      that the booking Agent A claimed to initiate is the same booking
+      Agent B claimed to accept.  The audit trail is structurally
+      ambiguous.
+
+   o  A party attempting to forge or replay a cross-principal
+      transaction faces no cryptographic barrier — there is no joint
+      commitment artifact that requires both parties' participation to
+      produce.
+
+   This document defines the PEER protocol to close this gap.  The
+   PEER Transaction Record (PTR) is a jointly-derived correlation
+   artifact that links two independent audit chains at the moment of
+   transaction — without requiring either party to disclose its
+   mandate contents to the other, and without requiring a trusted
+   third party.
+
+   The canonical URL for this draft is:
+   https://soosproject.ai/drafts/peer
+
+1.2.  Empirical Motivation: The Provenance Paradox
+
+   The architectural gap PEER addresses is not merely theoretical.
+   Prakash (2026) [PROVENANCE-PARADOX] presents the "Provenance
+   Paradox in Multi-Agent LLM Routing": in systems where agents
+   self-report their quality scores, routing performance is measurably
+   worse than random selection (mean quality score 0.55 vs. 0.68 for
+   random, p<0.001).  Attested routing — where agent capability claims
+   are externally verified — achieves near-optimal performance.
+
+   This result demonstrates that honor-system delegation governance
+   fails adversarially.  When agents self-certify their identity and
+   capability at a transaction boundary, the certification is
+   unverifiable and therefore gameable.  The PEER protocol replaces
+   self-certification with a cryptographic mutual attestation handshake
+   and a jointly-derived transaction identifier that neither party can
+   produce unilaterally.
+
+   The implication for the audit correlation problem is direct: a
+   ptxn_id that requires both GECs' cryptographic participation is
+   unforgeable by either party acting alone.  An audit chain that
+   includes the ptxn_id is therefore immune to the class of attacks
+   where one party claims a transaction occurred (or did not occur)
+   without the other's cooperation.
+
+1.3.  The Solution Model
+
+   PEER operates as a thin correlation layer above the existing SOOS
+   stack.  It does not replace or extend any existing primitive.
+   Instead, it adds one new artifact — the PEER Transaction Record
+   (PTR) — and one new identifier — the Cross-Principal Transaction
+   ID
+   (ptxn_id) — that each party's GEC independently computes and
+   independently stores in its own GAR chain.
+
+   PEER reuses:
+   o  KIA (draft-sato-soos-kia-03) for persistent identity attestation
+      by both parties.
+   o  RGP (draft-sato-soos-rgp-00) as the capability discovery gate
+      before engagement.
+   o  ACD (draft-sato-soos-acd-00) as the compliance disclosure gate
+      for regulated providers.
+   o  AEP (draft-sato-soos-aep-02) as the session governance layer
+      for each party's side of the transaction.
+   o  GAR (draft-sato-soos-gar-03) as the per-party audit record,
+      linked by ptxn_id as a cross-reference field.
+
+   PEER adds:
+   o  PTR: the PEER Transaction Record (new primitive, this document).
+   o  ptxn_id: the jointly-derived cross-principal transaction ID
+      (new identifier, this document).
+   o  ALE-PEER-01 through ALE-PEER-04: candidate GAR event types for
+      cross-principal transaction lifecycle events (candidate
+      registration; normative schemas in PEER-01).
+
+1.4.  Relationship to Adjacent Work
+
+   PEER composes with, rather than competes with, the following:
+
+   AIP (draft-prakash-aip-00): The Agent Identity Protocol defines
+   Invocation-Bound Capability Tokens (IBCT) using Ed25519 delegation
+   chains and Biscuit/Datalog scope attenuation.  AIP operates at the
+   transport token layer.  PEER operates at the session governance and
+   audit correlation layer above it.  In a PEER exchange, an AIP IBCT
+   is a candidate transport token for the mutual attestation handshake
+   (Section 4.4); KIA is the persistent identity layer above the IBCT.
+   These layers compose; they do not compete.
+
+   Kuehlewind/Birkholz Audit Architecture (draft-kuehlewind-
+   audit-architecture-00): This draft defines an architecture for
+   auditing AI agent delegation across distributed systems, identifying
+   six Potential Work Items (WI-1 through WI-6).  SOOS GAR provides
+   normative implementations of WI-1 (audit record format), WI-4
+   (authorization transition records), WI-5 (interaction records), and
+   WI-6 (transparency service integration via Session Block).  PEER
+   addresses the cross-domain case that the Kuehlewind/Birkholz draft
+   explicitly leaves open: "correlation emerges from consistent use of
+   shared identifiers" — a property that cannot hold when participants
+   have no shared GEC.  See Section 6.
+
+   WIMSE (draft-ietf-wimse-workload-identity): WIMSE provides workload
+   identity for agentic systems.  KIA (draft-sato-soos-kia-03)
+   provides the persistent identity layer that PEER builds on, and is
+   compatible with WIMSE identity substrates.
+
+   A2A Protocol: Google A2A defines agent-to-agent communication for
+   independent agents.  A2A operates at the application message layer.
+   PEER operates at the governance and audit correlation layer.  A2A
+   messages carrying a PTR in their metadata would satisfy the PEER
+   mutual attestation requirement without modification to the A2A
+   message format.
+
+   AIMS (draft-klrc-aiagent-auth-02): The AIMS model (WIMSE + SPIFFE +
+   OAuth composition) focuses on authentication.  PEER begins after
+   authentication is established: mutual attestation, capability
+   gating, and audit correlation are the additional properties PEER
+   specifies.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY",
+   and "OPTIONAL" in this document are to be interpreted as described
+   in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in
+   all capitals, as shown here.
+
+   Cross-Principal Transaction:
+      A transaction between two AI agents each operating under an
+      independent mandate root, where neither agent's principal is the
+      same entity as, or a delegate of, the other agent's principal,
+      and no shared Governed Execution Context (GEC) governs both
+      sides.
+
+   PEER:
+      The Cross-Principal Agent Communication protocol defined in this
+      document.  PEER governs the attestation, gating, and audit
+      correlation requirements for a Cross-Principal Transaction.
+      PEER does not govern the business payload of the transaction.
+
+   PEER Transaction Record (PTR):
+      A jointly-produced governance artifact capturing the identities,
+      timestamp, correlation identifier, and pre-call gate references
+      for a Cross-Principal Transaction.  The PTR is produced by both
+      GECs independently and stored in each party's GAR chain.  The
+      PTR is not a business record; it is a governance correlation
+      record.
+
+   ptxn_id (Cross-Principal Transaction ID):
+      A deterministically-derived identifier produced by the Initiating
+      Agent's GEC and countersigned by the Responding Agent's GEC,
+      uniquely identifying a single Cross-Principal Transaction.
+      Neither party can produce a valid ptxn_id for a transaction the
+      other did not participate in.  The ptxn_id serves as the
+      correlation key linking both parties' GAR entries for the same
+      transaction.
+
+   Initiating Agent:
+      The agent that opens a Cross-Principal Transaction by presenting
+      its KIA identity and requesting the Responding Agent's
+      participation.  The Initiating Agent's GEC generates the
+      ptxn_id.
+
+   Responding Agent:
+      The agent that receives a Cross-Principal Transaction request,
+      validates the Initiating Agent's KIA identity, and countersigns
+      the ptxn_id to confirm mutual participation.
+
+   GEC (Governed Execution Context):
+      The SOOS kernel runtime that enforces mandate constraints,
+      evaluates Cedar policies, endorses actions, and records audit
+      events for a single agent.  Defined in draft-sato-soos-kee-00.
+      Each party in a PEER exchange has its own GEC; no GEC spans
+      both parties.
+
+   KIA (Kernel Identity Attestation):
+      The persistent, independently-attested agent identity defined in
+      draft-sato-soos-kia-03.  Both parties in a PEER exchange hold
+      KIA identities; mutual attestation is the presentation and
+      validation of each party's KIA identity by the other.
+
+   ALE-PEER:
+      A class of Agent Lifecycle Event (GAR-03) types specific to
+      Cross-Principal Transactions.  Candidate types defined in this
+      document (Section 5.4); normative schemas deferred to PEER-01.
+
+
+3.  What PEER Is and Is Not
+
+3.1.  What PEER Does
+
+   PEER specifies three things:
+
+   (a) Mutual KIA attestation: the requirement that each party present
+       and validate the other's persistent KIA identity before a
+       Cross-Principal Transaction proceeds.  This replaces the use
+       of API keys, shared secrets, or implicit trust assumptions.
+
+   (b) Pre-call gating: the requirement that an RGP capability
+       discovery query and, where the Responding Agent is a regulated
+       provider, an ACD compliance query complete successfully before
+       the transaction payload is transmitted.
+
+   (c) PTR issuance and GAR linkage: the requirement that both parties'
+       GECs independently produce a PTR containing the ptxn_id and
+       record it in their respective GAR chains, creating a
+       cryptographically-linked pair of audit records for the same
+       transaction.
+
+   The three requirements together solve the audit correlation
+   problem: an auditor holding both parties' GAR chains can reconstruct
+   the full cross-principal transaction by locating matching ptxn_id
+   values across the two chains.
+
+3.2.  What PEER Does Not Do
+
+   PEER does not:
+
+   o  Standardize the business payload of the transaction.  The content
+      of the booking request, availability response, or settlement
+      instruction is governed by the domain protocol in use (e.g., ATP
+      for travel bookings).  PEER governs the governance scaffolding
+      around that payload, not the payload itself.
+
+   o  Establish a cross-principal constitutional layer.  Each party's
+      CAP prohibitions govern that party's GEC independently.  PEER
+      does not expose, propagate, or compare the two parties'
+      constitutional policies.
+
+   o  Resolve disputes between conflicting GAR records.  If Party A's
+      GAR records a transaction as COMPLETE and Party B's GAR records
+      it as FAILED, PEER provides the correlation key (ptxn_id) that
+      links the conflicting records, but does not specify the dispute
+      resolution procedure.  That is deferred to OQ-PEER-03
+      (Section 7).
+
+   o  Require either party to disclose its mandate contents to the
+      other.  The PTR contains only identity references (KIA IDs),
+      the ptxn_id, pre-call gate session references, and the
+      transaction class.  Mandate scope, Cedar policies, and
+      constitutional configurations remain opaque to the counterparty.
+
+3.3.  Boundary Against MAD / Sub-Agent Architecture
+
+   PEER is architecturally distinct from the sub-agent orchestration
+   governed by draft-sato-soos-mad-03.
+
+   In the sub-agent case (MAD/SACR), one GEC governs the mission and
+   spawns sub-agents whose authority is derived from a single MJWT
+   via the mandate_slice.parent_mjwt_jti field.  All sub-agents share
+   one mandate root, one accountable principal, and one audit chain.
+   Communication between sub-agents is mediated by the Mission Status
+   SO through the parent GEC; direct sub-agent-to-sub-agent messaging
+   is discouraged precisely because shared kernel state makes mediation
+   possible (and audit-traceable).
+
+   In the PEER case, no shared mandate root exists.  Direct
+   communication is not a governance gap to be closed — it is the only
+   mechanism that can exist when two independent principals' agents
+   transact.  Requiring mediation through a shared kernel state would
+   require a shared kernel, which does not exist in the peer scenario
+   and cannot be created without appointing a third-party GEC that
+   neither principal controls.
+
+   The practical boundary: if both agents' MJWT chains trace to the
+   same root principal, use MAD.  If they trace to independent root
+   principals, use PEER.
+
+3.4.  Boundary Against ACD
+
+   ACD (draft-sato-soos-acd-00) specifies the Agent Compliance
+   Disclosure record: a machine-readable declaration by a governed
+   agent of the compliance constraints under which it operates.  ACD
+   is queried via the /.well-known/soos-acd URI before engaging a
+   regulated provider.
+
+   PEER is not an ACD extension.  ACD is a pre-call disclosure gate
+   that PEER reuses as-is (Section 4.3).  The acd_session_id from a
+   successful ACD query is carried into the PTR as a linkage field,
+   establishing a record that the pre-call compliance check was
+   performed.  ACD governs what the Responding Agent discloses about
+   its constraints; PEER governs the attestation, gating, and audit
+   correlation of the transaction as a whole.
+
+   The structural distinction: ACD is a pre-call disclosure (what I am
+   constrained to do); PTR is a runtime/audit correlation artifact
+   (what we jointly did and when).  They compose; they do not overlap.
+
+
+4.  Architecture Overview
+
+4.1.  Two-GEC Model
+
+   A Cross-Principal Transaction involves two independent GECs.  The
+   following ASCII diagram shows the protocol structure.
+
+                INITIATING SIDE              RESPONDING SIDE
+                  (Agent A)                    (Agent B)
+
+   Principal A                              Principal B
+       |                                        |
+       v                                        v
+   +----------+                           +----------+
+   |  GEC-A   |                           |  GEC-B   |
+   | Cedar    |                           | Cedar    |
+   | MJWT-A   |                           | MJWT-B   |
+   | KIA-A    |                           | KIA-B    |
+   +----+-----+                           +-----+----+
+        |                                       |
+        |  1. Present KIA-A ----------------->  |
+        |  <------------------ Present KIA-B    |
+        |                                       |
+        |  2. RGP capability query ---------->  |
+        |  <------------ RGP capability reply   |
+        |                                       |
+        |  3. ACD query (if regulated) ------>  |
+        |  <-------------- ACD session ID       |
+        |                                       |
+        |  4. GEC-A generates ptxn_id           |
+        |     PTR (draft) ----------------->    |
+        |  <------ GEC-B countersigns ptxn_id   |
+        |          PTR (final)                  |
+        |                                       |
+        |  5. Transaction payload ----------->  |
+        |  <------------ Transaction response   |
+        |                                       |
+   GAR-A records:                         GAR-B records:
+     ALE-PEER-01 (attest)                   ALE-PEER-01 (attest)
+     ALE-PEER-02 (ptxn_id issued)           ALE-PEER-02 (ptxn_id)
+     ALE-PEER-03 (tx complete/failed)       ALE-PEER-03 (tx done)
+        |                                       |
+        v                                       v
+   GAR chain A  <-- ptxn_id correlates --> GAR chain B
+
+   The ptxn_id is the correlation key.  An auditor holding both GAR
+   chains can locate the matching ptxn_id entries and reconstruct the
+   cross-principal transaction record without either party's ongoing
+   cooperation.
+
+4.2.  Mutual Attestation Handshake
+
+   Before a Cross-Principal Transaction payload is transmitted, both
+   parties MUST complete a mutual attestation handshake.
+
+   Step 1 — Identity presentation:
+      The Initiating Agent's GEC presents KIA-A to the Responding
+      Agent's GEC.  The Responding Agent's GEC presents KIA-B to the
+      Initiating Agent's GEC.  Both GECs MUST validate the presented
+      KIA before proceeding.
+
+   Step 2 — Validation:
+      Each GEC validates the counterparty's KIA against the KIA
+      specification (draft-sato-soos-kia-03).  Validation failure MUST
+      cause the transaction to be rejected and ALE-PEER-04
+      (PEER_ATTESTATION_FAILED) to be recorded in the local GAR chain.
+      The rejection MUST be returned to the Initiating Agent.
+
+   Step 3 — Nonce contribution:
+      Upon successful validation of the counterparty's KIA, each GEC
+      generates a fresh nonce (initiating_nonce from GEC-A,
+      responding_nonce from GEC-B) for use in ptxn_id derivation.
+      Nonces MUST be generated using a cryptographically-secure random
+      number generator.
+
+   The mutual attestation handshake establishes that both parties are
+   SOOS-governed agents with verified persistent identities.  It does
+   not disclose mandate contents, Cedar policies, or constitutional
+   configurations to the counterparty.
+
+4.3.  Pre-Call Gates: RGP and ACD
+
+   Following successful mutual attestation, two pre-call gates MUST
+   complete before the transaction payload is transmitted:
+
+   Gate 1 — RGP capability query:
+      The Initiating Agent's GEC MUST query the Responding Agent's
+      Resource Declaration via the Stage 1 fingerprint at
+      /.well-known/soos-rgp or via a Stage 2 full declaration
+      (draft-sato-soos-rgp-00, Section 8 and 9).  The Initiating
+      Agent's GEC MUST verify that the Responding Agent declares a
+      capability class covering the requested transaction.  If no
+      covering capability class is declared, the transaction MUST NOT
+      proceed.  The rgp_resource_id from the discovered capability
+      declaration is carried into the PTR.
+
+   Gate 2 — ACD compliance query (conditional):
+      If the Responding Agent is a regulated provider (as indicated
+      in its RGP Stage 1 fingerprint via the regulated_provider flag),
+      the Initiating Agent's GEC MUST query the Responding Agent's ACD
+      Record at /.well-known/soos-acd (draft-sato-soos-acd-00,
+      Section 5).  The query MUST resolve an acd_session_id before
+      the transaction proceeds.  The acd_session_id is carried into
+      the PTR as evidence that the pre-call compliance check was
+      performed.
+
+4.4.  Transport Layer Composability: AIP IBCT
+
+   The PEER mutual attestation handshake is transport-layer agnostic.
+   The AIP Invocation-Bound Capability Token (IBCT) defined in
+   draft-prakash-aip-00 is a candidate transport-layer token for
+   carrying the KIA identity presentation in Step 1 of the mutual
+   attestation handshake (Section 4.2).
+
+   When AIP IBCT is used as the transport token:
+
+   o  The IBCT Ed25519 signature binds the KIA identity claim to the
+      specific invocation, preventing replay attacks.
+   o  The Biscuit/Datalog scope attenuation in the IBCT constrains
+      the claimed capability to the stated transaction scope.
+   o  The SOOS KIA identity claim appears as a field in the IBCT
+      payload; KIA validation occurs above the IBCT layer at the SOOS
+      GEC.
+
+   AIP IBCT satisfies the transport binding requirement.  KIA provides
+   the persistent identity layer above it.  The two layers compose
+   without modification to either specification.
+
+
+5.  PEER Transaction Record (PTR)
+
+5.1.  ptxn_id Derivation
+
+   The ptxn_id MUST be derived deterministically by the Initiating
+   Agent's GEC using the following input set:
+
+      ptxn_id = UUID-v5(
+          initiating_kia_id ||
+          responding_kia_id ||
+          initiated_at      ||
+          initiating_nonce  ||
+          responding_nonce
+      )
+
+   where:
+
+   o  initiating_kia_id is the Initiating Agent's KIA identity string
+      (as defined in draft-sato-soos-kia-03, Section 4.2).
+   o  responding_kia_id is the Responding Agent's KIA identity string.
+   o  initiated_at is the ISO 8601 timestamp at which the Initiating
+      Agent's GEC received the Responding Agent's nonce, in UTC.
+   o  initiating_nonce is the Initiating Agent's GEC entropy
+      contribution (Section 4.2, Step 3).
+   o  responding_nonce is the Responding Agent's GEC entropy
+      contribution (Section 4.2, Step 3).
+
+   The Initiating Agent's GEC MUST generate the ptxn_id after
+   receiving the responding_nonce.  The Responding Agent's GEC MUST
+   independently verify the ptxn_id by applying the same derivation
+   function to the same inputs.  If the verification fails, the
+   Responding Agent's GEC MUST reject the PTR and record
+   ALE-PEER-04.
+
+   No trusted third party is required.  The ptxn_id is unforgeable
+   by either party acting alone because production of a valid ptxn_id
+   requires both nonces, and each nonce is generated independently by
+   its respective GEC.
+
+   The GEC MUST expose a ptxn_id derivation function as part of the
+   kernel API (KEE-1 minor addition, draft-sato-soos-kee-00).
+
+5.2.  PTR Candidate Schema
+
+   The following is the candidate PTR schema.  Field names, types, and
+   cardinality are locked (DEC-PEER-02, DEC-PEER-03).  Full normative
+   field definitions are deferred to PEER-01.
+
+   {
+     "ptxn_id": {
+       "type": "string",
+       "format": "uuid-v5",
+       "required": true,
+       "description": "Jointly-derived cross-principal transaction ID.
+                       UUID-v5 derived from both KIA IDs, timestamp,
+                       and both GEC nonce contributions."
+     },
+     "initiating_principal_kia": {
+       "type": "string",
+       "required": true,
+       "description": "Initiating Agent's KIA identity string
+                       (draft-sato-soos-kia-03 §4.2)."
+     },
+     "responding_principal_kia": {
+       "type": "string",
+       "required": true,
+       "description": "Responding Agent's KIA identity string
+                       (draft-sato-soos-kia-03 §4.2)."
+     },
+     "initiated_at": {
+       "type": "string",
+       "format": "ISO 8601 datetime, UTC",
+       "required": true,
+       "description": "Timestamp at which the Initiating Agent's GEC
+                       received the Responding Agent's nonce."
+     },
+     "initiating_nonce": {
+       "type": "string",
+       "required": true,
+       "description": "Entropy contribution from the Initiating Agent's
+                       GEC.  Used as ptxn_id derivation input.
+                       MUST NOT be transmitted to any party other than
+                       the Responding Agent's GEC."
+     },
+     "responding_nonce": {
+       "type": "string",
+       "required": true,
+       "description": "Entropy contribution from the Responding Agent's
+                       GEC.  Used as ptxn_id derivation input.
+                       MUST NOT be transmitted to any party other than
+                       the Initiating Agent's GEC."
+     },
+     "responding_gec_countersignature": {
+       "type": "string",
+       "required": "RECOMMENDED",
+       "description": "The Responding Agent's GEC signature over the
+                       ptxn_id, confirming participation.
+                       Required for regulatory deployments."
+     },
+     "rgp_resource_id": {
+       "type": "string",
+       "required": false,
+       "description": "RGP resource identifier from the capability
+                       discovery query (draft-sato-soos-rgp-00 §8.3).
+                       Null if RGP was not used for discovery."
+     },
+     "acd_session_id": {
+       "type": "string",
+       "required": "CONDITIONAL",
+       "description": "ACD session ID from the pre-call compliance
+                       query (draft-sato-soos-acd-00 §5).
+                       REQUIRED if the Responding Agent is a regulated
+                       provider.  Null otherwise."
+     },
+     "transaction_class": {
+       "type": "string",
+       "enum": ["API_CALL", "WEBHOOK", "BOOKING_REQUEST",
+                "SETTLEMENT", "DATA_EXCHANGE"],
+       "required": true,
+       "description": "Class of the cross-principal transaction.
+                       Governs which ALE-PEER types apply."
+     },
+     "domain_transaction_ref": {
+       "type": "string",
+       "required": false,
+       "description": "Optional domain-layer transaction identifier
+                       (e.g., ATP Booking Object ID).  Links the
+                       SOOS governance record to the domain business
+                       record.  Omit in non-ATP deployments."
+     }
+   }
+
+   Complete JSON example:
+
+   {
+     "ptxn_id": "7f3e4a1b-9c2d-5e6f-8a0b-1c2d3e4f5a6b",
+     "initiating_principal_kia": "kia:myauberge.k.k.:booking-agent-01",
+     "responding_principal_kia": "kia:ponyhouse.farm:supplier-agent-01",
+     "initiated_at": "2026-07-20T09:14:33Z",
+     "initiating_nonce": "a3f8c2e1d4b7",
+     "responding_nonce": "b1e9d3f6a2c4",
+     "responding_gec_countersignature": "ed25519:...",
+     "rgp_resource_id": "rgp:ponyhouse.farm:organic-veg-2026-q3",
+     "acd_session_id": "acd-sess:2026-07-20:ph-supplier-001",
+     "transaction_class": "BOOKING_REQUEST",
+     "domain_transaction_ref": "atp-bo:PHFM-2026-07-20-0042"
+   }
+
+5.3.  PTR Placement in the Stack
+
+   The PTR is not a network packet header, an application message
+   field, or a user-visible record.  It is a kernel-layer governance
+   artifact generated by the GEC and stored in the GAR chain.
+
+   PTR placement in the SOOS stack:
+
+   +-------------------------------------------+
+   | Domain Protocol (ATP booking request,      |
+   | financial settlement, etc.)                |
+   +-------------------------------------------+
+   | AEP Session (one per side)                 |
+   | Session metadata includes: ptxn_id         |
+   +-------------------------------------------+
+   | PTR — PEER Transaction Record              |
+   | Generated by GEC before payload exchange   |
+   +-------------------------------------------+
+   | Mutual Attestation Handshake               |
+   | KIA-A presented to GEC-B; KIA-B to GEC-A  |
+   +-------------------------------------------+
+   | RGP + ACD Pre-Call Gates                   |
+   +-------------------------------------------+
+   | KIA Identity Layer (persistent)            |
+   | Transport Token Layer (AIP IBCT optional)  |
+   +-------------------------------------------+
+
+   The PTR is referenced in the AEP session metadata for both
+   sides of the transaction.  The ptxn_id appears in the GAR ALE
+   fields for all four ALE-PEER event types.
+
+5.4.  GAR Integration
+
+   The GAR (draft-sato-soos-gar-03) records the following
+   candidate ALE types for Cross-Principal Transactions.  Full
+   normative schemas are deferred to PEER-01.
+
+   ALE-PEER-01: MUTUAL_ATTESTATION_COMPLETE
+      Triggered when both agents have presented and validated each
+      other's KIA identity.  Records both KIA identities and the
+      initiating_nonce.
+
+   ALE-PEER-02: PTXN_ID_ISSUED
+      Triggered when the Initiating Agent's GEC generates the ptxn_id
+      after receiving the responding_nonce.  Records the ptxn_id and
+      initiated_at timestamp.
+
+   ALE-PEER-03: PEER_TRANSACTION_COMPLETE
+      Triggered when both sides' AEP sessions for the correlated
+      transaction reach a terminal state.  Records the ptxn_id,
+      terminal state (COMPLETE or FAILED), and the responding GEC
+      countersignature if present.
+
+   ALE-PEER-04: PEER_ATTESTATION_FAILED
+      Triggered when one agent's KIA identity fails validation.  The
+      transaction does not proceed.  Records the failing KIA identity
+      and the reason for rejection.
+
+   The ptxn_id field MUST be included in all ALE-PEER entries.  The
+   ptxn_id field is also an OPTIONAL-but-RECOMMENDED field in any
+   GAR ALE entry for transactions involving an external principal,
+   even when the counterparty is not a PEER-conforming system.
+
+
+6.  Relationship to Kuehlewind/Birkholz Audit Architecture
+
+   draft-kuehlewind-audit-architecture-00 [KUEHLEWIND-AUDIT] defines
+   an architecture for auditing AI agent delegation in distributed
+   systems.  The draft identifies six Potential Work Items (WI-1
+   through WI-6) for a proposed IETF working group:
+
+      WI-1: Audit record format standard
+      WI-2: Identity/role profile for AI agents (WIMSE sub-profile)
+      WI-3: Audit context propagation across protocols
+      WI-4: Authorization Transition Record schema
+      WI-5: Interaction Record schema (user intent to execution)
+      WI-6: Transparency service integration (SCITT)
+
+6.1.  SOOS GAR as WI-1/WI-4/WI-5/WI-6 Implementation
+
+   SOOS GAR (draft-sato-soos-gar-03) provides normative
+   implementations of four of the six work items:
+
+   WI-1: SOOS ALE types (ALE-001 through ALE-029 and counting) provide
+      a normative, typed, and versioned audit record format for kernel-
+      enforced deployments.
+
+   WI-4: The Cedar policy evaluation record implicit in the ALE
+      sequence, together with the MJWT authorization state at each
+      evaluation, constitutes an Authorization Transition Record for
+      every agent action.
+
+   WI-5: The MISSION_OPEN, EOD_ACKNOWLEDGED, and HEM ALE types
+      together provide a complete Interaction Record tracing user
+      intent (mission endorsement) through execution (AEP session
+      ALEs) to outcome (MISSION_CLOSE).
+
+   WI-6: The SOOS Session Block (GAR §6) is a Merkle-signed artifact
+      over a bounded set of ALEs, providing non-repudiation properties
+      compatible with SCITT Signed Statements.  A one-page technical
+      note mapping the Session Block to the SCITT Signed Statement
+      format is planned as a pre-Vienna artifact for Birkholz outreach
+      (OQ-PEER-09, Section 7).
+
+6.2.  PEER as the Cross-Domain Open Case
+
+   The Kuehlewind/Birkholz architecture explicitly does not solve the
+   cross-principal, cross-domain audit correlation problem.  The draft
+   states: "correlation emerges from consistent use of shared
+   identifiers across all participants" — a requirement that fails
+   when participants operate under independent mandate roots with
+   independent GECs and no shared identifier scheme.
+
+   The draft further acknowledges that "the Audit Store cannot deliver
+   non-repudiation for self-generated records" — the exact
+   self-certification problem Prakash (2026) [PROVENANCE-PARADOX]
+   demonstrates to be adversarially exploitable.
+
+   draft-sato-soos-peer-00 fills this gap with a concrete mechanism:
+
+   o  The ptxn_id is jointly derived from both GECs' nonce
+      contributions, creating a shared identifier that did not exist
+      before the transaction — produced by shared action rather than
+      requiring pre-existing shared infrastructure.
+   o  The responding GEC countersignature provides non-repudiation for
+      the Responding Agent's participation — a property that self-
+      generated records cannot provide.
+   o  Both GAR chains independently record the ptxn_id, enabling
+      cross-chain correlation without a shared audit store.
+
+   SOOS PEER is proposed as the reference implementation for the
+   cross-domain audit correlation work item implicitly identified
+   by the Kuehlewind/Birkholz architecture as out of scope for
+   their initial draft.
+
+
+7.  Open Issues
+
+   The following open questions are carried to PEER-01 (post-Vienna).
+
+   OQ-PEER-03: Dispute resolution when two GAR chains disagree.
+      If GEC-A records ALE-PEER-03 with terminal state COMPLETE and
+      GEC-B records ALE-PEER-03 with terminal state FAILED for the
+      same ptxn_id, no resolution mechanism currently exists.  This
+      may require a third-party arbitration protocol or a
+      domain-layer override mechanism.  Priority: HIGH.
+
+   OQ-PEER-04: ATP Booking Object relationship.
+      The domain_transaction_ref field in the PTR carries the ATP
+      Booking Object ID in ATP deployments (as specified in
+      draft-sato-soos-peer-00 §5.2).  The full normative specification
+      of the ATP Booking Object to PTR relationship — including the
+      lifecycle state machine alignment between the Booking Object
+      state and the ALE-PEER-03 terminal state — is deferred to
+      PEER-01.  Reference case: MyAuberge K.K. / Ponyhouse Farm.
+
+   OQ-PEER-05: Minimum mandatory disclosure in the PTR.
+      The PTR as currently specified includes nonce values that, if
+      disclosed, allow third parties to verify (but not forge) the
+      ptxn_id.  The appropriate disclosure boundary under APPI Article
+      17 and GDPR Article 25 (data minimization) has not been
+      analyzed.  The responding_gec_countersignature may satisfy
+      non-repudiation requirements without requiring nonce disclosure
+      in audit exports.  Deferred to PEER-01 Privacy Considerations.
+
+   OQ-PEER-07: Full ALE-PEER-01 through ALE-PEER-04 normative schemas.
+      The candidate ALE types defined in Section 5.4 are candidates
+      only.  Normative field definitions, required/optional
+      cardinality, and GAR-03 registration are deferred to PEER-01.
+
+   OQ-PEER-08: PEER interaction with FAIP.
+      FAIP (draft-sato-soos-faip-[TBD]) specifies federated multi-
+      agent intelligence pools.  An agent participating in a FAIP pool
+      may be simultaneously subject to FAIP governance and engaged in
+      a PEER exchange.  The interaction between FAIP pool governance
+      and the PEER mutual attestation requirement has not been
+      specified.  Deferred to PEER-01 or FAIP-01.
+
+   OQ-PEER-09: GAR Session Block to SCITT Signed Statement mapping.
+      A one-page technical note mapping the SOOS Session Block to the
+      SCITT Signed Statement format (RFC 9052) is identified as a
+      pre-Vienna outreach artifact for Birkholz (July 14, 2026
+      deadline).  This mapping is informative, not normative in
+      PEER-00; normative treatment deferred to PEER-01 or GAR-04.
+
+
+8.  Security Considerations
+
+   Note: Security Considerations was the first section structured in
+   the authoring session for this draft, per the SOOS DraftAuthoring
+   Manual §2.7.  The three attack vectors defined here are candidates
+   expanded from the DR-PEER-02 security brief.  Full normative
+   treatment is deferred to PEER-01.
+
+8.1.  Attack Vector 1: ptxn_id Spoofing
+
+   Mechanism: An adversary attempts to produce a plausible ptxn_id
+   value for a transaction in which they did not participate, in order
+   to insert a fraudulent record into one party's GAR chain.
+
+   Defense: The ptxn_id derivation function (Section 5.1) requires
+   both responding_nonce (generated by GEC-B) and initiating_nonce
+   (generated by GEC-A).  An adversary who has not participated in
+   the mutual attestation handshake cannot obtain both nonces and
+   therefore cannot produce a valid ptxn_id.
+
+   MUST requirement: The Responding Agent's GEC MUST NOT transmit the
+   responding_nonce to any entity other than the Initiating Agent's
+   GEC during the mutual attestation handshake.  The Initiating
+   Agent's GEC MUST NOT transmit the initiating_nonce to any entity
+   other than the Responding Agent's GEC.
+
+   Residual risk: If either GEC is compromised at the kernel level,
+   nonce leakage enables ptxn_id spoofing.  This is a GEC compromise
+   scenario, not a PEER protocol weakness; defense is provided by
+   KEE-1 kernel integrity requirements.
+
+8.2.  Attack Vector 2: GAR Chain Forgery
+
+   Mechanism: An adversary who controls one side's GAR chain attempts
+   to insert a forged ALE-PEER-03 entry claiming a transaction
+   completed, when in fact it did not — or claiming it failed, when
+   in fact it succeeded.
+
+   Defense: The responding_gec_countersignature in the PTR is a
+   cryptographic signature by GEC-B over the ptxn_id.  A forged
+   ALE-PEER-03 entry that references a ptxn_id for which the
+   countersignature is absent or invalid is distinguishable from a
+   genuine entry by any verifier holding GEC-B's public key.
+
+   MUST requirement: For regulatory deployments, the Responding
+   Agent's GEC MUST produce a countersignature over the ptxn_id.
+   Implementations SHOULD include the countersignature for all
+   PEER exchanges regardless of regulatory context.
+
+   Residual risk: If GEC-B's signing key is compromised, forgery
+   becomes possible.  Key rotation policy for GEC signing keys is
+   outside the scope of this document.
+
+8.3.  Attack Vector 3: Mutual Attestation Replay
+
+   Mechanism: An adversary records a completed mutual attestation
+   handshake (KIA presentations + nonces) and attempts to replay it
+   to establish a new PTR, thereby claiming a transaction occurred
+   at a different time than it actually did.
+
+   Defense: The initiated_at timestamp in the ptxn_id derivation
+   (Section 5.1) is the timestamp at which the Initiating Agent's
+   GEC received the responding_nonce.  Since nonces are single-use
+   and generated freshly per handshake, a replay of a prior handshake
+   uses stale nonces.  The Responding Agent's GEC MUST reject a
+   ptxn_id derivation attempt that references a responding_nonce
+   it has already issued in a prior handshake.
+
+   MUST requirement: Each GEC MUST maintain a short-lived cache of
+   issued nonce values sufficient to detect replay within the
+   transaction timeout window.  The cache retention period SHOULD be
+   not less than the maximum network round-trip time for the
+   transaction class plus 60 seconds.
+
+8.4.  Attack Vector 4: KIA Identity Confusion
+
+   Mechanism: An adversary presents a KIA identity that is
+   superficially similar to a legitimate peer's KIA identity (e.g.,
+   differing by one character or unicode homoglyph), causing the
+   Initiating Agent's GEC to proceed under the belief that it is
+   transacting with a known counterparty when it is not.
+
+   Defense: KIA validation (draft-sato-soos-kia-03) MUST be performed
+   against the full KIA identity string using exact string matching,
+   not prefix matching, pattern matching, or human-readable label
+   comparison.  GEC implementations MUST NOT accept KIA identity
+   strings containing unicode characters outside the ASCII range
+   unless the full unicode normalization procedure defined in KIA-03
+   is applied before comparison.
+
+   MUST requirement: The Initiating Agent's GEC MUST validate the
+   Responding Agent's KIA identity against an allow-list or
+   principal-configured registry before proceeding.  Ad-hoc
+   acceptance of unknown KIA identities is NOT RECOMMENDED.
+
+
+9.  Privacy Considerations
+
+   The PTR is a governance artifact, not a business record.  It
+   contains no user personal data (as defined by APPI Article 2 or
+   GDPR Article 4).  However:
+
+   o  KIA identity strings may be correlatable to legal entities.
+      The ptxn_id, if logged alongside transaction metadata, may
+      enable correlation of agent activity to specific organizations.
+
+   o  The minimum disclosure requirement (OQ-PEER-05, Section 7) has
+      not been resolved.  Until resolved, PTR records SHOULD NOT be
+      published to public transparency logs without prior legal review
+      under the applicable data protection regime.
+
+   o  The responding_gec_countersignature demonstrates that the
+      Responding Agent's GEC participated in a specific transaction.
+      For regulated providers, this participation record may itself
+      be subject to regulatory retention requirements.
+
+   Full privacy analysis is deferred to PEER-01.
+
+
+10.  IANA Considerations
+
+   This document requests the following candidate IANA registrations.
+   Full registration templates are deferred to PEER-01.
+
+10.1.  ptxn_id Media Type
+
+   A media type for PTR records serialized as JSON is anticipated.
+   Candidate: application/soos-ptr+json.
+   Registration template: deferred to PEER-01.
+
+10.2.  ALE-PEER Event Type Registry
+
+   The following candidate event types are proposed for the SOOS GAR
+   Agent Lifecycle Event registry (established in draft-sato-soos-
+   gar-03, Section 12):
+
+      ALE-PEER-01: MUTUAL_ATTESTATION_COMPLETE
+      ALE-PEER-02: PTXN_ID_ISSUED
+      ALE-PEER-03: PEER_TRANSACTION_COMPLETE
+      ALE-PEER-04: PEER_ATTESTATION_FAILED
+
+   Full normative schemas and registration templates are deferred to
+   PEER-01.
+
+10.3.  Well-Known URI
+
+   No new well-known URI is defined by this document.  The PEER
+   protocol uses existing well-known URIs from RGP and ACD.
+
+
+11.  References
+
+11.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017.
+
+   [SOOS-KIA] Sato, T., "Kernel Identity Attestation",
+              draft-sato-soos-kia-03, Work in Progress, 2026.
+
+   [SOOS-AEP] Sato, T., "Agent Execution Protocol",
+              draft-sato-soos-aep-02, Work in Progress, 2026.
+
+   [SOOS-GAR] Sato, T., "Governed Audit Record",
+              draft-sato-soos-gar-03, Work in Progress, 2026.
+
+   [SOOS-RGP] Sato, T., "Resource Governance Protocol",
+              draft-sato-soos-rgp-00, Work in Progress, 2026.
+
+   [SOOS-ACD] Sato, T., "Agent Compliance Disclosure",
+              draft-sato-soos-acd-00, Work in Progress, 2026.
+
+   [SOOS-KEE] Sato, T., "Kernel Execution Environment",
+              draft-sato-soos-kee-00, Work in Progress, 2026.
+
+11.2.  Informative References
+
+   [SOOS-CAP] Sato, T., "Constitutional AI Prohibitions",
+              draft-sato-soos-cap-04, Work in Progress, 2026.
+
+   [SOOS-MJWT] Sato, T., "Mission JWT",
+               draft-sato-soos-mjwt-02, Work in Progress, 2026.
+
+   [SOOS-MAD] Sato, T., "Multi-Agent Delegation",
+              draft-sato-soos-mad-03, Work in Progress, 2026.
+
+   [SOOS-HEM] Sato, T., "Human Escalation Mandate",
+              draft-sato-soos-hem-05, Work in Progress, 2026.
+
+   [AIP]      Prakash, S., "Agent Identity Protocol",
+              draft-prakash-aip-00, Work in Progress, 2026.
+
+   [KUEHLEWIND-AUDIT]
+              Kuhlewind, M. and Birkholz, H., "An Architecture for
+              Auditing AI Agent Delegation",
+              draft-kuehlewind-audit-architecture-00,
+              Work in Progress, May 2026.
+
+   [PROVENANCE-PARADOX]
+              Prakash, S., "The Provenance Paradox in Multi-Agent
+              LLM Routing", arXiv:2603.18043, March 2026.
+
+   [AIP-ARXIV]
+              Prakash, S., "AIP: Agent Identity Protocol",
+              arXiv:2603.24775, March 2026.
+
+   [WIMSE]    IETF WIMSE Working Group,
+              draft-ietf-wimse-workload-identity,
+              Work in Progress, 2026.
+
+   [RFC9052]  Schaad, J., "CBOR Object Signing and Encryption (COSE):
+              Structures and Process", RFC 9052, 2022.
+              (Referenced for SCITT Signed Statement compatibility.)
+
+   [AIMS]     Kasselman, P., Lombardo, V., Rosomakho, Y., and
+              Campbell, B., "AI Agent Authentication and
+              Authorization", draft-klrc-aiagent-auth-02,
+              Work in Progress, 2026.
+
+
+Appendix A.  Worked Example: Booking Request Across Two Operators
+
+   This appendix illustrates a complete PEER exchange between a travel
+   booking agent (MyAuberge K.K.) and a farm supplier agent (Ponyhouse
+   Farm), demonstrating all four PEER protocol steps and both the
+   PERMIT and REJECT paths.
+
+   Actors:
+      Agent A: kia:myauberge.k.k.:booking-agent-01
+               Mandate: travel bookings, organic produce sourcing
+               Principal: MyAuberge K.K. (hotel operator)
+
+      Agent B: kia:ponyhouse.farm:supplier-agent-01
+               Mandate: order acceptance, availability declaration
+               Principal: Ponyhouse Farm (ATP reference supplier)
+
+   Scenario: Agent A requests a produce delivery booking for a hotel
+   event on 2026-07-20.  Agent B is an ATP-conforming regulated
+   provider.
+
+   Step 1 — Mutual Attestation (PERMIT path):
+
+      Agent A's GEC presents kia:myauberge.k.k.:booking-agent-01.
+      Agent B's GEC validates: KIA present, not revoked.
+      Agent B's GEC presents kia:ponyhouse.farm:supplier-agent-01.
+      Agent A's GEC validates: KIA present, not revoked.
+
+      Both GECs record ALE-PEER-01 (MUTUAL_ATTESTATION_COMPLETE).
+
+      Agent A's GEC generates initiating_nonce: "a3f8c2e1d4b7".
+      Agent B's GEC generates responding_nonce:  "b1e9d3f6a2c4".
+
+   Step 2 — Pre-Call Gates:
+
+      Agent A's GEC queries /.well-known/soos-rgp on ponyhouse.farm.
+      Stage 1 fingerprint: capability class CAP-EXP declared;
+        regulated_provider: true (ATP certified supplier).
+        rgp_resource_id: "rgp:ponyhouse.farm:organic-veg-2026-q3".
+
+      Agent A's GEC queries /.well-known/soos-acd on ponyhouse.farm.
+        acd_session_id: "acd-sess:2026-07-20:ph-supplier-001".
+        ACD record confirms: ATP compliance, organic certification
+        scope, JP jurisdiction.
+
+   Step 3 — ptxn_id Generation:
+
+      Agent A's GEC derives:
+        ptxn_id = UUID-v5(
+          "kia:myauberge.k.k.:booking-agent-01" ||
+          "kia:ponyhouse.farm:supplier-agent-01" ||
+          "2026-07-20T09:14:33Z" ||
+          "a3f8c2e1d4b7" ||
+          "b1e9d3f6a2c4"
+        )
+        = "7f3e4a1b-9c2d-5e6f-8a0b-1c2d3e4f5a6b"
+
+      PTR draft transmitted to Agent B's GEC.
+      Agent B's GEC independently verifies ptxn_id: VALID.
+      Agent B's GEC produces responding_gec_countersignature.
+
+      Both GECs record ALE-PEER-02 (PTXN_ID_ISSUED, ptxn_id =
+        "7f3e4a1b-...").
+
+   Step 4 — Transaction (PERMIT path):
+
+      Agent A sends ATP BOOKING_REQUEST (organic vegetable delivery,
+        20 kg, 2026-07-20 AM) with PTR ptxn_id in AEP session
+        metadata.
+      Agent B accepts, issues ATP Booking Object PHFM-2026-07-20-0042.
+      PTR domain_transaction_ref set to "atp-bo:PHFM-2026-07-20-0042".
+
+      Both GECs record ALE-PEER-03 (PEER_TRANSACTION_COMPLETE,
+        terminal_state: COMPLETE).
+
+   REJECT path (attestation failure):
+
+      If Agent B's GEC fails to validate Agent A's KIA (e.g., KIA
+      has been revoked due to a mandate expiry), Agent B's GEC
+      records ALE-PEER-04 (PEER_ATTESTATION_FAILED) and returns a
+      rejection.  Agent A's GEC records ALE-PEER-04 on its side.
+      No ptxn_id is generated.  No payload is transmitted.
+
+   Audit reconstruction:
+
+      An auditor holding GAR chain A and GAR chain B locates
+      ptxn_id = "7f3e4a1b-..." in both chains.  The two ALE-PEER-03
+      entries with matching ptxn_id confirm that both sides recorded
+      the same transaction as COMPLETE.  The responding_gec_counter-
+      signature in Chain B's entry provides non-repudiation for
+      Agent B's participation.  The domain_transaction_ref links the
+      governance record to the ATP Booking Object for domain-layer
+      verification.
+
+
+Appendix B.  Related Work
+
+B.1.  Existing Frameworks and IETF Drafts
+
+   AIP (draft-prakash-aip-00) defines Invocation-Bound Capability
+   Tokens (IBCT) for agent identity at the transport layer.  AIP
+   stops at the token layer and does not address session governance,
+   mission-level mandate validation, or cross-principal audit
+   correlation.  SOOS PEER uses AIP IBCT as a candidate transport
+   token in the mutual attestation handshake; the two layers compose
+   without conflict.  The Provenance Paradox result [PROVENANCE-
+   PARADOX] provides empirical motivation for the governance layer
+   above IBCT that PEER specifies.
+
+   Kuehlewind/Birkholz Audit Architecture (draft-kuehlewind-audit-
+   architecture-00) defines the most significant IETF work in this
+   space.  SOOS GAR addresses their WI-1, WI-4, WI-5, and WI-6 as
+   a kernel-enforced deployment profile.  SOOS PEER addresses their
+   cross-domain open case.  See Section 6.
+
+   AIMS (draft-klrc-aiagent-auth-02) addresses AI agent authentication
+   via WIMSE + SPIFFE + OAuth composition.  PEER begins after
+   authentication is established; AIMS and PEER compose at the
+   authentication/session boundary.
+
+   Sharif Framework (draft-sharif-agent-identity-framework-00)
+   enumerates identity gaps without providing normative protocol
+   specifications.  SOOS KIA addresses the persistent identity gap;
+   SOOS PEER addresses the cross-principal correlation gap identified
+   in the Sharif framework.
+
+   Human Delegation Provenance (draft-helixar-hdp-agentic-delegation-
+   00) narrows to the provenance chain of human authorization for
+   terminal actions.  This is a complementary concern to PEER;
+   HDP addresses "who authorized this action," while PEER addresses
+   "who participated in this cross-principal transaction and when."
+
+B.2.  SOOS Companion Drafts
+
+   PEER depends on:
+      KIA-03 (draft-sato-soos-kia-03) — persistent agent identity
+      AEP-02 (draft-sato-soos-aep-02) — session governance; PTR
+        carried as AEP session metadata
+      GAR-03 (draft-sato-soos-gar-03) — audit record; ALE-PEER types
+        registered here
+      RGP-00 (draft-sato-soos-rgp-00) — capability discovery gate
+      ACD-00 (draft-sato-soos-acd-00) — compliance disclosure gate
+      KEE-00 (draft-sato-soos-kee-00) — ptxn_id derivation function
+        in kernel API
+
+   PEER does not depend on (but is consistent with):
+      CAP-04 (draft-sato-soos-cap-04) — constitutional prohibitions
+        govern each GEC independently; PEER does not affect CAP
+      MJWT-02 (draft-sato-soos-mjwt-02) — mandate issuance; PEER
+        does not extend MJWT; the two mandate trees remain independent
+      MAD-03 (draft-sato-soos-mad-03) — sub-agent delegation; the
+        PEER/MAD boundary is defined in Section 3.3
+
+   The following drafts will depend on PEER (post-Vienna):
+      PEER-01 — full normative specification of this draft
+      FAIP-[TBD] — federated multi-agent pools; FAIP agents engaged
+        in cross-principal transactions use PEER (OQ-PEER-08)
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+
+   Email: tom@myauberge.com
+   URI:   https://soosproject.ai/drafts/peer

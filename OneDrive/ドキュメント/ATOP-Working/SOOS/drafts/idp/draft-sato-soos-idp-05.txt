@@ -1,0 +1,1926 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                          11 July 2026
+Expires: 11 January 2027
+
+
+         The Intent Declaration Primitive (IDP) for Agentic AI Systems
+                        draft-sato-soos-idp-05
+
+Abstract
+
+   Every action an AI agent takes is a decision.  Right now, none of
+   those decisions are signed.
+
+   AI agents operating in automated workflows take actions without any
+   normative mechanism for expressing why those actions are being taken.
+   Access tokens declare what an agent is permitted to do; no existing
+   standard declares what the agent believes it is doing, on what
+   reasoning basis, and with what level of confidence, at the moment of
+   action.  This document defines the Intent Declaration Primitive
+   (IDP): a structured per-transition declaration submitted by an AI
+   agent to the Governing Enforcement Component (GEC) at each action
+   step of an execution loop.  The IDP is committed to a tamper-evident
+   Event Log before the action executes, enabling post-hoc review of
+   agent reasoning, richer authorization policy evaluation, and enriched
+   denial responses that guide agent behaviour.  The IDP also provides
+   the technical basis for compliance with EU AI Act Article 12 logging
+   requirements for high-risk AI systems.
+
+   Version -05 adds: the intake_endorsement operation (Section 4.6)
+   through which the GEC endorses a submitted EOD before the first
+   SENSE delivery, making the EOD a GEC-signed artifact and preventing
+   unendorsed IDPs from proceeding; the PD-EOD (Prompt-Derived EOD)
+   branch (Section 4.7) for IDPs derived from natural-language prompts
+   rather than structured input, with scope-bounding rules and HEM
+   notification requirements; the mandate_reference field (Section 4.1)
+   linking each IDP to an SPO URI for structural validation; confidence_
+   level calibration guidance (Section 7) including the CONFIDENCE_
+   MISCALIBRATION_WARNING trigger; RETRY_CONTINUATION normative
+   strengthening with backward reference to AEP-02's what_changed
+   requirement; and four new Security Considerations addressing prompt
+   injection at intake, EOD scope manipulation, confidence_level
+   inflation attacks, and COMMITMENT_GAP exploitation.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 11 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Problem Statement
+     3.1.  The Intent Gap in Agentic Authorization
+     3.2.  Relationship to EU AI Act Article 12
+     3.3.  Relationship to Williams Intent Bound Authorization
+     3.4.  Relationship to Mission Bound Authorization
+     3.5.  Event Log as Operational Intelligence
+   4.  The Intent Declaration Primitive
+     4.1.  IDP Structure
+     4.2.  Field Definitions
+     4.3.  Reasoning Basis Types
+     4.3.1.  Reasoning Mode Values
+     4.4.  HEM Urgency Values
+     4.5.  IDP Profiles
+     4.6.  Intake Endorsement Operation [NEW in -05]
+     4.6.1.  Endorsement Request
+     4.6.2.  Endorsed EOD Response
+     4.6.3.  Intake Endorsement Validation Errors
+     4.7.  PD-EOD: Prompt-Derived EOD Branch [NEW in -05]
+     4.7.1.  PD-EOD Schema
+     4.7.2.  PD-EOD Scope-Bounding Rule
+     4.7.3.  PD-EOD HEM Notification Requirement
+   5.  Submission Protocol
+     5.1.  When the IDP Is Submitted
+     5.2.  GEC Receipt and Validation
+     5.3.  Event Log Commitment
+     5.4.  IDP in Cedar Policy Evaluation
+     5.5.  IDP Commitment Verification
+     5.5.1.  IDP Commitment Verification Record Schema
+     5.5.2.  Event Log Entries
+     5.5.3.  Commitment Verification Scope
+     5.5.4.  Relationship to GAR
+     5.6.  Outcome Event Log Entries
+     5.6.1.  STATE_TRANSITIONED
+     5.6.2.  CEDAR_DENY_RECORDED
+     5.6.3.  ACTION_RESULT_RECORDED
+     5.6.4.  Complete Audit Trail Example
+   6.  Enriched DENY Response
+     6.1.  Structure
+     6.2.  Field Definitions
+     6.3.  HEM Routing from DENY
+   7.  Confidence Level Calibration Guidance [NEW in -05]
+     7.1.  Calibration Obligations
+     7.2.  CONFIDENCE_MISCALIBRATION_WARNING Trigger
+     7.3.  Correction Mechanism
+   8.  IDP Thin Profile
+   9.  Security Considerations
+     9.1.  IDP as Declaration, Not Proof
+     9.2.  Tamper Evidence
+     9.3.  Inference from Denials
+     9.4.  Replay Prevention
+     9.5.  Delegation Chain Integrity
+     9.6.  Thin Profile Risk
+     9.7.  Commitment Verification Integrity
+     9.8.  Retry Loop Exhaustion Attacks
+     9.9.  Cross-Context Replay
+     9.10. Agent Session Revocation
+     9.11. Prompt Injection at Intake [NEW in -05]
+     9.12. EOD Scope Manipulation [NEW in -05]
+     9.13. Confidence Level Inflation Attack [NEW in -05]
+     9.14. COMMITMENT_GAP Exploitation [NEW in -05]
+   10. Conformance Levels
+     10.1. Overview
+     10.2. Level 1 -- Application Profile
+     10.3. Level 2 -- Isolated Profile
+     10.4. Level 3 -- Kernel Profile
+     10.5. Regulatory Applicability
+     10.6. Conformance Level Signalling
+   11. Privacy Considerations
+   12. EU AI Act Applicability
+   13. IANA Considerations
+   14. References
+     14.1. Normative References
+     14.2. Informative References
+
+
+1.  Introduction
+
+   When an AI agent takes an action in a production system -- approving
+   a transaction, modifying a record, sending a message -- there is
+   currently no standard mechanism for that agent to declare, before
+   the action executes, what goal the action serves, what reasoning led
+   to it, and how confident the agent is that it is appropriate.  If
+   the action produces a bad outcome, there is no signed record of what
+   the agent was thinking.  If the agent acted contrary to its
+   instructions, there is no tamper-evident evidence of the
+   discrepancy.  If a regulator asks why the AI system made a specific
+   decision, the answer is reconstructed from action logs that record
+   what happened, not why.
+
+   If you are building an agentic AI system today, the absence of a
+   per-transition intent record means that when an agent takes a wrong
+   action, you cannot prove what the agent believed it was doing at
+   the moment it acted -- only what it did.  IDP closes this gap by
+   requiring the agent to declare its goal, reasoning basis, and
+   confidence level to the GEC before each action executes, committed
+   to a tamper-evident Event Log.  Without it, post-hoc review,
+   regulatory audit, and automatic anomaly detection are all working
+   from an incomplete record.
+
+   The Internet Engineering Task Force and related standards bodies have
+   made significant progress in specifying how AI agents authenticate
+   (WIMSE [I-D.ietf-wimse-arch]) and how they obtain authorization
+   tokens for API invocation (OAuth 2.1 [I-D.ietf-oauth-v2-1],
+   AAuth [I-D.rosenberg-oauth-aauth]).  These specifications answer the
+   question: is this agent permitted to perform this action?
+
+   No existing specification answers the companion question: why does
+   this agent believe it should perform this action at this moment?
+
+   This distinction matters for four reasons.  First, post-hoc review
+   of AI agent behaviour requires not only a record of what actions were
+   taken but a record of the reasoning that led to them.  Access token
+   issuance records do not provide this.  Second, authorization policy
+   evaluation can be made significantly more precise when the agent's
+   declared intent is available as a policy context attribute; a Cedar
+   [Cedar] policy that evaluates both the action requested and the
+   reasoning basis for that action is a more powerful governance tool
+   than one that evaluates the action alone.  Third, EU AI Act Article
+   12 requires that high-risk AI systems maintain logs sufficient for
+   post-hoc human review of system decisions [EUAIA]; per-transition
+   intent declaration is the technical specification that satisfies this
+   requirement.
+
+   Fourth, uninformed retry loops represent a significant and measurable
+   source of computational waste in deployed agentic systems.  When an
+   agent's action is denied and the agent receives no structured
+   information about what alternative actions are available or what
+   reasoning adjustments are warranted, the agent re-enters its
+   reasoning loop without a revised basis for action.  This produces
+   semantically redundant computation: token expenditure and inference
+   cost that generate no new information and advance no declared goal.
+   The IDP addresses this through the Enriched DENY Response
+   (Section 6), the RETRY_CONTINUATION reasoning basis type (Section
+   4.3), and the AEP-02 what_changed requirement [I-D.sato-soos-aep]
+   Section 10.4, which together make failure history a first-class input
+   to both Cedar policy evaluation and human principal review.
+
+   This document defines the Intent Declaration Primitive (IDP): a
+   structured JSON object submitted by an AI agent to a governing
+   runtime component at each action step of an agent execution loop,
+   prior to the execution of the action.  The IDP is recorded in a
+   tamper-evident append-only Event Log before the action is executed.
+   When authorization is denied, the GEC returns an Enriched DENY
+   Response that includes the denial reason, available alternative
+   actions, and the echo of the received IDP -- enabling the agent to
+   reason about what it may do next.
+
+   The IDP is a GEC primitive, not an application-layer logging
+   construct.  It is submitted as part of the action invocation call,
+   not after it.  This is the property that gives the IDP its audit
+   guarantee: ex-post fabrication of intent is structurally impossible
+   in a conforming SOOS deployment because the IDP is GEC-signed before
+   Cedar evaluation executes.
+
+   Version -05 introduces the intake_endorsement operation (Section
+   4.6), which provides a GEC-signed Endorsed EOD before the first
+   SENSE delivery.  The intake_endorsement output is a prerequisite
+   for the AEP session to begin for Class 2 and Class 3 agents: an
+   IDP submitted in a session without an Endorsed EOD MUST be rejected
+   unless the session is Class 1.  Version -05 also defines the PD-EOD
+   branch (Section 4.7) for IDPs derived from natural-language prompts,
+   with normative scope-bounding rules and HEM notification requirements
+   for external-system touch.  Confidence level calibration guidance
+   (Section 7) and four new Security Considerations complete the -05
+   additions.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   Endorsed EOD:
+      An Expected Outcome Declaration [I-D.sato-soos-aep] Section 6
+      that has been processed by the GEC intake_endorsement operation
+      (Section 4.6) and returned with a GEC signature.  An Endorsed EOD
+      is a prerequisite for an IDP-bearing session to begin for Class 2
+      and Class 3 agents.
+
+   PD-EOD (Prompt-Derived EOD):
+      An EOD derived by the GEC from a natural-language prompt submitted
+      by the agent or operator, rather than from a structured EOD
+      submission.  A PD-EOD carries a derived: true flag and is subject
+      to additional scope-bounding and HEM notification requirements
+      (Section 4.7).
+
+   SPO URI:
+      A Sovereign Protocol Object URI identifying the mandate or SO
+      Type that governs this IDP session.  Used in the mandate_reference
+      field (Section 4.1) for structural validation.
+
+   CONFIDENCE_MISCALIBRATION_WARNING:
+      A GEC-generated Event Log entry emitted when the agent's declared
+      confidence_level is systematically inconsistent with the observed
+      outcome pattern for the same action class.  See Section 7.2.
+
+   All other terms are as defined in [I-D.sato-soos-aep] and
+   [I-D.sato-soos-idp] (prior versions).
+
+
+3.  Problem Statement
+
+3.1.  The Intent Gap in Agentic Authorization
+
+   Access control systems have advanced from identity-based (who is
+   this agent?) to role-based (what is this agent's role?) to
+   attribute-based (what attributes does this context have?).  None of
+   these systems capture intent: what does this agent declare it is
+   trying to accomplish with this specific action in this specific
+   context?
+
+   The intent gap has three concrete consequences:
+
+   (a) Post-hoc reconstruction of reasoning.  After an agent takes a
+       harmful action, the audit record shows what it did.  The
+       reasoning that led to it is reconstructed -- from logs, from
+       LLM traces, from system state -- not retrieved from a signed
+       pre-action commitment.  Reconstructed intent is rebuttable.
+       Committed intent is not.
+
+   (b) Undifferentiated retry semantics.  When an action is denied,
+       the standard response is a 403 or equivalent.  The agent knows
+       the action was denied; it does not know why in a structured,
+       machine-processable form.  Without structured denial reason and
+       declared-what-changed semantics, the agent's retry is
+       informationally equivalent to its first attempt.
+
+   (c) Intent-blind authorization.  Cedar policies and ABAC rules
+       evaluate the action, the resource, and the context.  None of
+       these systems evaluate the declared purpose of the action.  Two
+       agents requesting the same action on the same resource with the
+       same attributes but different declared purposes are
+       indistinguishable to the authorization engine.
+
+   IDP closes all three gaps.
+
+3.2.  Relationship to EU AI Act Article 12
+
+   EU AI Act Article 12 requires high-risk AI systems to maintain logs
+   sufficient for post-market monitoring and post-hoc review of system
+   decisions.  The IDP is the technical mechanism that satisfies this
+   requirement at the action level.
+
+   For each governed action: the IDP provides the declared intent
+   (before), the Cedar evaluation result (during), and the outcome
+   Event Log entries (after).  The pre-action/post-action pair is the
+   Article 12 record.  The GEC-signed IDP_SUBMITTED Event Log entry is
+   the proof that the record cannot be fabricated post-hoc.
+
+3.3.  Relationship to Williams Intent Bound Authorization
+
+   The Williams Intent Bound Authorization framework articulates the
+   principle that authorization decisions should evaluate declared intent
+   alongside action and resource.  IDP is the IETF standards-track
+   specification of this principle: it defines the wire format,
+   commitment semantics, and Cedar integration for intent-bound
+   authorization.
+
+3.4.  Relationship to Mission Bound Authorization
+
+   The McGuinness Mission Bound Authorization framework
+   [I-D.mcguinness-oauth-mission-bound-authorization] defines how
+   agent missions are declared and bounded.  IDP's mission_ref field
+   (Section 4.1) links the per-transition intent declaration to the
+   governing MissionDeclaration.  IDP's mandate_reference field
+   [NEW in -05] provides the SPO URI of the governing mandate, enabling
+   structural validation of IDP scope against the governing mission
+   structure.
+
+3.5.  Event Log as Operational Intelligence
+
+   The IDP Event Log is not merely an audit artifact.  It is a
+   structured record of agent reasoning over time -- what actions agents
+   declared they were taking, why, at what confidence, in what reasoning
+   mode.  Aggregated across sessions, the IDP record is operational
+   intelligence about agent behaviour patterns.  The data_residency
+   field (Section 4.1) governs which records are eligible for Tier 2
+   and Tier 3 analytics aggregation under the FAIP specification.
+
+
+4.  The Intent Declaration Primitive
+
+4.1.  IDP Structure
+
+   The IDP is a JSON object with the following structure:
+
+   {
+     "idp_id":           string,   ; REQUIRED. UUID v4.
+     "session_id":       string,   ; REQUIRED. Agent session identifier.
+     "so_id":            string,   ; REQUIRED. Governed object UUID.
+     "mandate_id":       string,   ; REQUIRED. Mandate JWT jti claim.
+     "mandate_reference": string,  ; OPTIONAL. [NEW in -05] SPO URI
+                                   ; of the governing mandate or SO
+                                   ; Type.  See Section 4.2.
+     "mission_ref":      string,   ; OPTIONAL. MissionDeclaration UUID.
+     "endorsed_eod_id":  string,   ; OPTIONAL [Class 2: RECOMMENDED,
+                                   ; Class 3: REQUIRED]. [NEW in -05]
+                                   ; UUID of the Endorsed EOD produced
+                                   ; by the intake_endorsement operation
+                                   ; (Section 4.6).  When absent for a
+                                   ; Class 2 or Class 3 session, the
+                                   ; GEC MUST log EOD_ABSENT and MAY
+                                   ; apply Cedar policy restrictions.
+     "eod_id":           string,   ; OPTIONAL. UUID of the original
+                                   ; (unendorsed) EOD from which
+                                   ; endorsed_eod_id was produced.
+     "plan_b_ref":       string,   ; OPTIONAL. plan_b_id from the EOD
+                                   ; when the session is in
+                                   ; PLAN_B_ACTIVE state [AEP-02].
+                                   ; REQUIRED when session_state is
+                                   ; PLAN_B_ACTIVE.
+     "step_sequence":    integer,  ; REQUIRED. ACT step number, 1-based.
+     "requested_action": string,   ; REQUIRED. Cedar action string.
+     "declared_goal": {            ; REQUIRED.
+       "goal_id":        string,   ; REQUIRED. UUID v4.
+       "description":    string    ; REQUIRED. Human-readable. Max 500.
+     },
+     "reasoning_basis": {          ; REQUIRED.
+       "type":           string,   ; REQUIRED. See Section 4.3.
+       "description":    string    ; REQUIRED. Human-readable. Max 1000.
+     },
+     "confidence_level": number,   ; REQUIRED. Float, 0.0 to 1.0.
+     "hem_urgency":      string,   ; REQUIRED. See Section 4.4.
+     "context_refs":    [string],  ; OPTIONAL. UUIDs of relevant prior.
+     "audit_accessible": boolean,  ; OPTIONAL. Default: true.
+     "metadata":         object,   ; OPTIONAL. Implementation-defined.
+     "timestamp":        string,   ; REQUIRED. ISO 8601 UTC.
+     "gec_instance_id":  string,   ; RECOMMENDED (L2/L3: REQUIRED).
+                                   ; GEC instance attestation ID.
+     "data_residency": {           ; OPTIONAL. Analytics eligibility.
+       "jurisdiction":   string,
+       "tier2_eligible": boolean,
+       "tier3_eligible": boolean,
+       "retention_days": integer,
+       "anonymization_delay_days": integer
+     },
+     "reasoning_mode":   string    ; OPTIONAL. See Section 4.3.1.
+   }
+
+4.2.  Field Definitions
+
+   idp_id:
+      A UUID v4 [RFC9562] assigned by the agent.  Uniquely identifies
+      this IDP within the Event Log.  MUST be unique across all IDPs for
+      the lifetime of a governed object instance.
+
+   session_id:
+      The identifier of the agent session within which this action is
+      taken.  MUST match the session_id established at session creation.
+
+   so_id:
+      The UUID v4 of the governed object being operated on.  MUST match
+      the UUID bound to the mandate_id.
+
+   mandate_id:
+      The jti claim of the mandate JWT presented with this IDP.  Links
+      the intent declaration to the authorization credential under which
+      the action is requested.
+
+   mandate_reference: [NEW in -05]
+      OPTIONAL SPO URI identifying the governing mandate or SO Type for
+      this IDP session.  SPO URI format: a URI string that resolves to
+      the SO Type definition or mandate document that governs this
+      session's scope.
+
+      When present, the GEC MUST perform structural validation of the
+      IDP's requested_action against the SPO identified by
+      mandate_reference before Cedar evaluation:
+
+      (a) The GEC MUST verify that the SPO URI is resolvable and that
+          the resolved document is not expired.  An IDP with an SPO URI
+          that resolves to an expired document MUST be rejected with
+          deny code IDP_SPO_EXPIRED.
+
+      (b) The GEC MUST verify that the requested_action is within the
+          action space defined by the resolved SPO.  An action not
+          within the SPO action space MUST be rejected with deny code
+          IDP_ACTION_OUTSIDE_SPO.
+
+      (c) A mandate_reference that resolves to a document that does
+          not define the session's so_id SO Type MUST be rejected with
+          deny code IDP_SPO_TYPE_MISMATCH.
+
+      When mandate_reference is absent, the GEC proceeds with normal
+      Cedar evaluation without SPO structural validation.
+
+   endorsed_eod_id: [NEW in -05]
+      OPTIONAL UUID of the Endorsed EOD produced by the
+      intake_endorsement operation (Section 4.6) before this session
+      began.  For Class 2 agents, RECOMMENDED.  For Class 3 agents,
+      REQUIRED.
+
+      When endorsed_eod_id is present, the GEC MUST verify that the
+      referenced Endorsed EOD exists in the Event Log, that it has not
+      been revoked, and that it covers the so_id and mandate_id of this
+      IDP.  An endorsed_eod_id that does not match an Event Log
+      ENDORSED_EOD entry MUST result in deny code IDP_ENDORSED_EOD_INVALID.
+
+      When endorsed_eod_id is absent for a Class 3 agent, the GEC MUST
+      reject the IDP with deny code IDP_ENDORSED_EOD_REQUIRED.
+
+      When endorsed_eod_id is absent for a Class 2 agent, the GEC MUST
+      log EOD_ABSENT in the Event Log.  Cedar policies MAY require
+      endorsed_eod_id as a permit condition for Class 2 agents on high-
+      risk SO Types.
+
+   eod_id:
+      OPTIONAL UUID of the original (unendorsed) EOD from which the
+      Endorsed EOD was produced.  When endorsed_eod_id is present,
+      eod_id SHOULD also be present for full audit chain traceability.
+
+   plan_b_ref:
+      OPTIONAL string.  The plan_b_id from the EOD (Section 6.4 of
+      [I-D.sato-soos-aep]) when the AEP session is in PLAN_B_ACTIVE
+      state.  REQUIRED when the AEP session_state is PLAN_B_ACTIVE.
+      A Transition Request submitted in PLAN_B_ACTIVE state without
+      plan_b_ref MUST be rejected by the GEC per CONF-AEP-14
+      [I-D.sato-soos-aep].
+
+   mission_ref:
+      OPTIONAL.  The UUID of the MissionDeclaration governing the
+      session.  When present, MUST match the mission_ref claim in the
+      mandate_jwt if that claim is present.
+
+   step_sequence:
+      A positive integer indicating the ordinal position of this ACT
+      step within the current session.  Starts at 1.  MUST be
+      monotonically increasing within a session.  The GEC SHOULD
+      reject an IDP with a step_sequence equal to or less than the
+      last committed step_sequence for this session.
+
+   requested_action:
+      The Cedar action string identifying the action the agent requests.
+      MUST be the same Cedar action string submitted to the GEC for
+      policy evaluation.  When mandate_reference is present, MUST be
+      within the SPO action space per Section 4.2.
+
+   declared_goal:
+      A structured declaration of the goal the agent believes this
+      action serves.
+
+   reasoning_basis:
+      A structured declaration of the reasoning that led the agent to
+      request this action.
+
+      type:
+         One of the reasoning basis types defined in Section 4.3.
+
+      description:
+         A human-readable description.  MUST NOT contain personally
+         identifiable information.  Maximum 1000 characters.  When
+         reasoning_basis.type is RETRY_CONTINUATION, this field MUST
+         identify: (a) what action was previously denied or failed,
+         (b) what has changed in the agent's understanding or approach
+         since the prior attempt (the what_changed content required by
+         [I-D.sato-soos-aep] Section 10.4 MUST be reflected here), and
+         (c) why the agent believes the revised approach will succeed.
+
+   confidence_level:
+      A floating-point number in [0.0, 1.0] expressing the agent's
+      self-assessed confidence that this action is appropriate.  This
+      value is self-reported.  See Section 7 for calibration guidance
+      and the CONFIDENCE_MISCALIBRATION_WARNING trigger.
+
+   hem_urgency:
+      A declaration of the agent's assessment of whether human
+      judgment should be sought.  See Section 4.4.
+
+   context_refs:
+      An OPTIONAL array of Event Log entry UUIDs relevant to
+      reasoning.  When retrying after denial, SHOULD include the
+      idp_ids of prior IDP_SUBMITTED events for the same action.
+
+   gec_instance_id:
+      The attestation identity of the receiving GEC instance per
+      [I-D.sato-soos-kia].  RECOMMENDED for L2/L3 implementations;
+      OPTIONAL for L1.  When present, the GEC MUST verify this field
+      matches its own attested instance identifier.
+
+   reasoning_mode:
+      OPTIONAL string.  The reasoning mode classification (Section
+      4.3.1).  When absent, the GEC treats the IDP as ROUTINE.
+
+   data_residency:
+      OPTIONAL.  Analytics tier eligibility per FAIP specification.
+      When absent, SO Type default policy applies.
+
+
+4.3.  Reasoning Basis Types
+
+   The reasoning_basis.type field MUST be one of the following values:
+
+   RULE_BASED:
+      The agent is executing a predetermined rule or procedure.
+
+   INFERENCE:
+      The agent inferred that this action is appropriate based on
+      contextual reasoning.
+
+   INSTRUCTION:
+      The agent is executing an explicit instruction from a human
+      principal or from a higher-authority agent in the delegation
+      chain.  The reasoning_basis.description MUST identify the source
+      of the instruction by mandate_id or session_id.
+
+   UNCERTAINTY_REDUCTION:
+      The agent is taking this action to reduce uncertainty, not to
+      directly advance the declared goal.
+
+   MISSION_STAGE:
+      The agent is executing an action to advance the governing
+      MissionDeclaration from one stage to the next.  The mission_ref
+      field MUST be present when this type is used.
+
+   RETRY_CONTINUATION: [REVISED in -05]
+      The agent is retrying an action following a prior denial or
+      failure within the current session.  The idp_id of the prior
+      attempt's IDP_SUBMITTED Event Log entry MUST be included in
+      context_refs.  The reasoning_basis.description MUST identify:
+      (a) what action was previously denied or failed, (b) what has
+      changed in the agent's understanding or approach since the prior
+      attempt -- this MUST reference specific fields identified in the
+      DENY enrichment response or an observable Context Package change
+      since the denial, consistent with the AEP-02 what_changed
+      requirement [I-D.sato-soos-aep] Section 10.4, and (c) why the
+      agent believes the revised approach will succeed.
+
+      A RETRY_CONTINUATION IDP whose description does not reference a
+      specific enrichment field or observable Context Package change
+      MUST be treated as a WHAT_CHANGED_ABSENT declaration.  The GEC
+      MUST log a WARNING (RETRY_WHAT_CHANGED_WEAK) in the Event Log.
+      Cedar policies MAY apply additional restrictions to
+      WHAT_CHANGED_ABSENT declarations.  The deny code
+      RETRY_WHAT_CHANGED_INVALID from AEP-02 Section 10.4 applies
+      when the AEP layer rejects the ACT before the IDP is committed;
+      RETRY_WHAT_CHANGED_WEAK is the IDP-layer signal when the ACT
+      is accepted but the description does not meet specificity
+      requirements.
+
+      The prior_denial_count Cedar context attribute (Section 5.4) is
+      GEC-derived; it MUST NOT be accepted as an agent-supplied field.
+
+   Implementations MAY define additional type values per IANA
+   registration or URI-prefixed extension.
+
+   The reasoning_basis.type field describes the epistemic basis for
+   action selection.  The reasoning_mode field (Section 4.3.1)
+   describes the operational context.  The two fields are orthogonal
+   and complement each other.
+
+4.3.1.  Reasoning Mode Values
+
+   The following values are defined for the reasoning_mode field.
+
+   ROUTINE:
+      The agent is executing a planned transition on a known path to
+      the declared goal state.  SHOULD be omitted unless explicit
+      declaration is required; absent field is treated as ROUTINE.
+
+   PREDICTIVE:
+      The agent has inferred a future state from SENSE signals and is
+      taking preemptive action.  Confidence SHOULD be in STANDARD
+      range (0.60--0.79) or lower; VERIFIED confidence with PREDICTIVE
+      MUST be flagged in uncertainty_flags.
+
+   DIAGNOSTIC:
+      The agent has detected an anomalous SO Instance state and is
+      investigating cause before selecting an action.
+
+   CHANNEL_DEGRADED:
+      The agent has detected reduced Context Package fidelity.  Agents
+      declaring CHANNEL_DEGRADED MUST declare confidence_level in the
+      UNCERTAIN range (0.0--0.59).
+
+   META:
+      The agent is reasoning about its own execution process.  Agents
+      declaring META MUST set hem_urgency to RECOMMENDED or REQUIRED.
+
+   COMPENSATING:
+      The agent is selecting an alternate action path following a DENY
+      in the prior OBSERVE step.  reasoning_basis MUST use
+      RETRY_CONTINUATION type.
+
+   DELEGATION_AWARE:
+      The agent is replanning because a DELEGATION_EVENT or
+      CLUSTER_STATUS_CHANGE trigger changed goal achievability.
+
+   HEM_INFORMED:
+      The agent is re-entering REASON following an HEM_RESOLUTION
+      trigger.  The reasoning_basis.description MUST reference the
+      HEM decision identifier (hem_context.decision_id).
+
+   Implementations MAY define additional values per IANA registration.
+
+
+4.4.  HEM Urgency Values
+
+   The hem_urgency field declares the agent's assessment of whether
+   human judgment should be sought.
+
+   NONE:
+      No human judgment needed.  GEC proceeds with normal evaluation.
+
+   RECOMMENDED:
+      Human judgment would be beneficial but is not required.
+
+   REQUIRED:
+      The agent requires human judgment before this action executes.
+      The GEC MUST initiate HEM_PENDING for this session regardless
+      of Cedar evaluation outcome.
+
+   A hem_urgency of REQUIRED does not override Cedar evaluation; Cedar
+   still executes.  However, even a Cedar PERMIT MUST NOT cause the
+   action to execute; the session enters HEM_PENDING.
+
+
+4.5.  IDP Profiles
+
+   IDP_STANDARD:
+      All REQUIRED fields present.  confidence_level is agent-assessed.
+      reasoning_basis.type is one of the defined values.
+
+   IDP_THIN:
+      A reduced profile for agents with limited reasoning capability.
+      See Section 8.
+
+   The GEC MUST accept both profiles.  The GEC MUST record the profile
+   type in the IDP Event Log entry.
+
+
+4.6.  Intake Endorsement Operation [NEW in -05]
+
+   The intake_endorsement operation is a GEC service that processes
+   a submitted EOD before session initiation, validates it against the
+   governing mandate and SO Type, and returns a GEC-signed Endorsed
+   EOD.  The Endorsed EOD is the GEC's pre-session attestation that
+   the EOD is structurally valid, within mandate scope, and bound to
+   the specific SO Instance for which the session will be established.
+
+   The intake_endorsement operation is a read-write GEC interaction
+   that occurs between GNAP grant issuance and the first AEP SENSE
+   delivery.  It is the bridge between the EOD submitted by the agent
+   and the endorsed_eod_id required in IDPs for Class 2 and Class 3
+   sessions.
+
+4.6.1.  Endorsement Request
+
+   The intake_endorsement request MUST include:
+
+   {
+     "eod":              object,   ; REQUIRED. Full EOD per AEP-02 §6.2.
+     "mandate_jwt":      string,   ; REQUIRED. Root Mandate JWT for the
+                                   ; session for which the EOD applies.
+     "principal_credential": string, ; REQUIRED. Credential of the human
+                                   ; principal or operator authorizing
+                                   ; the EOD.  MUST be a credential
+                                   ; recognized by the GEC's KIA
+                                   ; configuration.
+     "requested_at":     string,   ; REQUIRED. ISO 8601 UTC.
+     "request_id":       string    ; REQUIRED. UUID v4. For idempotency.
+   }
+
+   The principal_credential MUST be a verifiable credential or signed
+   token issued by a principal recognized by the GEC's Party Registry
+   [I-D.sato-soos-kia].  An intake_endorsement request without a
+   valid principal_credential MUST be rejected with error code
+   INTAKE_PRINCIPAL_UNRECOGNIZED.
+
+4.6.2.  Endorsed EOD Response
+
+   On successful validation, the GEC returns an Endorsed EOD:
+
+   {
+     "endorsed_eod_id":  string,   ; REQUIRED. UUID v4. Unique
+                                   ; identifier for this Endorsed EOD.
+     "eod_id":           string,   ; REQUIRED. UUID of the input EOD.
+     "eod_hash":         string,   ; REQUIRED. SHA-256 of the input EOD.
+     "mandate_jwt_id":   string,   ; REQUIRED. jti of the Mandate JWT.
+     "so_id_bound":      string,   ; REQUIRED. SO Instance UUID to which
+                                   ; this Endorsed EOD is bound.
+     "primary_outcome_validated": boolean, ; REQUIRED. true if primary
+                                   ; outcome.target_state exists in the
+                                   ; SO Type state machine.
+     "plan_b_validated": boolean,  ; REQUIRED. true if plan_b is present
+                                   ; and plan_b.plan_b_target_state
+                                   ; exists in SO Type state machine.
+     "scope_status":     string,   ; REQUIRED. IN_SCOPE | OUT_OF_SCOPE |
+                                   ; PARTIAL_SCOPE.
+     "scope_detail":     string,   ; OPTIONAL. Human-readable detail
+                                   ; when scope_status is not IN_SCOPE.
+     "endorsed_at":      string,   ; REQUIRED. ISO 8601 UTC.
+     "gec_signature":    string    ; REQUIRED. GEC Ed25519 signature
+                                   ; over canonical JSON of this object.
+   }
+
+   When scope_status is OUT_OF_SCOPE, the GEC MUST return the Endorsed
+   EOD with scope_status: OUT_OF_SCOPE rather than rejecting the
+   request.  The agent or operator MAY revise the EOD and resubmit.
+   A session MUST NOT begin with an Endorsed EOD whose scope_status is
+   OUT_OF_SCOPE.
+
+   The GEC MUST commit an ENDORSED_EOD Event Log entry upon issuing
+   the Endorsed EOD, before returning it to the requester.  The
+   ENDORSED_EOD entry carries the endorsed_eod_id, eod_hash,
+   mandate_jwt_id, so_id_bound, and gec_signature.  This entry is the
+   source of truth that the GEC checks when validating endorsed_eod_id
+   in subsequent IDPs.
+
+4.6.3.  Intake Endorsement Validation Errors
+
+   The following error codes apply to intake_endorsement operations:
+
+   INTAKE_PRINCIPAL_UNRECOGNIZED:
+      The principal_credential is not recognized by the GEC's Party
+      Registry.
+
+   INTAKE_EOD_MALFORMED:
+      The EOD does not conform to the AEP-02 EOD schema.
+
+   INTAKE_MANDATE_INVALID:
+      The mandate_jwt fails MJWT verification.
+
+   INTAKE_PRIMARY_OUTCOME_INVALID:
+      The EOD primary_outcome.target_state does not exist in the SO
+      Type's state machine.
+
+   INTAKE_PLAN_B_INVALID:
+      The EOD plan_b.plan_b_target_state does not exist in the SO
+      Type's state machine.
+
+   INTAKE_SPO_EXPIRED:
+      The mandate_reference SPO URI in the EOD resolves to an expired
+      document.
+
+   INTAKE_DUPLICATE:
+      A duplicate request_id is detected (idempotency signal: the
+      prior Endorsed EOD is returned).
+
+
+4.7.  PD-EOD: Prompt-Derived EOD Branch [NEW in -05]
+
+   A Prompt-Derived EOD (PD-EOD) is an EOD produced by the GEC from
+   a natural-language prompt submitted by the agent or operator, rather
+   than from a structured EOD.  PD-EODs are intended for deployments
+   where the agent or operator cannot or does not supply a structured
+   EOD but where the human principal's natural-language instruction
+   provides sufficient information for the GEC to derive one.
+
+   PD-EODs carry a derived: true flag in the EOD structure
+   (Section 6.2 of [I-D.sato-soos-aep]).  This flag signals to auditors
+   and governance reviewers that the EOD was machine-derived from a
+   prompt, not human-structured.
+
+4.7.1.  PD-EOD Schema
+
+   A PD-EOD is an EOD (per AEP-02 Section 6.2) with the following
+   additional fields:
+
+   "derived":            boolean,  ; REQUIRED. MUST be true for PD-EOD.
+   "source_prompt":      string,   ; REQUIRED. The natural-language
+                                   ; prompt from which the EOD was
+                                   ; derived.  Max 2000 chars.
+   "derivation_model":   string,   ; REQUIRED. Identifier of the model
+                                   ; or procedure used to derive the
+                                   ; EOD from the prompt.
+   "derivation_confidence": number, ; REQUIRED. Float 0.0-1.0. GEC's
+                                   ; confidence that the derived EOD
+                                   ; accurately reflects the prompt's
+                                   ; intent.
+   "derivation_warnings": [string] ; OPTIONAL. GEC-generated warnings
+                                   ; about ambiguity, out-of-scope
+                                   ; content, or unsupported claims
+                                   ; in the source prompt.
+
+4.7.2.  PD-EOD Scope-Bounding Rule
+
+   A PD-EOD MUST NOT declare a primary_outcome.target_state or
+   plan_b.plan_b_target_state outside the action space of the SO Type
+   bound to the session's Mandate JWT.  This constraint is normative
+   regardless of what the source_prompt contains.
+
+   The GEC MUST enforce the scope-bounding rule before returning a
+   PD-EOD.  A prompt that implies an out-of-scope target state MUST
+   produce a PD-EOD whose scope_status is OUT_OF_SCOPE, not one that
+   silently clips the target to the nearest in-scope state.  Silent
+   scope reduction changes the agent's declared intent in an
+   unacknowledged way; this is a governance failure.
+
+   If the GEC produces a PD-EOD with a constrained target state (i.e.,
+   a target that differs from what the prompt implied), the PD-EOD MUST
+   carry this constraint in derivation_warnings.  The human principal
+   MUST acknowledge the constraint before the session begins.
+
+4.7.3.  PD-EOD HEM Notification Requirement
+
+   When a PD-EOD session involves touch of an external system not
+   referenced in the source_prompt or the SO Type's declared
+   interaction surface, the GEC MUST notify the human principal via
+   HEM [I-D.sato-soos-hem] before the first Transition Request
+   targeting that external system is executed.
+
+   "External system touch" for this purpose means: any Cedar action
+   that modifies state in a system whose identifier does not appear in
+   the SO Type's state machine or in the source_prompt.  The threshold
+   is intended to catch scope expansion that was neither declared in
+   the prompt nor supported by the SO Type definition.
+
+   The HEM notification MUST carry:
+   - The PD-EOD (endorsed_eod_id reference).
+   - The Cedar action that would trigger external system touch.
+   - The external system identifier.
+   - A human-readable explanation of why this constitutes unplanned
+     external system access.
+
+   The human principal's response MUST be one of: APPROVE (session
+   continues, external system touch is permitted), REDIRECT_GOAL (new
+   goal state that does not require external system touch), or TERMINATE.
+
+
+5.  Submission Protocol
+
+5.1.  When the IDP Is Submitted
+
+   The IDP MUST be submitted by the agent as part of the same GEC
+   call that requests the state transition.  The IDP MUST NOT be
+   submitted after the action has executed.
+
+   In a conforming AEP-02 execution loop [I-D.sato-soos-aep]:
+
+   0. (PRE-SESSION) Agent submits EOD to intake_endorsement operation;
+      receives Endorsed EOD with endorsed_eod_id.
+   1. (SENSE) GEC delivers context to agent.
+   2. (REASON) Agent reasons about next action.
+   3. (PLAN) Agent consults Transition Graph API for available actions.
+   4. (ACT) Agent submits GEC.transition(mandate_jwt, cedar_action,
+      idp) -- the IDP carries endorsed_eod_id from step 0.
+   5. (OBSERVE) Agent receives PERMIT, enriched DENY, HEM_PENDING,
+      or STALLED response.
+   6. (LOOP) Agent processes result before next ACT.
+
+   The IDP MUST be present in the Transition Request.  A
+   Transition Request without an IDP MUST be rejected by a
+   conforming GEC implementation.
+
+5.2.  GEC Receipt and Validation
+
+   Upon receiving a Transition Request, the GEC MUST:
+
+   (a) Validate that an IDP is present.  If absent, return REJECT
+       with error code IDP_MISSING.
+
+   (b) Validate that the IDP fields conform to this specification.
+       If malformed, return REJECT with error code IDP_MALFORMED.
+
+   (c) Validate that the idp_id is unique for this governed object.
+       If a duplicate idp_id is detected, return REJECT with error
+       code IDP_DUPLICATE.
+
+   (d) Validate that the IDP so_id matches the governed object UUID
+       bound to the mandate_jwt.  If mismatched, return REJECT with
+       error code IDP_SO_MISMATCH.
+
+   (e) Validate that the IDP mandate_id matches the jti claim of the
+       presented mandate_jwt.  If mismatched, return REJECT with
+       error code IDP_MANDATE_MISMATCH.
+
+   (f) Validate that step_sequence is strictly greater than the last
+       committed step_sequence for this session.
+
+   (g) If mission_ref is present, validate against mandate_jwt.
+
+   (h) If mandate_reference is present, perform SPO structural
+       validation per Section 4.2.  [NEW in -05]
+
+   (i) If endorsed_eod_id is present, validate against the
+       ENDORSED_EOD Event Log entry per Section 4.2.  [NEW in -05]
+       If endorsed_eod_id is absent and agent_class is CLASS_3,
+       return REJECT with error code IDP_ENDORSED_EOD_REQUIRED.
+
+   (j) If session_state is PLAN_B_ACTIVE and plan_b_ref is absent,
+       return REJECT with error code IDP_PLAN_B_REF_REQUIRED.
+       [NEW in -05]
+
+   (k) If reasoning_basis.type is RETRY_CONTINUATION, validate
+       what_changed specificity per Section 4.3.  Log
+       RETRY_WHAT_CHANGED_WEAK if description lacks specificity.
+
+   (l) If reasoning_basis.type is RETRY_CONTINUATION and context_refs
+       contains no reference to a prior IDP_SUBMITTED event for the
+       same requested_action, log WARNING (RETRY_WITHOUT_PRIOR_REF).
+
+   GEC validation of the IDP precedes Cedar evaluation.
+
+5.3.  Event Log Commitment
+
+   A conforming GEC implementation MUST commit an IDP_SUBMITTED event
+   to the Event Log upon successful validation of the IDP, BEFORE Cedar
+   evaluation executes.
+
+   The IDP_SUBMITTED event MUST contain:
+
+   * The full IDP object as submitted.
+   * The GEC receipt timestamp.
+   * The mandate_id and session_id.
+   * The audit_accessible value (defaults to true if absent).
+   * The GEC-derived prior_denial_count for the requested_action.
+   * The endorsed_eod_id if present.  [NEW in -05]
+   * The GEC signature over the event.
+
+   The Event Log ordering guarantee:
+
+      IDP_SUBMITTED < Cedar evaluation < STATE_TRANSITIONED
+      (or CEDAR_DENY_RECORDED) < ACTION_RESULT_RECORDED
+      < IDP_COMMITMENT_VERIFIED (or IDP_COMMITMENT_GAP)
+
+   No STATE_TRANSITIONED event may appear in the Event Log without a
+   preceding IDP_SUBMITTED event for the same step_sequence.
+
+5.4.  IDP in Cedar Policy Evaluation
+
+   The GEC MUST make the following IDP fields available as Cedar
+   context attributes during policy evaluation:
+
+   * idp.reasoning_basis.type  -- string
+   * idp.confidence_level      -- number
+   * idp.hem_urgency           -- string
+   * idp.reasoning_mode        -- string (ROUTINE when absent)
+   * idp.prior_denial_count    -- integer (GEC-derived from Event Log)
+   * idp.has_endorsed_eod      -- boolean  [NEW in -05]
+   * idp.eod_scope_status      -- string (IN_SCOPE/OUT_OF_SCOPE/
+                                  PARTIAL_SCOPE from Endorsed EOD)
+                                  [NEW in -05]
+   * idp.plan_b_active         -- boolean  [NEW in -05]
+   * idp.mandate_reference_valid -- boolean (true if SPO validation
+                                  passed, false or absent if not
+                                  evaluated)  [NEW in -05]
+   * idp.miscalibration_score  -- number (Section 7.2) [NEW in -05]
+
+   Cedar policies MAY gate on any of these attributes.
+
+5.5.  IDP Commitment Verification
+
+   Following every STATE_TRANSITIONED event, the GEC MUST generate
+   an IDP_COMMITMENT_VERIFIED or IDP_COMMITMENT_GAP event per the
+   IDP Commitment Verification mechanism.  This mechanism verifies
+   that the agent's actual action matches its declared intent.
+
+5.5.1.  IDP Commitment Verification Record Schema
+
+   {
+     "verification_id":  string,  ; UUID v4.
+     "idp_id":           string,  ; idp_id of the verified IDP.
+     "transition_event": string,  ; event_id of STATE_TRANSITIONED.
+     "match_result":     string,  ; MATCH | MISMATCH | PARTIAL_MATCH.
+     "verified_at":      string,  ; ISO 8601 UTC.
+     "gec_signature":    string   ; GEC signature.
+   }
+
+5.5.2.  Event Log Entries
+
+   IDP_COMMITMENT_VERIFIED:
+      Emitted when the committed action matches the declared intent.
+      Carries verification_id and match_result: MATCH.
+
+   IDP_COMMITMENT_GAP:
+      Emitted when the committed action does not match the declared
+      intent.  Carries verification_id and match_result: MISMATCH
+      or PARTIAL_MATCH.  The GEC MUST generate a WARNING Audit
+      Alert for MISMATCH.  PARTIAL_MATCH is informational only.
+
+5.5.3.  Commitment Verification Scope
+
+   Commitment verification compares:
+   - The requested_action in the committed IDP_SUBMITTED event.
+   - The action field in the subsequent STATE_TRANSITIONED event.
+
+   A match is exact string equality.  Partial match is where the
+   two actions are in the same Cedar namespace but differ in
+   specificity (e.g., "atp:booking:*" vs "atp:booking:confirm").
+
+5.5.4.  Relationship to GAR
+
+   IDP_COMMITMENT_VERIFIED and IDP_COMMITMENT_GAP events are recorded
+   in the SO Instance Event Stream [I-D.sato-soos-gar].  GAR includes
+   the commitment verification result in the Session Audit Record.
+
+5.6.  Outcome Event Log Entries
+
+   After the GEC processes a Transition Request and returns a result,
+   three outcome Event Log entries MUST be generated in order.
+
+5.6.1.  STATE_TRANSITIONED
+
+   Emitted when a transition is permitted and executed.
+
+   {
+     "event_type":    "STATE_TRANSITIONED",
+     "event_id":      string,  ; UUID v4.
+     "idp_id":        string,  ; idp_id of the corresponding IDP.
+     "from_state":    string,  ; SO state before transition.
+     "to_state":      string,  ; SO state after transition.
+     "cedar_action":  string,  ; Cedar action executed.
+     "transition_at": string,  ; ISO 8601 UTC.
+     "gec_signature": string
+   }
+
+5.6.2.  CEDAR_DENY_RECORDED
+
+   Emitted when Cedar evaluation returns DENY.
+
+   {
+     "event_type":       "CEDAR_DENY_RECORDED",
+     "event_id":         string,
+     "idp_id":           string,
+     "deny_code":        string,
+     "deny_reason":      string,
+     "denied_at":        string,
+     "prior_denial_count": integer,
+     "gec_signature":    string
+   }
+
+5.6.3.  ACTION_RESULT_RECORDED
+
+   Emitted after STATE_TRANSITIONED (or CEDAR_DENY_RECORDED) as
+   the operational outcome record.
+
+   {
+     "event_type":    "ACTION_RESULT_RECORDED",
+     "event_id":      string,
+     "idp_id":        string,
+     "result":        string,  ; PERMIT | DENY | HEM_PENDING | STALLED.
+     "result_detail": string,
+     "recorded_at":   string,
+     "gec_signature": string
+   }
+
+5.6.4.  Complete Audit Trail Example
+
+   For a PERMIT transition:
+
+   1. IDP_SUBMITTED     (idp_id: IDP-001, step_sequence: 1)
+   2. STATE_TRANSITIONED (from: CONFIRMED, to: PRE_ACTIVITY)
+   3. ACTION_RESULT_RECORDED (result: PERMIT)
+   4. IDP_COMMITMENT_VERIFIED (match_result: MATCH)
+
+   For a DENY:
+
+   1. IDP_SUBMITTED     (idp_id: IDP-002, step_sequence: 2)
+   2. CEDAR_DENY_RECORDED (deny_code: POLICY_DENY, prior_denial_count: 1)
+   3. ACTION_RESULT_RECORDED (result: DENY)
+
+
+6.  Enriched DENY Response
+
+6.1.  Structure
+
+   When Cedar evaluation results in DENY, the GEC MUST return an
+   Enriched DENY Response to the agent.
+
+   {
+     "deny_code":        string,   ; REQUIRED. See Section 13 registry.
+     "deny_reason":      string,   ; REQUIRED. Human-readable.
+     "idp_echo":         object,   ; REQUIRED. The submitted IDP.
+     "available_actions": [string], ; RECOMMENDED. Cedar actions
+                                   ; available in current SO state.
+     "suggested_paths":  [object], ; OPTIONAL. Alternate action paths.
+     "enrichment":       object,   ; REQUIRED. IDP fields that, if
+                                   ; changed, would produce PERMIT.
+     "prior_denial_count": integer, ; REQUIRED. [REVISED in -05]
+                                   ; Total denials for this action
+                                   ; in this session.  Also exposed
+                                   ; as Cedar context attribute.
+     "last_deny_code":   string,   ; RECOMMENDED. [NEW in -05]
+     "what_changed_guidance": string ; RECOMMENDED. [NEW in -05]
+                                   ; Human-readable guidance on what
+                                   ; must change for the next
+                                   ; RETRY_CONTINUATION to be specific
+                                   ; enough.  References enrichment
+                                   ; fields by name.
+   }
+
+6.2.  Field Definitions
+
+   deny_code:
+      One of the IDP Deny Codes registered in Section 13.
+
+   deny_reason:
+      A human-readable explanation of why the action was denied.
+      MUST be informative without revealing exploitable policy
+      structure (Section 9.3).
+
+   idp_echo:
+      The full submitted IDP.  Enables the agent to see exactly what
+      was committed before constructing its next IDP.
+
+   available_actions:
+      RECOMMENDED array of Cedar action strings available in the
+      current SO state.  This is the primary mechanism by which the
+      GEC guides the agent's next REASON step away from the denied
+      action and toward viable alternatives.
+
+   enrichment:
+      REQUIRED object carrying the specific IDP fields whose values,
+      if changed, would produce a PERMIT at the same Cedar policy set.
+      This is the structured basis for the RETRY_CONTINUATION
+      reasoning_basis.description requirement in Section 4.3.
+
+   prior_denial_count:
+      REQUIRED.  The total count of DENY responses for this
+      cedar_action in this session.  Also exposed as Cedar context
+      attribute idp.prior_denial_count at subsequent ACT steps.
+
+   what_changed_guidance: [NEW in -05]
+      RECOMMENDED.  GEC-generated guidance on what must be different
+      in the next RETRY_CONTINUATION IDP for it to meet the
+      specificity requirement of Section 4.3.  MUST reference specific
+      enrichment field names.  Example: "The next retry must change
+      reasoning_basis.description to reference enrichment.confidence_
+      level_required: 0.75 or above."
+
+6.3.  HEM Routing from DENY
+
+   When the deny_code is RETRY_LIMIT_EXCEEDED (prior_denial_count at
+   the Cedar policy threshold), the GEC MUST initiate HEM_PENDING.
+   The HEM escalation carries the full Enriched DENY Response as the
+   trigger context.
+
+
+7.  Confidence Level Calibration Guidance [NEW in -05]
+
+7.1.  Calibration Obligations
+
+   The confidence_level field is self-reported by the agent.  The GEC
+   cannot verify it at submission time.  However, over a session or
+   across sessions, the GEC CAN detect systematic miscalibration: an
+   agent that consistently declares VERIFIED confidence (0.90--1.00)
+   but receives DENY or HEM_PENDING on a significant fraction of its
+   IDPs is systematically overconfident.  An agent that consistently
+   declares UNCERTAIN confidence (0.0--0.59) on routine transitions is
+   systematically underconfident.
+
+   Both patterns are governance signals.  Overconfidence may indicate
+   an agent attempting to bypass Cedar policies that gate on confidence
+   level.  Underconfidence may indicate an agent gaming the HEM
+   escalation trigger to force human review on every transition.
+
+   Agents SHOULD calibrate confidence_level to reflect actual
+   outcome distribution over their operating history.  The
+   Progressive Trust model [I-D.sato-soos-pt] uses the relationship
+   between declared confidence and actual outcomes as a behavioral
+   dimension (the Precision Score).
+
+7.2.  CONFIDENCE_MISCALIBRATION_WARNING Trigger
+
+   The GEC MUST emit a CONFIDENCE_MISCALIBRATION_WARNING Event Log
+   entry when the following condition is met:
+
+   Within any window of 10 or more IDPs from the same session or
+   agent (computed across sessions when cross-session analytics are
+   enabled), the ratio of IDPs declaring confidence_level >= 0.80
+   (HIGH or VERIFIED) to IDPs that received DENY or HEM_PENDING is
+   greater than a configurable threshold (default: 0.40).
+
+   Interpretation: more than 40% of the agent's high-confidence
+   declarations resulted in DENY or HEM_PENDING.  This is a systematic
+   miscalibration signal.
+
+   The CONFIDENCE_MISCALIBRATION_WARNING entry:
+
+   {
+     "event_type":     "CONFIDENCE_MISCALIBRATION_WARNING",
+     "event_id":       string,
+     "agent_id":       string,
+     "session_id":     string,   ; or null for cross-session.
+     "window_size":    integer,  ; IDP count in the window.
+     "high_conf_count": integer, ; IDPs with confidence >= 0.80.
+     "deny_hem_count": integer,  ; DENYs + HEM_PENDINGs in window.
+     "ratio":          number,   ; deny_hem_count / high_conf_count.
+     "threshold":      number,   ; Configured threshold.
+     "occurred_at":    string,   ; ISO 8601 UTC.
+     "gec_signature":  string
+   }
+
+   CONFIDENCE_MISCALIBRATION_WARNING MUST be made available as a Cedar
+   context attribute:
+
+   context.agent_miscalibration_active: boolean (true when the most
+      recent window produced a CONFIDENCE_MISCALIBRATION_WARNING)
+
+   Cedar policies MAY gate on agent_miscalibration_active to apply
+   additional scrutiny or mandatory HEM escalation.
+
+7.3.  Correction Mechanism
+
+   When a CONFIDENCE_MISCALIBRATION_WARNING is emitted, the GEC SHOULD:
+
+   (a) Notify the human principal via HEM with urgency ADVISORY.
+       The HEM notification MUST include the miscalibration ratio and
+       the window period.
+
+   (b) Make the CONFIDENCE_MISCALIBRATION_WARNING available as a
+       session annotation visible in the GEC administrative interface.
+
+   (c) If configured, apply a Cedar policy adjustment that increases
+       the hem_urgency threshold for this agent's sessions until the
+       miscalibration window clears.
+
+   The correction mechanism MUST NOT automatically reduce the agent's
+   confidence_level declarations.  The confidence_level field is
+   the agent's self-report; the GEC records and detects miscalibration
+   but does not alter the agent's declared values.
+
+
+8.  IDP Thin Profile
+
+   The IDP_THIN profile is a reduced profile for agents with limited
+   reasoning capability.  IDP_THIN submissions provide reduced
+   accountability because the reasoning record is minimal.
+
+   IDP_THIN MUST include:
+   - idp_id, session_id, so_id, mandate_id, step_sequence,
+     requested_action, hem_urgency, timestamp.
+
+   IDP_THIN MUST NOT include:
+   - reasoning_basis.type: RETRY_CONTINUATION.
+
+   High-value or high-risk transitions SHOULD require IDP_STANDARD
+   submissions.  SO Type designers SHOULD use the IDP_THIN_NOT_ACCEPTED
+   mechanism for transitions where reasoning accountability is critical.
+
+   The endorsed_eod_id and plan_b_ref fields are not required in
+   IDP_THIN.  However, if a PD-EOD was used to initiate the session,
+   the endorsed_eod_id SHOULD be included in IDP_THIN submissions.
+
+
+9.  Security Considerations
+
+9.1.  IDP as Declaration, Not Proof
+
+   The IDP records the agent's declared intent; it does not verify it.
+   A compromised or adversarial agent may submit an IDP that does not
+   accurately represent its actual reasoning.  The security value of
+   the IDP lies in the permanent, pre-action record that creates
+   accountability: an agent that acts contrary to its declared intent
+   produces an auditable inconsistency between the IDP record and the
+   observed action sequence.  The IDP Commitment Verification mechanism
+   (Section 5.5) detects this inconsistency automatically.
+
+9.2.  Tamper Evidence
+
+   The IDP_SUBMITTED Event Log entry MUST be GEC-signed before
+   Cedar evaluation executes.  This prevents retroactive modification
+   of the intent record.  Implementations MUST use an asymmetric
+   signing key held by the GEC attestation component and MUST NOT
+   permit agents to write directly to the Event Log.
+
+9.3.  Inference from Denials
+
+   The Enriched DENY Response reveals information about permitted
+   actions and authorization policy structure.  The what_changed_
+   guidance field [NEW in -05] carries specific enrichment field names;
+   implementations MUST ensure that what_changed_guidance does not
+   reveal policy thresholds or conditions that would enable adversarial
+   policy reverse-engineering.  Guidance MUST be specific enough to
+   enable genuine retry without exposing Cedar policy internals.
+
+9.4.  Replay Prevention
+
+   The idp_id uniqueness requirement (Section 5.2(c)) prevents replay
+   of previously committed IDP objects.  Implementations MUST maintain
+   an in-memory index of committed idp_ids, rebuilt from the Event Log
+   on GEC restart.
+
+9.5.  Delegation Chain Integrity
+
+   The IDP's mandate_id field links the intent declaration to the
+   authorization credential.  In multi-hop delegation chains, the
+   mandate_id identifies the specific delegation under which the action
+   is requested.  This enables audit tracing of intent across
+   delegation trees per [I-D.mcguinness-oauth-actor-profile].
+
+9.6.  Thin Profile Risk
+
+   IDP_THIN submissions provide reduced accountability because the
+   reasoning record is minimal.  High-value or high-risk transitions
+   SHOULD require IDP_STANDARD submissions.  IDP_THIN MUST NOT carry
+   RETRY_CONTINUATION reasoning basis type (Section 8).
+
+9.7.  Commitment Verification Integrity
+
+   The IDP Commitment Verification Record (Section 5.5) is GEC-
+   generated and GEC-signed.  Agents MUST NOT be able to influence
+   the match_result field.  Implementations MUST ensure that the
+   comparison between requested_action and the executed transition
+   action string occurs entirely within the GEC.
+
+9.8.  Retry Loop Exhaustion Attacks
+
+   An adversarial agent may attempt to exhaust system resources by
+   submitting continuous RETRY_CONTINUATION IDPs against a denied
+   action.  Implementations MUST enforce the Cedar policy threshold
+   for prior_denial_count (Section 5.4) and MUST enter HEM_PENDING
+   automatically when RETRY_LIMIT_EXCEEDED is triggered.  The AEP-02
+   STALLED state (Section 5.4 of [I-D.sato-soos-aep]) provides an
+   additional bound: the STALL_DENY_THRESHOLD terminates the retry
+   sequence before budget exhaustion.
+
+9.9.  Cross-Context Replay
+
+   A valid IDP from session S1 may be replayed in session S2 if the
+   IDP does not include session-binding claims sufficient to bind the
+   declaration to a specific execution context.  Mitigation: IDP MUST
+   include session_id, which the GEC MUST verify matches the active
+   session.  IDPs with mismatched session_id MUST be rejected with
+   error code IDP_SESSION_MISMATCH.  For L2/L3 implementations,
+   gec_instance_id provides an additional binding.
+
+   Reference: OpenID Foundation, "Responsible Disclosure Notice on
+   Security Vulnerability for private_key_jwt", January 2025
+   [OIDF-2025-01].
+
+9.10.  Agent Session Revocation
+
+   When an agent session is revoked, this document's protocol
+   obligations are superseded by the MAD session revocation procedure
+   [I-D.sato-soos-mad] Section 3.6.  IDPs submitted after session
+   revocation MUST be rejected with IDP_SESSION_REVOKED.  All in-
+   flight Commitment Verification records at revocation MUST be
+   finalized with completion_state PARTIAL or CLEAN.
+
+9.11.  Prompt Injection at Intake [NEW in -05]
+
+   The intake_endorsement operation (Section 4.6) processes a
+   natural-language source_prompt to derive PD-EODs (Section 4.7).
+   An adversary who can influence the content of the source_prompt
+   may attempt to inject instructions that cause the GEC to endorse
+   an EOD with a broader scope or more permissive outcome than the
+   human principal intended.
+
+   Attack vectors:
+
+   (a) Scope expansion injection.  The source_prompt contains embedded
+       instructions (e.g., "also authorize access to [system]") that
+       are processed as PD-EOD scope declarations rather than as
+       natural-language content to be bounded.  The PD-EOD produced
+       includes the injected scope claim.
+
+   (b) Confidence manipulation.  The source_prompt includes language
+       asserting high certainty ("I am authorized to...") that
+       influences the derivation_confidence assigned to the PD-EOD,
+       causing the GEC to produce an Endorsed EOD with higher
+       derivation_confidence than the prompt's substantive content
+       warrants.
+
+   (c) Plan B poisoning.  The source_prompt includes embedded plan B
+       instructions that declare a fallback to a broader-scope action
+       than the primary outcome, causing the endorsed Plan B to have
+       a wider blast radius than the primary path.
+
+   Mitigations:
+
+   (i)  The scope-bounding rule (Section 4.7.2) is the primary
+        mitigation: the PD-EOD MUST NOT declare a target state outside
+        the SO Type's state machine, regardless of what the prompt
+        contains.  Scope injection that targets states outside the
+        SO Type is structurally non-exploitable.
+
+   (ii) The GEC MUST treat the source_prompt as untrusted natural-
+        language input.  Implementations MUST NOT evaluate source_prompt
+        content as policy instructions.  The derivation process MUST
+        extract goal-relevant information from the prompt using a model
+        or procedure that is separate from the GEC's Cedar evaluation
+        engine.
+
+   (iii) derivation_warnings (Section 4.7.1) MUST flag any prompt
+        content that was excluded from the PD-EOD because it was
+        outside the SO Type's action space or outside the mandate's
+        Cedar scope.  The human principal review of derivation_warnings
+        is the human-in-the-loop check on prompt injection attempts.
+
+   (iv) The human principal's acknowledgment of the PD-EOD
+        (required before session begins) is the final gate.
+
+9.12.  EOD Scope Manipulation [NEW in -05]
+
+   The Endorsed EOD (Section 4.6) commits the agent's expected
+   outcome before the first SENSE delivery.  An adversary who can
+   modify the EOD between the intake_endorsement operation and the
+   session start (or who can cause the GEC to endorse a manipulated
+   EOD) gains the ability to mismatch the governing pre-commitment
+   from the agent's actual declared intent.
+
+   Attack vectors:
+
+   (a) EOD substitution.  An adversary with network access to the
+       intake_endorsement response modifies the Endorsed EOD in transit,
+       changing the primary_outcome.target_state to a more permissive
+       state before the session receives it.
+
+   (b) endorsed_eod_id forgery.  An adversary supplies a fabricated
+       endorsed_eod_id in the IDP, referencing an Endorsed EOD that
+       was never actually produced by the GEC.
+
+   Mitigations:
+
+   (i)  The Endorsed EOD is GEC-signed (gec_signature in Section 4.6.2).
+        An adversary who modifies the Endorsed EOD in transit invalidates
+        the GEC signature.  IDP validation at step (i) of Section 5.2
+        verifies the Endorsed EOD exists in the Event Log, not merely
+        in the agent-supplied IDP field.
+
+   (ii) The ENDORSED_EOD Event Log entry (Section 4.6.2) is the source
+        of truth.  endorsed_eod_id validation checks the Event Log;
+        a fabricated endorsed_eod_id that does not match an Event Log
+        entry MUST result in IDP_ENDORSED_EOD_INVALID.
+
+   (iii) Transport of the Endorsed EOD from GEC to agent MUST use
+         GEC-authenticated TLS.  Implementations MUST NOT transmit
+         Endorsed EODs over unauthenticated channels.
+
+9.13.  Confidence Level Inflation Attack [NEW in -05]
+
+   A malicious agent may systematically declare VERIFIED confidence
+   (0.90--1.00) to exploit Cedar policies that grant elevated
+   permissions to high-confidence IDPs.  By inflating its declared
+   confidence, the agent attempts to bypass Cedar policy restrictions
+   that would apply at lower confidence levels.
+
+   Mitigation:
+
+   (a) The CONFIDENCE_MISCALIBRATION_WARNING trigger (Section 7.2) is
+       the primary detection mechanism.  Systematic high-confidence
+       declarations followed by DENYs or HEM_PENDINGs are detectable
+       within a 10-IDP window.
+
+   (b) The idp.miscalibration_score Cedar context attribute (Section
+       5.4) enables Cedar policies to reduce the governance weight of
+       declared confidence_level when systematic miscalibration is
+       detected.  Cedar policies SHOULD apply elevated scrutiny to
+       agents whose agent_miscalibration_active is true.
+
+   (c) The Progressive Trust model [I-D.sato-soos-pt] uses the
+       relationship between declared confidence and outcomes as a
+       Precision Score behavioral dimension.  Sustained inflation
+       degrades the agent's PT score over time, reducing its
+       autonomous authority.
+
+   Implementations MUST NOT use the declared confidence_level as the
+   sole basis for elevated-privilege Cedar permits.  Cedar policies
+   SHOULD combine confidence_level with PT score, prior_denial_count,
+   and agent_miscalibration_active to make autonomous-privilege
+   decisions robust to inflation.
+
+9.14.  COMMITMENT_GAP Exploitation [NEW in -05]
+
+   An IDP_COMMITMENT_GAP event (Section 5.5.2) indicates that the
+   agent's executed action did not match its declared intent.  A
+   sophisticated adversary may attempt to exploit the COMMITMENT_GAP
+   mechanism as a confusion vector: by deliberately submitting IDPs
+   whose requested_action is close-but-not-equal to the action the
+   agent intends to execute, the adversary creates a pattern of
+   PARTIAL_MATCH events that obscures intentional mismatch within
+   noise.
+
+   Attack vectors:
+
+   (a) PARTIAL_MATCH flooding.  An agent submits IDPs with
+       requested_action values in the same Cedar namespace as the
+       actual actions (e.g., "atp:booking:*" while executing
+       "atp:booking:cancel") to produce a consistent PARTIAL_MATCH
+       pattern that suppresses MISMATCH detection.
+
+   (b) Timing exploitation.  In high-throughput deployments, the
+       adversary exploits the gap between IDP_SUBMITTED and
+       IDP_COMMITMENT_VERIFIED to execute an action inconsistent with
+       the IDP before the verification event is committed.
+
+   Mitigations:
+
+   (i)  The IDP Commitment Verification Record (Section 5.5.1) is
+        GEC-generated and GEC-signed at transition time.  The comparison
+        uses exact string equality for MATCH; namespace-only overlap
+        produces PARTIAL_MATCH, which carries a WARNING distinct from
+        MISMATCH.  PARTIAL_MATCH patterns above a frequency threshold
+        MUST generate a KERNEL_AUDIT_ANOMALY alert.
+
+   (ii) Implementations MUST use requested_action as an exact Cedar
+        action string in the IDP.  Wildcard requested_action values
+        (e.g., "atp:booking:*") MUST be rejected with IDP_MALFORMED,
+        as they are not valid Cedar action strings.
+
+   (iii) The timing gap mitigation is ACT atomicity (Section 9.2 of
+         [I-D.sato-soos-aep]): the GEC execution sequence does not
+         return a result to the agent until IDP_SUBMITTED and
+         STATE_TRANSITIONED (or CEDAR_DENY_RECORDED) are both committed.
+         An action cannot succeed without the corresponding commitment.
+
+
+10.  Conformance Levels
+
+10.1.  Overview
+
+   IDP conformance is defined at three levels.  All three levels share
+   the same IDP wire format (Section 4.1), the same pre-action
+   submission requirement (Section 5.1), and the same Enriched DENY
+   Response structure (Section 6).  They differ in the implementation
+   form of the GEC and in the resulting non-suppressibility guarantee.
+
+   Level 1 -- Application Profile:
+      GEC as library or middleware.  Non-suppressibility is
+      probabilistic.  Compensated by SCITT corroboration.
+
+   Level 2 -- Isolated Profile:
+      GEC as separate process or sidecar.  Signing key inaccessible
+      to agent process.  Non-suppressibility is architectural.
+
+   Level 3 -- Kernel Profile:
+      GEC in a RATS-attested TEE.  Signing key bound to TEE via RATS.
+      Non-suppressibility is hardware-enforced.
+
+10.2.  Level 1 -- Application Profile
+
+   The Application Profile is the entry-level conformance tier.  SDK
+   libraries, middleware interceptors, in-process enforcement modules,
+   and agent framework plugins are all conforming Level 1 GEC
+   implementations.
+
+   Level 1 GEC implementations MUST:
+
+   (a) Accept the IDP as part of the Transition Request (Section 5.1)
+       and commit an IDP_SUBMITTED entry before the governed action
+       executes.
+
+   (b) Return an Enriched DENY Response for all DENY outcomes.
+
+   (c) Implement the IDP Commitment Verification mechanism
+       (Section 5.5).
+
+   (d) Support the intake_endorsement operation (Section 4.6) for
+       Class 2 and Class 3 sessions.  [NEW in -05]
+
+   Level 1 implementations SHOULD:
+
+   (e) Submit IDP records to a SCITT transparency log.
+
+   (f) Emit CONFIDENCE_MISCALIBRATION_WARNING events (Section 7.2)
+       based on in-session window analysis.  [NEW in -05]
+
+10.3.  Level 2 -- Isolated Profile
+
+   Level 2 adds architectural non-suppressibility.  The GEC signing
+   key is inaccessible to the agent process.
+
+   Level 2 GEC implementations MUST meet all Level 1 requirements plus:
+
+   (a) Implement the GEC as a separate process or container with
+       software-enforced isolation from the agent process.
+
+   (b) Include gec_instance_id in all IDP records.
+
+   (c) Validate gec_instance_id in incoming IDPs.
+
+   (d) Emit CONFIDENCE_MISCALIBRATION_WARNING events across sessions
+       within the GEC's configured analytics window.  [NEW in -05]
+
+10.4.  Level 3 -- Kernel Profile
+
+   Level 3 provides hardware-enforced non-suppressibility.
+
+   Level 3 GEC implementations MUST meet all Level 2 requirements plus:
+
+   (a) Run in a RATS-attested hardware execution environment
+       [I-D.ietf-rats-architecture].
+
+   (b) Bind the GEC signing key to the TEE via RATS attestation.
+
+   (c) Emit CONFIDENCE_MISCALIBRATION_WARNING events with cross-
+       session analytics when the GEC's attestation boundary covers
+       multiple sessions.  [NEW in -05]
+
+10.5.  Regulatory Applicability
+
+   The three conformance levels map to EU AI Act Article 9 risk
+   classifications:
+
+   - Level 1: Appropriate for limited-risk AI systems.
+   - Level 2: Appropriate for high-risk AI systems under Article 9
+     where hardware attestation is not operationally feasible.
+   - Level 3: Required for high-risk AI systems under Article 9
+     where hardware attestation is available.
+
+   Level 3 + endorsed_eod_id [NEW in -05]: For Class 3 agents
+   operating at Level 3 conformance with an Endorsed EOD, the
+   combination of pre-session commitment (Endorsed EOD), per-transition
+   commitment (IDP), hardware non-suppressibility (Level 3), and
+   commitment verification (Section 5.5) constitutes a complete EU AI
+   Act Article 9 technical risk management record.
+
+10.6.  Conformance Level Signalling
+
+   The GEC MUST signal its conformance level in the GEC Manifest
+   [I-D.sato-soos-kia].  Agents MAY query the GEC Manifest to
+   determine the conformance level before session initiation.
+
+   SO Type definitions MAY declare a minimum GEC conformance level
+   required for sessions on that SO Type.  A session initiated by a
+   GEC whose conformance level is below the SO Type minimum MUST be
+   rejected with deny code GEC_LEVEL_INSUFFICIENT.
+
+
+11.  Privacy Considerations
+
+   The IDP contains the agent's declared goal description (Section 4.1,
+   declared_goal.description).  Implementations MUST ensure that
+   declared_goal.description does not contain personally identifiable
+   information.  The GEC SHOULD validate this field against a PII
+   detection policy before committing the IDP_SUBMITTED entry.
+
+   The source_prompt in a PD-EOD (Section 4.7) may contain personal
+   information included by the operator or human principal in the
+   natural-language prompt.  GEC implementations MUST apply the same
+   PII constraints to source_prompt as to declared_goal.description.
+   The derivation process MUST NOT propagate PII from source_prompt
+   into derived PD-EOD fields.  [NEW in -05]
+
+   The data_residency field (Section 4.1) governs which IDP records
+   are eligible for Tier 2 and Tier 3 analytics aggregation.  When
+   data_residency is absent, the GEC MUST apply the SO Type's default
+   residency policy.
+
+   The Endorsed EOD (Section 4.6) contains the primary_outcome and
+   plan_b fields from the EOD.  These fields reveal the human
+   principal's intentions for the SO Instance.  Access to Endorsed EOD
+   records MUST be controlled by Cedar policy and MUST be subject to
+   the same access controls as the IDP records for the session.
+   [NEW in -05]
+
+
+12.  EU AI Act Applicability
+
+   The IDP is the Article 12 audit artifact at the action level.  For
+   each governed action: the Endorsed EOD provides pre-session
+   commitment (new in -05), the IDP provides the per-transition intent
+   declaration (pre-action), the Cedar evaluation result and
+   Commitment Verification provide the governance decision, and the
+   Outcome Event Log entries provide the post-action record.
+
+   The full audit chain -- Endorsed EOD → IDP_SUBMITTED → Cedar result
+   → STATE_TRANSITIONED or CEDAR_DENY_RECORDED → IDP_COMMITMENT_VERIFIED
+   -- is the Article 12 record for a single governed transition.  The
+   pre-action/post-action pair is GEC-signed and non-suppressible at
+   the conformance level appropriate to the Article 9 risk class.
+
+   The CONFIDENCE_MISCALIBRATION_WARNING (Section 7.2) provides the
+   Article 9 "monitoring throughout the lifecycle" signal for confidence
+   calibration drift.  [NEW in -05]
+
+
+13.  IANA Considerations
+
+   This document requests the creation of the following IANA registries
+   (extending the IDP-04 registries with new entries).
+
+   IDP Reasoning Basis Types Registry:
+   Initial values: as in IDP-04.
+
+   New entry in -05:
+
+   No new reasoning basis types are added in -05.  The RETRY_
+   CONTINUATION type is revised (normative requirement for
+   what_changed specificity; cross-reference to AEP-02 Section 10.4).
+   The revision does not add a new registry entry; it narrows the
+   existing entry's normative requirements.
+
+   IDP Deny Codes Registry:
+   Initial values: as in IDP-04, plus the following additions in -05:
+
+   +--------------------------------+--------------------------------+
+   | Deny Code                      | Description                    |
+   +--------------------------------+--------------------------------+
+   | IDP_ENDORSED_EOD_REQUIRED      | Class 3 agent submitted IDP    |
+   |                                | without endorsed_eod_id;       |
+   |                                | Endorsed EOD is required       |
+   | IDP_ENDORSED_EOD_INVALID       | endorsed_eod_id not found in   |
+   |                                | Event Log or GEC signature     |
+   |                                | invalid                        |
+   | IDP_PLAN_B_REF_REQUIRED        | Session in PLAN_B_ACTIVE state |
+   |                                | but plan_b_ref absent          |
+   | IDP_SPO_EXPIRED                | mandate_reference SPO URI      |
+   |                                | resolves to expired document   |
+   | IDP_ACTION_OUTSIDE_SPO         | requested_action not in SPO    |
+   |                                | action space                   |
+   | IDP_SPO_TYPE_MISMATCH          | mandate_reference SPO does     |
+   |                                | not cover session so_id type   |
+   | INTAKE_PRINCIPAL_UNRECOGNIZED  | intake_endorsement principal   |
+   |                                | credential not recognized      |
+   | INTAKE_EOD_MALFORMED           | EOD does not conform to schema |
+   | INTAKE_MANDATE_INVALID         | Mandate JWT fails verification |
+   | INTAKE_PRIMARY_OUTCOME_INVALID | primary_outcome.target_state   |
+   |                                | not in SO Type state machine   |
+   | INTAKE_PLAN_B_INVALID          | plan_b.plan_b_target_state     |
+   |                                | not in SO Type state machine   |
+   | INTAKE_SPO_EXPIRED             | mandate_reference in EOD       |
+   |                                | resolves to expired SPO        |
+   | INTAKE_DUPLICATE               | Duplicate request_id;          |
+   |                                | prior Endorsed EOD returned    |
+   | RETRY_WHAT_CHANGED_WEAK        | RETRY_CONTINUATION description |
+   |                                | lacks specificity (IDP-layer   |
+   |                                | signal; warning, not reject)   |
+   +--------------------------------+--------------------------------+
+
+   IDP Reasoning Mode Values Registry:
+   Initial values: as in IDP-04.  No new reasoning mode values in -05.
+
+   IDP Operation Code Registry: [NEW in -05]
+
+   Registry name: IDP Operation Codes
+   Registration procedure: Specification Required [RFC8126]
+
+   Initial registrations:
+
+   +----------------------+------------------------------------------+
+   | Operation Code       | Description                              |
+   +----------------------+------------------------------------------+
+   | intake_endorsement   | GEC operation to endorse a submitted EOD |
+   |                      | before session initiation.  Input:       |
+   |                      | EOD + principal_credential.  Output:     |
+   |                      | Endorsed EOD with gec_signature and      |
+   |                      | endorsed_eod_id.  See Section 4.6.       |
+   +----------------------+------------------------------------------+
+
+   PD-EOD Derivation Flag Registry: [NEW in -05]
+
+   Registry name: IDP PD-EOD Derivation Flags
+   Registration procedure: Specification Required [RFC8126]
+
+   Initial registrations:
+
+   +------------------------+----------------------------------------+
+   | Flag                   | Description                            |
+   +------------------------+----------------------------------------+
+   | derived                | boolean. When true, EOD was derived     |
+   |                        | from a natural-language prompt. See    |
+   |                        | Section 4.7.                           |
+   +------------------------+----------------------------------------+
+
+
+14.  References
+
+14.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC9562]  Davis, B., Peabody, C., and P. Leach, "Universally
+              Unique IDentifiers (UUIDs)", RFC 9562, May 2024.
+
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Token (JWT)", RFC 7519, May 2015.
+
+   [RFC8126]  Cotton, M., Leiba, B., and T. Narten, "Guidelines for
+              Writing an IANA Considerations Section in RFCs", BCP 26,
+              RFC 8126, June 2017.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [Cedar]    Amazon Web Services, "Cedar Policy Language",
+              <https://www.cedarpolicy.com/>.
+
+   [I-D.sato-soos-aep]
+              Sato, T., "The Agent Execution Protocol (AEP) for
+              Agentic AI Systems", draft-sato-soos-aep-02, July 2026.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM) for
+              Agentic AI Systems", draft-sato-soos-hem-05, July 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Architecture (KIA) for
+              Agentic AI Systems", draft-sato-soos-kia-03, July 2026.
+
+   [OIDF-2025-01]
+              OpenID Foundation, "Responsible Disclosure Notice on
+              Security Vulnerability for private_key_jwt", January 2025.
+
+14.2.  Informative References
+
+   [EUAIA]    European Union, "Regulation (EU) 2024/1689 of the
+              European Parliament and of the Council (Artificial
+              Intelligence Act)", 12 July 2024.
+
+   [I-D.ietf-wimse-arch]
+              Salowey, J., et al., "WIMSE Architecture",
+              draft-ietf-wimse-arch, work in progress.
+
+   [I-D.ietf-oauth-v2-1]
+              Hardt, D., Parecki, A., and T. Lodderstedt, "OAuth
+              2.1 Authorization Framework", work in progress.
+
+   [I-D.rosenberg-oauth-aauth]
+              Rosenberg, J., "Agent Authentication (AAuth)",
+              work in progress.
+
+   [I-D.klrc-aiagent-auth]
+              Kasselman, P., et al., "AI Agent Authentication and
+              Authorization", draft-klrc-aiagent-auth-01, 2026.
+
+   [I-D.rosenberg-aiproto-cheq]
+              Rosenberg, J., White, P., and C. Jennings, "CHEQ",
+              draft-rosenberg-aiproto-cheq-00, 2025.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "The Governance Audit Record (GAR) for
+              Agentic AI Systems", draft-sato-soos-gar-03, July 2026.
+
+   [I-D.sato-soos-pt]
+              Sato, T., "Progressive Trust (PT) for Agentic AI
+              Systems", draft-sato-soos-pt-02, May 2026.
+
+   [I-D.sato-soos-mad]
+              Sato, T., "Multi-Agent Delegation (MAD) for Agentic
+              AI Systems", draft-sato-soos-mad-03, June 2026.
+
+   [I-D.mcguinness-oauth-actor-profile]
+              McGuinness, K., "OAuth Actor Profile for AI Agents",
+              draft-mcguinness-oauth-actor-profile-00, 2026.
+
+   [I-D.mcguinness-oauth-mission-bound-authorization]
+              McGuinness, K., "Mission Bound Authorization",
+              draft-mcguinness-oauth-mission-bound-authorization-00,
+              2026.
+
+   [I-D.ietf-rats-architecture]
+              Birkholz, H., et al., "Remote ATtestation procedureS
+              (RATS) Architecture", RFC 9334, January 2023.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/idp

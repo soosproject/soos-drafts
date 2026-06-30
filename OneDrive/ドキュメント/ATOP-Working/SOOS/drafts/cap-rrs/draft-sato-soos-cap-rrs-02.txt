@@ -1,0 +1,1342 @@
+Internet Engineering Task Force                                  T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                        28 June 2026
+Expires: 28 December 2026
+
+
+         Constitutional AI Protocol -- Regulation Record Specification
+                          (CAP-RRS)
+                    draft-sato-soos-cap-rrs-02
+
+
+Abstract
+
+   Compliance with applicable law should be a package import, not a
+   Cedar authoring problem.
+
+   The Constitutional AI Protocol (CAP) [I-D.sato-soos-cap] defines
+   the enforcement architecture for governed AI agent systems: a
+   three-tier Cedar policy evaluation model that distinguishes
+   absolute prohibitions, jurisdictional legal constraints, operator
+   policies, and resource limits.  CAP specifies what the Governance
+   Execution Controller (GEC) does when a Cedar policy fires.  It
+   does not specify how Cedar policies are authored, certified,
+   distributed, or maintained as law changes.
+
+   This document defines the Regulation Record: the structured
+   representation of a compliance obligation at any CAP tier.  A
+   Regulation Record is the human-readable, machine-compilable
+   intermediate form between legal text and Cedar policy.  This
+   document specifies the Regulation Record schema (Section 4), the
+   Cedar Compilation Profile that governs how Regulation Records are
+   translated into Cedar policies (Section 5), the conflict
+   declaration model (Section 6), the certification model governing
+   which publishers may certify records at each tier (Section 7), and
+   the versioning and update protocol for the Constitutional Mandate
+   Registry (Section 8).
+
+   Version -02 adds the Law Reference Interface (LRI) generic model
+   (Section 9), the Statute-Primacy Rule (Section 10), and the
+   Operational Requirements for catalog amendment and interpretation
+   detection (Section 11).  These three additions complete the
+   regulation lifecycle: from law encoding (Sections 4-8) through law
+   reference and provenance (Section 9), through the consequences of
+   law amendment (Section 10), through the operational cadence
+   governing detection and response (Section 11).
+
+   The core developer experience this document enables: a developer
+   imports certified Regulation Record packages from the
+   Constitutional Mandate Registry, declares their own Tier 2
+   operator policies and Tier 3 resource policies, calls compile(),
+   and receives a Cedar policy set ready for GEC loading.  No Cedar
+   is authored by hand for compliance purposes.  Compliance is a
+   package management operation.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 28 December 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+       1.1.  The Compliance Authoring Problem
+       1.2.  The Compilation Model
+       1.3.  Relationship to CAP
+       1.4.  Cedar as Compilation Target
+   2.  Conventions and Definitions
+   3.  Architecture Overview
+       3.1.  The Three-Layer Stack
+       3.2.  Developer Experience
+       3.3.  Registry as Package Ecosystem
+   4.  Regulation Record Schema
+       4.1.  Top-Level Fields
+       4.2.  agent_check Object
+       4.3.  resource_policy Object (Tier 3)
+       4.4.  conflict_declarations Array
+       4.5.  certification Object
+       4.6.  Complete Schema Reference
+       4.7.  Tier-Specific Requirements
+       4.8.  Worked Examples
+           4.8.1.  Tier 0-A: Genocide Prohibition (Rome Statute)
+           4.8.2.  Tier 1: GDPR Article 6 Lawful Basis
+           4.8.3.  Tier 1: AML Suspicious Transaction (BSA)
+           4.8.4.  Tier 1: Japan -- APPI Article 17
+           4.8.5.  Tier 1: Japan -- FIEA Article 38
+           4.8.6.  Tier 2: Operator Data Access Policy
+           4.8.7.  Tier 3: Token Budget Resource Policy
+   5.  Cedar Compilation Profile
+       5.1.  Compilation Overview
+       5.2.  Field Mapping: agent_check to Cedar
+       5.3.  Conflict Surfacing at Compile Time
+       5.4.  Compiler Conformance Requirements
+   6.  Conflict Declaration Model
+       6.1.  Conflict Types
+       6.2.  Static vs. Runtime Conflicts
+       6.3.  Conflict Resolution Protocol
+   7.  Certification Model
+       7.1.  Publisher Tiers
+       7.2.  Certification Process
+       7.3.  Certification Verification
+   8.  Constitutional Mandate Registry Protocol
+       8.1.  Package Structure
+       8.2.  Versioning
+       8.3.  Update Notification
+       8.4.  GEC Update Response Options
+   9.  Law Reference Interface (LRI)           [NEW in -02]
+       9.1.  Purpose and Design Rationale
+       9.2.  LRI Generic Schema
+       9.3.  Five Normative LRI Requirements
+       9.4.  resolution_basis Controlled Vocabulary
+       9.5.  Co-Endorsement Model
+       9.6.  interpretation_endpoint
+       9.7.  LRI Profile URI Registry
+   10. Statute-Primacy Rule                    [NEW in -02]
+       10.1. Normative Rule Text
+       10.2. CATALOG_VERSION_CONFLICT Event
+       10.3. INTERPRETATION_SUPERSEDED Event
+       10.4. 信頼保護 Safe Harbor Clause
+       10.5. catalog_version Object Schema
+   11. Operational Requirements               [NEW in -02]
+       11.1. Amendment Detection Cadence
+       11.2. Interpretation Detection Cadence
+       11.3. Maximum Suspension Window
+       11.4. authority_source_uri Mandatory Field
+   12. HEM Integration
+       12.1. HEM_TIER3_ANTICIPATORY (Class 8)
+       12.2. HEM_TIER3_OBSERVED (Class 9)
+       12.3. Execution Options Package
+       12.4. Natural Breakpoint Declaration
+   13. Open Issues
+   14. Security Considerations
+   15. Privacy Considerations
+   16. IANA Considerations
+   17. References
+       17.1. Normative References
+       17.2. Informative References
+   Acknowledgments
+   Appendix A.  Japan e-LAWS LRI Profile Notes
+   Appendix B.  Related Work
+       B.1.  Compliance Automation Approaches
+       B.2.  Relationship to CAP
+       B.3.  Relationship to SCITT
+       B.4.  Relationship to AIPREF
+       B.5.  Relationship to OSCAL
+   Author's Address
+
+
+1.  Introduction
+
+1.1.  The Compliance Authoring Problem
+
+   The Constitutional AI Protocol [I-D.sato-soos-cap] specifies that
+   a GEC evaluates Cedar policies before every agent transition.  For
+   high-risk and regulated deployments, those Cedar policies must
+   accurately reflect applicable legal obligations: data protection
+   law, financial crime prevention requirements, healthcare
+   regulations, and so on.  The question CAP does not answer is: who
+   writes those Cedar policies, and how?
+
+   Writing Cedar policies by hand from legal text is not a viable
+   path to adoption.  Legal text is authored in natural language for
+   human interpretation; Cedar is a formal policy language designed
+   for machine evaluation.  The translation between them requires
+   both legal expertise and Cedar authoring expertise -- a rare
+   combination.  More critically, Cedar policies must be updated
+   whenever the law changes.  Regulatory amendment, judicial
+   interpretation, and supervisory guidance can all alter the
+   operative effect of a legal obligation.  A compliance
+   architecture that requires manual Cedar updates on every
+   regulatory change will not be maintained correctly in practice.
+
+   The Regulation Record resolves this by separating the authoring
+   concern (compliance specialists working in structured JSON with
+   legal vocabulary) from the compilation concern (automated
+   translation from Regulation Record to Cedar per the Cedar
+   Compilation Profile) and the enforcement concern (GEC evaluating
+   Cedar at runtime, fully specified by CAP).  Each layer is owned
+   by the appropriate expert.  No layer requires expertise in all
+   three domains.
+
+1.2.  The Compilation Model
+
+   Cedar is the compilation target, not the authoring language.
+   The relationship between Regulation Records and Cedar policies
+   is analogous to the relationship between high-level programming
+   languages and machine code: the higher abstraction is where
+   humans work; the lower abstraction is what machines execute; the
+   compiler is the normative bridge between them.
+
+   This document specifies the compiler -- the Cedar Compilation
+   Profile -- as a normative mapping.  Any two conforming
+   implementations of the Cedar Compilation Profile MUST produce
+   semantically equivalent Cedar from identical Regulation Records.
+   This determinism is essential: it means a Regulation Record
+   certified by a regulatory authority can be compiled by any GEC
+   implementation and produce Cedar that the certifying authority
+   would recognise as an accurate representation of their
+   requirement.
+
+1.3.  Relationship to CAP
+
+   CAP [I-D.sato-soos-cap] specifies runtime enforcement: what the
+   GEC does when a Cedar policy fires.  CAP-RRS (this document)
+   specifies the governance of the policy corpus that CAP enforces:
+   how Cedar policies are authored, certified, distributed, and kept
+   current as law changes.  The two documents are complementary and
+   form one governance stack.  CAP-RRS does not revise or supersede
+   CAP; it extends it.  A GEC implementing CAP alone has a governed
+   enforcement engine whose policies are manually authored and
+   unverified.  A GEC implementing CAP and CAP-RRS has a governed
+   enforcement engine whose policies are registry-sourced, certified,
+   version-managed, and automatically updated.
+
+   Version -01 of this document added worked examples for Japan
+   regulatory encoding (APPI Article 17, FIEA Article 38) and the
+   full conflict declaration model.  Version -02 adds Sections 9, 10,
+   and 11: the Law Reference Interface (LRI) generic model, the
+   Statute-Primacy Rule, and the Operational Requirements for
+   amendment and interpretation detection.  These three sections
+   complete the regulation lifecycle specification that Sections 4-8
+   begin.
+
+   OSCAL makes regulations machine-readable.  CAP makes them machine-
+   enforceable.  CAP-RRS is the bridge between the two.
+
+1.4.  Cedar as Compilation Target
+
+   Cedar [CEDAR] is the policy language and evaluation engine used by
+   GEC implementations in the SOOS protocol family.  Cedar is open
+   source, formally verified for policy decidability, and developed
+   by Amazon Web Services.
+
+   CAP-RRS does not extend Cedar.  CAP-RRS specifies the governance
+   layer above Cedar: how Cedar policies originate from legal text,
+   who may certify them, how they are distributed, and how they are
+   kept current as law changes.
+
+   Cedar's formal decidability guarantee -- every Cedar policy
+   evaluation terminates -- is a requirement for GEC implementations
+   that must evaluate policy at every agent transition.  Non-
+   terminating policy evaluation is not acceptable in a governance
+   kernel.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+   "MAY", and "OPTIONAL" in this document are to be interpreted as
+   described in BCP 14 [RFC2119] [RFC8174] when, and only when,
+   they appear in all capitals.
+
+   CAP:
+      The Constitutional AI Protocol enforcement specification
+      [I-D.sato-soos-cap].
+
+   Cedar Compilation Profile:
+      The normative mapping from Regulation Record fields to Cedar
+      policy syntax specified in Section 5 of this document.
+
+   Constitutional Mandate Registry (CMR):
+      The signed, versioned, append-only repository of certified
+      Regulation Record packages.  Protocol specified in Section 8.
+
+   GEC (Governance Execution Controller):
+      The runtime component that enforces Cedar policies produced
+      by the CAP-RRS compiler.  Defined in [I-D.sato-soos-cap].
+
+   Law Reference Interface (LRI):   [NEW in -02]
+      The normative interface that each jurisdiction-specific
+      statute reference binding MUST implement.  Specified in
+      Section 9.  Each implementation is an LRI profile identified
+      by a URI registered per Section 9.7.
+
+   LRI Profile:   [NEW in -02]
+      A jurisdiction-specific implementation of the LRI.  An LRI
+      Profile defines how law_id, article_ref, version_identifier,
+      amendment_detection_endpoint, and authority_id are bound to
+      the jurisdiction's legal publication system.
+
+   authority_source:   [NEW in -02]
+      The LRI block within a Regulation Record that identifies which
+      law, which article, which statutory version, when the
+      endorsement was made, who made it, and the endorsement's legal
+      character (resolution_basis).
+
+   resolution_basis:   [NEW in -02]
+      A controlled vocabulary field on the endorsement block that
+      records the legal character of the endorsement act.  Values:
+      statute_clear, interpretive_ruling, internal_conflict_
+      resolution, cross_statute_coordination.
+
+   CATALOG_VERSION_CONFLICT:   [NEW in -02]
+      A GAR event raised when an amendment posterior to a Regulation
+      Record's endorsed_at timestamp is detected.  Triggers
+      provisional suspension and HEM escalation.  Schema in
+      Section 10.2.
+
+   INTERPRETATION_SUPERSEDED:   [NEW in -02]
+      A GAR event raised when an interpretive ruling supersedes the
+      resolution_basis of a Regulation Record's endorsement, without
+      any change to the underlying statutory text.  Schema in
+      Section 10.3.
+
+   catalog_version:   [NEW in -02]
+      A mandatory object on every distributed catalog update that
+      carries version_id, effective_date, supersedes, amendment_
+      basis, published_by, and published_at.  Schema in
+      Section 10.5.
+
+   Natural Breakpoint:
+      A point in a multi-step agent mission at which stopping
+      produces a coherent, complete deliverable of independent
+      value.  Used by HEM_TIER3_ANTICIPATORY to identify scope-
+      reduction options.
+
+   Operative Clause:
+      The specific prohibition or permission within a legal text
+      that applies at agent decision time and is therefore
+      representable as a Cedar policy.
+
+   Regulation Record:
+      The structured intermediate representation of a compliance
+      obligation, as defined in Section 4 of this document.
+
+   Regulation Record Package:
+      A signed, versioned collection of Regulation Records covering
+      a defined legal instrument (e.g., GDPR, BSA, APPI).
+
+   Resource Policy:
+      A Tier 3 Regulation Record governing agent resource
+      consumption (tokens, API calls, time windows, storage).
+
+
+3.  Architecture Overview
+
+3.1.  The Three-Layer Stack
+
+   The compliance architecture operates as three distinct layers:
+
+   Layer 1 -- Law to Regulation Record:
+      Compliance specialists extract the operative clause from
+      legal text and represent it as a structured Regulation
+      Record.  This layer requires legal expertise.  It does not
+      require Cedar knowledge.  The output is JSON in the
+      Regulation Record schema (Section 4).  Law provenance is
+      captured in the authority_source block (Section 9).
+      Certification is governed by Section 7.
+
+   Layer 2 -- Regulation Record to Cedar:
+      The CAP-RRS compiler applies the Cedar Compilation Profile
+      (Section 5) to transform Regulation Records into Cedar
+      policies.  This layer is fully automated.  No human
+      authoring of Cedar for compliance purposes is required or
+      expected.  The output is a Cedar policy set suitable for
+      loading by a CAP-conforming GEC.
+
+   Layer 3 -- Cedar to Enforcement:
+      The GEC evaluates the Cedar policy set at every agent
+      transition.  This layer is fully specified by CAP.  The
+      developer observes PERMIT or DENY with a structured reason
+      code referencing the specific Regulation Record that fired.
+
+3.2.  Developer Experience
+
+   A developer configuring compliance for a regulated agent
+   deployment performs four operations:
+
+   (1)  Import certified Regulation Record packages from the CMR
+        for all applicable legal frameworks.
+
+   (2)  Author Tier 2 operator policies in Regulation Record
+        format.  No Cedar knowledge required.
+
+   (3)  Author Tier 3 resource policies in Regulation Record
+        format.  No Cedar knowledge required.
+
+   (4)  Call compile().  The Cedar Compilation Profile generates
+        the full Cedar policy set.  The developer does not review
+        or modify Cedar output except for debugging purposes.
+
+   Pseudocode example:
+
+      cap.import("cmr://eu.gdpr.2016/679@2.1.0")   ; Tier 1 -- GDPR
+      cap.import("cmr://eu.ai_act.2024/art14@1.0.0")
+      cap.import("cmr://jp.appi.2003/art17@3.0.0")
+      cap.import("cmr://us.bsa.1970/sar@3.2.1")
+
+      cap.operator_policy({ record_id: "acme.data_access.v1",
+                             tier: "2", ... })
+
+      cap.resource_policy({ record_id: "acme.token_budget.v1",
+                            tier: "3", ... })
+
+      cedar_policy_set = cap.compile()
+      gec.load_policies(cedar_policy_set)
+
+3.3.  Registry as Package Ecosystem
+
+   The Constitutional Mandate Registry operates as a signed package
+   ecosystem.  Each Regulation Record Package is:
+
+   *  Identified by a URI: cmr://{publisher}.{instrument}@{version}
+   *  Signed by the certified publisher's Ed25519 keypair
+   *  Versioned using Semantic Versioning [SEMVER]
+   *  Accompanied by a changelog declaring which operative clauses
+      changed between versions
+   *  Conflict-declared against known incompatible packages
+   *  Carrying a catalog_version object per Section 10.5 in
+      every distributed update [NEW in -02]
+
+   GEC implementations subscribe to update notifications for
+   imported packages.  Update handling is governed by Section 8.4.
+
+   The tier architecture determines both the certification
+   requirements (Section 7) and the post-DENY recourse availability:
+
+   Tier  Category                    Recourse on DENY
+   -------------------------------------------------------
+   0-A   Absolute universal prohib.  None.  Ever.
+   0-B   Qualified absolute prohib.  None within scope.
+   1     Jurisdictional legal        None within jurisdiction.
+   2     Operator policy             Operator-defined exception
+                                     path or HEM escalation.
+   3     Resource / usage policy     Always exists: commercial,
+                                     scope reduction, temporal.
+
+
+4.  Regulation Record Schema
+
+[Sections 4.1 through 4.8 are carried forward from
+draft-sato-soos-cap-rrs-01 without substantive change, with the
+following additions:
+
+- Section 4.1 top-level fields: authority_source_uri is now
+  REQUIRED (was OPTIONAL).  See Section 11.4.
+- Section 4.1: catalog_version object added as REQUIRED top-level
+  field in every distributed catalog update.  See Section 10.5.
+- Section 4.8: Worked examples updated to include authority_source
+  block per Section 9 format.
+
+The full text of Sections 4.1 through 4.8 is carried forward from
+-01 and is not reproduced here to conserve space in this working
+draft.  See draft-sato-soos-cap-rrs-01 Sections 4.1-4.8 for the
+base text.]
+
+
+5.  Cedar Compilation Profile
+
+[Carried forward from draft-sato-soos-cap-rrs-01 Section 5 without
+change.]
+
+
+6.  Conflict Declaration Model
+
+[Carried forward from draft-sato-soos-cap-rrs-01 Section 6 without
+change.]
+
+
+7.  Certification Model
+
+[Carried forward from draft-sato-soos-cap-rrs-01 Section 7 without
+change.]
+
+
+8.  Constitutional Mandate Registry Protocol
+
+[Carried forward from draft-sato-soos-cap-rrs-01 Section 8, with
+the following addition to Section 8.4 (GEC Update Response Options):
+
+Section 8.4 now cross-references Section 10 (Statute-Primacy Rule)
+as the normative specification for how GECs respond to catalog
+updates that trigger CATALOG_VERSION_CONFLICT or
+INTERPRETATION_SUPERSEDED events.  The four-phase propagation
+workflow (Detection, Suspension, Re-publication, Re-activation)
+specified in [I-D.sato-soos-cap] Section 8.9 applies to all
+CAP-RRS catalog updates.]
+
+
+9.  Law Reference Interface (LRI)   [NEW in -02]
+
+9.1.  Purpose and Design Rationale
+
+   Every Regulation Record encodes a specific statutory provision.
+   That encoding is a legal act -- the endorsing authority certifies
+   that the Cedar policy correctly represents the operative clause
+   as the authority interprets it under the statutory version
+   current at endorsement time.
+
+   Without a normative interface for this provenance, a Regulation
+   Record is a policy with a human-readable citation but no machine-
+   readable link to the living statutory text.  When the law
+   changes, nothing in the Regulation Record schema (Sections 4-8)
+   provides a mechanism to detect the change, suspend the affected
+   Cedar policy, or verify the endorsement against the new version.
+
+   The Law Reference Interface (LRI) fills this gap.  The LRI is a
+   jurisdiction-neutral generic interface that any national legal
+   publication system can implement as an LRI Profile.  Three
+   profiles are defined in this document: Japan (e-LAWS), EU (ELI),
+   and US (USLM).  The LRI Profile approach parallels how OSCAL
+   handles framework profiles: NIST 800-53 and ISO 27001 are OSCAL
+   profiles of the same underlying OSCAL catalog format; e-LAWS,
+   ELI, and USLM are LRI profiles of the same underlying LRI schema.
+
+9.2.  LRI Generic Schema
+
+   Every Regulation Record for Tier 0, 1, or 2 MUST include an
+   authority_source block conforming to this schema.  Tier 3
+   resource policy records MAY omit authority_source.
+
+      "authority_source": {
+        "lri_version":                "1.0",
+        "profile":                    string,  ; REQUIRED -- LRI
+                                               ;   profile URI
+        "law_id":                     string,  ; REQUIRED -- unique
+                                               ;   within profile
+        "article_ref":                string,  ; REQUIRED -- resolvable
+                                               ;   within profile
+        "version_identifier":         string,  ; REQUIRED -- statutory
+                                               ;   version
+        "retrieved_at":               string,  ; REQUIRED -- ISO8601
+                                               ;   timestamp
+        "amendment_detection_        
+          endpoint":                  string,  ; REQUIRED -- URI
+        "interpretation_endpoint":    string,  ; OPTIONAL -- URI | null;
+                                               ;   REQUIRED when
+                                               ;   resolution_basis MAY
+                                               ;   be interpretive_ruling
+        "endorsement": {
+          "authority_id":             string,  ; REQUIRED -- URI
+          "endorsed_at":              string,  ; REQUIRED -- ISO8601
+          "endorsement_scope":        string,  ; REQUIRED -- controlled
+                                               ;   vocab
+          "resolution_basis":         string,  ; REQUIRED -- see §9.4
+          "resolution_instrument_id": string,  ; CONDITIONAL -- required
+                                               ;   when resolution_basis
+                                               ;   is interpretive_ruling
+          "co_endorsement_required":  boolean, ; REQUIRED
+          "co_endorsement_quorum":    string,  ; CONDITIONAL -- required
+                                               ;   when
+                                               ;   co_endorsement_required
+                                               ;   is true.  Values:
+                                               ;   "all" | "primary_only"
+          "co_endorsers":             [string],; CONDITIONAL -- array of
+                                               ;   authority_id URIs;
+                                               ;   REQUIRED when
+                                               ;   co_endorsement_required
+                                               ;   is true
+          "endorsement_claim":        string   ; REQUIRED -- signed JWT
+        }
+      }
+
+9.3.  Five Normative LRI Requirements
+
+   Every LRI Profile MUST define:
+
+   LRI-1: How law_id uniquely identifies a law within the
+          jurisdiction.  Example (Japan): law_id maps to the e-LAWS
+          法令ID (e.g., "325AC0000000089").
+
+   LRI-2: How article_ref addresses a specific provision within
+          that law.  The article_ref MUST be resolvable against the
+          profile's official law structure to a unique operative
+          clause.  Example (Japan): XPath 1.0 expression against
+          XMLSchemaForJapaneseLaw_v3.xsd.
+
+   LRI-3: How version_identifier captures the statutory version the
+          Cedar policy was certified against.  The version_identifier
+          MUST be derivable from the amendment history of the law.
+          Example (Japan): the PromulgationDate of the amendment in
+          ISO8601 format.
+
+   LRI-4: What amendment_detection_endpoint returns when queried
+          with a since parameter.  The response MUST enumerate all
+          amendments with PromulgationDate or EnforcementDate
+          posterior to the since value.
+
+   LRI-5: Who may hold authority_id.  The LRI Profile MUST specify
+          the endorsement authority table: which authority class may
+          sign endorsements for which category of law within the
+          jurisdiction.
+
+9.4.  resolution_basis Controlled Vocabulary
+
+   The resolution_basis field on the endorsement block records the
+   legal character of the endorsement act.  This field is REQUIRED.
+   It affects which authority may endorse the record and what
+   re-endorsement is required on amendment.
+
+   +-----------------------------+------------------------------------+
+   | Value                       | Meaning                            |
+   +-----------------------------+------------------------------------+
+   | statute_clear               | The statutory text unambiguously   |
+   |                             | supports the Cedar policy.         |
+   |                             | Designated authority per LRI       |
+   |                             | Profile endorser table.            |
+   +-----------------------------+------------------------------------+
+   | interpretive_ruling         | The Cedar policy is based on an    |
+   |                             | interpretive ruling, not clear      |
+   |                             | statutory text.  Same authority    |
+   |                             | as statute_clear, but              |
+   |                             | resolution_instrument_id MUST be   |
+   |                             | populated with the ruling          |
+   |                             | instrument reference.              |
+   +-----------------------------+------------------------------------+
+   | internal_conflict_          | Two provisions of the same law     |
+   | resolution                  | conflict; one is chosen.  Elevated |
+   |                             | authority required (内閣法制局 or    |
+   |                             | equivalent for Japan; equivalent   |
+   |                             | legislative counsel body for       |
+   |                             | other jurisdictions).              |
+   +-----------------------------+------------------------------------+
+   | cross_statute_coordination  | The Cedar policy spans two or more |
+   |                             | statutes.  co_endorsement_required |
+   |                             | MUST be true.  co_endorsement_     |
+   |                             | quorum MUST be "all".  All         |
+   |                             | co-endorsers must re-endorse on    |
+   |                             | any amendment to any statute in    |
+   |                             | scope.                             |
+   +-----------------------------+------------------------------------+
+
+   Table 1: resolution_basis Controlled Vocabulary
+
+9.5.  Co-Endorsement Model
+
+   A Regulation Record may require endorsement from more than one
+   legally distinct authority.  This arises when the Cedar policy
+   encodes a coordination rule that spans authority chains -- for
+   example, when disaster response protocols require coordination
+   between prefectural and municipal command authorities, each
+   operating under different statutory frameworks.
+
+   When co_endorsement_required is true:
+
+   (a)  co_endorsers MUST list the authority_id URI of every
+        required co-endorsing authority.
+
+   (b)  co_endorsement_quorum MUST be specified.  "all" means every
+        co-endorser must endorse before the Cedar policy is active.
+        "primary_only" means the primary authority_id endorsement is
+        sufficient (co-endorsers are advisory only).
+
+   (c)  The Cedar policy MUST NOT be loaded into the GEC's active
+        policy set unless all co-endorsements required by the quorum
+        rule are present and valid.
+
+   (d)  If any co-endorser's endorsement_claim is superseded,
+        expires, or is revoked, the Cedar policy MUST be suspended
+        per the Statute-Primacy Rule (Section 10), regardless of the
+        status of other co-endorsers' endorsements.
+
+   CONF-RRS-COEND-01: A GEC MUST NOT activate a Cedar policy with
+   co_endorsement_required: true unless all required endorsements
+   (per the quorum rule) are present and their endorsement_claims
+   are verifiable.
+
+9.6.  interpretation_endpoint
+
+   The interpretation_endpoint is an OPTIONAL LRI field that
+   identifies the URI to query for interpretive rulings that may
+   affect the endorsement's resolution_basis.
+
+   This field is REQUIRED (even if its value is null) when the
+   Regulation Record's resolution_basis is interpretive_ruling or
+   when the LRI Profile specifies that interpretive rulings are
+   machine-queryable for the jurisdiction.
+
+   When non-null, the GEC MUST poll interpretation_endpoint at a
+   cadence not exceeding 24 hours per Section 11.2.  The endpoint
+   MUST return interpretive instruments (rulings, administrative
+   guidance, court judgments) with an effective_date and a reference
+   to the prior interpretation they supersede.
+
+9.7.  LRI Profile URI Registry
+
+   This document establishes the IANA "CAP-RRS LRI Profile URI"
+   registry at:
+   https://www.iana.org/assignments/cap-rrs-lri-profiles
+
+   Registration procedure: Specification Required.
+
+   Initial values:
+
+   +---------+-------------------------------------------+----------+
+   | Juris.  | Profile URI                               | System   |
+   +---------+-------------------------------------------+----------+
+   | Japan   | https://laws.e-gov.go.jp/lri/v1           | e-LAWS   |
+   |         |                                           | XML v3   |
+   | EU      | http://data.europa.eu/eli/lri/v1          | ELI      |
+   | US      | https://uscode.house.gov/lri/v1           | USLM     |
+   +---------+-------------------------------------------+----------+
+
+   Table 2: Initial LRI Profile Registry
+
+
+10. Statute-Primacy Rule   [NEW in -02]
+
+10.1. Normative Rule Text
+
+   Statute-Primacy Rule.  A CAP-RRS catalog entry's Cedar policy
+   derives its enforcement authority exclusively from the
+   endorsement claim in its authority_source block.  The endorsed_at
+   timestamp establishes the version of the statutory text the Cedar
+   policy was certified against.
+
+   If the law_id and article_ref referenced in authority_source
+   resolves -- via the profile's amendment_detection_endpoint --
+   to a statutory text whose amendment history contains any amendment
+   with PromulgationDate or EnforcementDate posterior to endorsed_at,
+   the following consequences apply automatically:
+
+   (1) Provisional suspension.  The Cedar policy is suspended for
+       new agent actions.  Ongoing actions already authorized under
+       a valid SACR may complete.  No new SACR may be issued citing
+       the suspended catalog entry.  The GEC MUST return SUSPENDED
+       per [I-D.sato-soos-cap] Section 6.3.
+
+   (2) CATALOG_VERSION_CONFLICT event.  The GEC MUST raise a GAR
+       event of type CATALOG_VERSION_CONFLICT per Section 10.2.
+
+   (3) HEM escalation.  The conflict is escalated to the designated
+       human operator via HEM.  No agent may act under the affected
+       prohibition until one of: (a) re-endorsement by the
+       designated authority, or (b) explicit human override logged
+       in GAR with operator identity and stated rationale.
+
+   Statute primacy is absolute.  A Cedar policy does not override a
+   statute.  A GAR audit record whose authority_source traces to a
+   superseded statutory version is valid as a historical record but
+   does not constitute legal authorization for future actions.
+
+   Re-endorsement authority depends on the resolution_basis of the
+   original catalog entry per Table 1 (Section 9.4):
+
+   statute_clear: Designated authority per the LRI Profile endorser
+   table.  interpretive_ruling: Same authority plus updated
+   resolution_instrument_id.  internal_conflict_resolution: Elevated
+   authority (内閣法制局 or equivalent).  cross_statute_coordination:
+   All co-endorsers must re-endorse.
+
+10.2. CATALOG_VERSION_CONFLICT Event Schema
+
+   The GEC MUST record a CATALOG_VERSION_CONFLICT event in GAR when
+   an amendment posterior to endorsed_at is detected.
+
+      {
+        "event_type":                    "CATALOG_VERSION_CONFLICT",
+        "catalog_entry_id":              string, ; REQUIRED
+        "authority_source_profile":      string, ; LRI profile URI
+        "authority_source_law_id":       string,
+        "authority_source_article_ref":  string,
+        "endorsed_at":                   string, ; ISO8601
+        "conflicting_amendment_
+          promulgation_date":            string, ; ISO8601 date
+        "conflict_delta_days":           integer,; days between
+                                                 ;   endorsed_at and
+                                                 ;   amendment date
+        "suspension_effective_at":       string, ; ISO8601 timestamp
+        "hem_escalation_id":             string,
+        "resolution":                    null    ; null until resolved
+      }
+
+   resolution field, populated on re-endorsement or human override:
+
+      "resolution": {
+        "type":          string, ; "re_endorsement" |
+                                 ;   "human_override"
+        "resolved_at":   string, ; ISO8601 timestamp
+        "resolved_by":   string, ; operator KIA or
+                                 ;   authority_id URI
+        "new_endorsed_at": string, ; ISO8601 timestamp
+        "rationale":     string  ; REQUIRED for human_override
+      }
+
+10.3. INTERPRETATION_SUPERSEDED Event Schema
+
+   The GEC MUST record an INTERPRETATION_SUPERSEDED event in GAR
+   when an interpretive ruling supersedes the resolution_basis of
+   a Regulation Record's endorsement, without any change to the
+   underlying statutory text.
+
+   INTERPRETATION_SUPERSEDED is distinct from CATALOG_VERSION_
+   CONFLICT.  CATALOG_VERSION_CONFLICT is triggered by statutory
+   amendment (the law text changes).  INTERPRETATION_SUPERSEDED is
+   triggered by interpretive change (the law text is unchanged but
+   the authoritative interpretation changes).  The consequences are
+   identical -- provisional suspension, GAR event, HEM escalation --
+   but the required re-endorsement authority differs: an
+   interpretive change routes to the authority that issued the
+   superseded ruling, not necessarily the primary statutory
+   authority.
+
+      {
+        "event_type":               "INTERPRETATION_SUPERSEDED",
+        "catalog_entry_id":         string,
+        "authority_source_profile": string,
+        "authority_source_law_id":  string,
+        "authority_source_article_ref": string,
+        "endorsed_at":              string, ; ISO8601
+        "superseding_interpretation": {
+          "issuing_authority":      string, ; URI
+          "instrument_type":        string, ; "cabinet_order" |
+                                           ;   "ministerial_guidance"
+                                           ;   | "court_judgment" |
+                                           ;   "ietf_interpretation"
+          "instrument_id":          string,
+          "effective_date":         string, ; ISO8601 date
+          "prior_interpretation_id":string  ; id of superseded
+                                           ;   interpretation
+        },
+        "suspension_effective_at":  string, ; ISO8601 timestamp
+        "hem_escalation_id":        string,
+        "resolution":               null    ; same schema as §10.2
+      }
+
+10.4. 信頼保護 Safe Harbor Clause
+
+   Agent actions taken under a valid, non-superseded endorsement
+   at the time of action are shielded from retroactive liability.
+   The GAR audit record of the action is the machine-native 信頼保護
+   instrument.
+
+   The GAR record of any agent action governed by a Regulation
+   Record MUST carry three fields that together constitute the safe
+   harbor evidence:
+
+   (a)  endorsed_at: the timestamp of the endorsement that governed
+        the action at the time it was taken.
+
+   (b)  prior_interpretation_id: the resolution_instrument_id of the
+        then-authoritative interpretation, when resolution_basis is
+        interpretive_ruling.
+
+   (c)  suspension_effective_at (from the INTERPRETATION_SUPERSEDED
+        or CATALOG_VERSION_CONFLICT event that followed): the
+        timestamp at which the subsequent change took effect.
+
+   The combination of fields (a) and (c) establishes that the action
+   was taken under a valid, non-superseded endorsement: endorsed_at
+   is anterior to suspension_effective_at.  Past actions are
+   protected; future actions require re-endorsement.
+
+   When an interpretation changes, agent actions taken under the
+   prior interpretation are protected by the GAR audit record.  The
+   code automatically lapses, but the legitimacy of past actions is
+   secured by the audit chain.
+
+10.5. catalog_version Object Schema
+
+   All distributed catalog updates MUST carry a catalog_version
+   object.  The catalog_version object MUST be present at the top
+   level of every CMR package release.
+
+      "catalog_version": {
+        "version_id":      string, ; REQUIRED -- semver or opaque
+                                   ;   string, unique within catalog
+        "effective_date":  string, ; REQUIRED -- ISO8601 date
+        "supersedes":      string, ; REQUIRED -- version_id of
+                                   ;   previous version, or null
+        "amendment_basis": string, ; REQUIRED -- law amendment
+                                   ;   instrument ID that triggered
+                                   ;   this version
+        "published_by":    string, ; REQUIRED -- URI; MUST match
+                                   ;   endorsement.authority_id
+        "published_at":    string  ; REQUIRED -- ISO8601 timestamp
+      }
+
+   A GEC MUST reject a catalog update where:
+   (a) catalog_version is absent.
+   (b) supersedes does not match the currently active version_id
+       for this catalog entry.
+   (c) effective_date is earlier than the currently active
+       effective_date (rollback attack defense).
+   (d) published_by does not match the endorsement.authority_id
+       in the updated entry.
+
+
+11. Operational Requirements   [NEW in -02]
+
+11.1. Amendment Detection Cadence
+
+   A SOOS-compliant CAP-RRS catalog implementation MUST poll the
+   amendment_detection_endpoint of each active authority_source at
+   a cadence not exceeding 24 hours.
+
+   On detection of a new amendment whose PromulgationDate or
+   EnforcementDate is posterior to endorsed_at: CATALOG_VERSION_
+   CONFLICT MUST be raised immediately, without waiting for the
+   next polling interval or for human confirmation.
+
+   The detection mechanism is: query amendment_detection_endpoint
+   with a since parameter equal to endorsed_at; if any amendment is
+   returned, the conflict exists.
+
+   Implementations MAY use push notification mechanisms (webhooks,
+   event subscriptions) in addition to polling, provided the
+   maximum detection latency does not exceed 24 hours.
+
+11.2. Interpretation Detection Cadence
+
+   When interpretation_endpoint is non-null, a SOOS-compliant
+   CAP-RRS catalog implementation MUST poll interpretation_endpoint
+   at a cadence not exceeding 24 hours.
+
+   On detection of a new interpretive ruling whose effective_date
+   is posterior to endorsed_at and which references the same
+   law_id and article_ref: INTERPRETATION_SUPERSEDED MUST be raised
+   immediately.
+
+   This requirement is parallel to the amendment detection
+   requirement and uses the same timing guarantee: maximum 24 hours
+   from interpretive ruling publication to detection and suspension.
+
+11.3. Maximum Suspension Window
+
+   A GEC MUST NOT leave a Cedar policy in SUSPENDED state for more
+   than 30 days without either:
+   (a) A valid updated catalog entry received from the designated
+       re-endorsement authority, or
+   (b) A human override logged in GAR with operator identity and
+       stated rationale.
+
+   After 30 days in SUSPENDED state without (a) or (b), the GEC
+   MUST treat the suspended policy as DENY for all new actions.
+   The GEC MUST notify the operator and generate a CRITICAL Audit
+   Alert per [I-D.sato-soos-gar] before converting SUSPENDED to
+   DENY.
+
+   This cross-references [I-D.sato-soos-cap] Section 8.9.4, which
+   specifies the same 30-day maximum from the CAP perspective.
+
+11.4. authority_source_uri Mandatory Field
+
+   The authority_source_uri field in the Regulation Record schema
+   (Section 4.1) is REQUIRED for all Regulation Records.  This
+   field was OPTIONAL in -01; it is REQUIRED in -02.
+
+   For Japan jurisdiction implementations, the RECOMMENDED format
+   for authority_source_uri is the e-Gov URI with article XPath:
+
+      https://elaws.e-gov.go.jp/document?lawid={law_id}#{article_xpath}
+
+   Example:
+      https://elaws.e-gov.go.jp/document?lawid=415AC0000000057
+      #/Law/LawBody/MainProvision/Article[@Num='17']
+
+   The authority_source_uri MUST be the same URI as the
+   soos.cap.authority_source_uri OTel span attribute emitted by
+   the GEC at Cedar evaluation time per [I-D.sato-soos-cap]
+   Section 13.5.  A mismatch between these two values constitutes
+   a PTD inconsistency under [I-D.sato-soos-cap] Section 12a.6.
+
+
+12. HEM Integration
+
+[Carried forward from draft-sato-soos-cap-rrs-01 Section 9 without
+change.  Section numbering updated: Section 9 in -01 becomes
+Section 12 in -02.]
+
+12.1. HEM_TIER3_ANTICIPATORY (Class 8)
+12.2. HEM_TIER3_OBSERVED (Class 9)
+12.3. Execution Options Package
+12.4. Natural Breakpoint Declaration
+
+[Full text carried forward from draft-sato-soos-cap-rrs-01
+Section 9.1-9.4.]
+
+
+13. Open Issues
+
+13.1.  Pattern-Before-Threshold (OQ-CAP-PATTERN)
+
+   Detecting a prohibited pattern before any individual observation
+   crosses the confidence threshold is not fully specified.  The
+   typology_match_id field provides partial support, but Cedar
+   policy evaluation over event stream trajectories requires formal
+   verification methods not yet specified.  Deferred to a successor
+   document.
+
+13.2.  Cross-Jurisdiction Tier 1 Compilation (OQ-CAP-XJURIS)
+
+   When a single agent session spans multiple jurisdictions, the
+   mechanism for selecting the correct jurisdiction-specific record
+   at Cedar evaluation time is not yet specified.  The
+   jurisdiction_scope field provides the metadata; the runtime
+   selection algorithm requires further specification.
+
+13.3.  Japan Interpretation Registry (JP-OQ-03, JP-OQ-04)
+
+   The Japan profile requires a machine-queryable interpretation
+   registry for Cabinet Orders, 解釈指針, and 内閣法制局意見.  The
+   current e-LAWS API v2 does not expose interpretive instruments.
+   A provisional SOOS-operated registry has been scoped.  The
+   Digital Agency has been identified as the target for a native
+   capability.  Formal specification deferred to the Japan LRI
+   profile document (draft-sato-soos-cap-rrs-jp-00, post-Vienna).
+
+13.4.  Co-Endorsement Authority for Cross-Prefectural Rules (JP-OQ-01)
+
+   For Japan cross-statute coordination rules spanning 都道府県知事
+   authority, the question of whether individual governors or 全国知事会
+   provides the standing endorsement is unresolved.  Deferred to
+   the Japan LRI profile document.
+
+
+14. Security Considerations
+
+   Regulation Record integrity:
+      Regulation Records are signed by the issuing authority.  An
+      implementation MUST verify the endorsement_claim signature on
+      every package load.  The CMR MUST support keypair rotation
+      with a defined transition period.
+
+   LRI amendment signal injection:   [NEW in -02]
+      An adversarial actor may attempt to inject false amendment
+      detection signals via the amendment_detection_endpoint to force
+      Cedar policies into SUSPENDED state without a real statutory
+      change.  GEC implementations MUST authenticate the source of
+      amendment detection signals and MUST NOT enter SUSPENDED state
+      on an unauthenticated signal.  For registered LRI profiles,
+      the amendment_detection_endpoint is the jurisdiction's
+      official government URI; GEC implementations MUST verify TLS
+      certificate chains to the government CA for these endpoints.
+
+   Catalog version rollback:   [NEW in -02]
+      An attacker with access to the catalog update channel may
+      attempt to re-publish an older catalog version with a lower
+      restriction level.  The GEC MUST reject any catalog update
+      where catalog_version.supersedes does not match the currently
+      active version_id, and MUST reject updates with an
+      effective_date earlier than the currently active effective_date
+      (see Section 10.5 conformance requirements).
+
+   interpretation_endpoint authenticity:   [NEW in -02]
+      The interpretation_endpoint is a new external dependency.
+      Implementations MUST verify interpretation_endpoint TLS
+      certificate chains before processing returned interpretive
+      instruments.  For the provisional SOOS-operated Japan
+      interpretation registry, implementations MUST verify the
+      SOOS project's certificate and SHOULD pin it.
+
+   Co-endorsement bypass:   [NEW in -02]
+      An attacker may attempt to activate a co-endorsement-required
+      Cedar policy with only a subset of required endorsements.
+      CONF-RRS-COEND-01 is the normative defense: a GEC MUST NOT
+      activate such a policy unless all required endorsements are
+      present and verifiable.
+
+   Cedar Compilation Profile determinism:
+      The determinism requirement (Section 5.1) is a security
+      property: it ensures that a certified Regulation Record
+      produces identical Cedar across all conforming compiler
+      implementations.
+
+   Agent Session Revocation:
+      When an agent session is revoked, all CAP-RRS compiler
+      operations and CMR update processing MUST cease.  All pending
+      HEM escalations (HEM_TIER3_ANTICIPATORY, HEM_TIER3_OBSERVED)
+      at point of revocation MUST be finalized with completion_state
+      PARTIAL or CLEAN per [I-D.sato-soos-mad] Section 3.6.3.
+
+
+15. Privacy Considerations
+
+   Regulation Records do not contain personal data.  The GEC audit
+   records produced on DENY events carry the record_id of the
+   firing Regulation Record as metadata only.
+
+   The CATALOG_VERSION_CONFLICT and INTERPRETATION_SUPERSEDED GAR
+   events carry law identifiers and endorsement timestamps but no
+   personal data.
+
+
+16. IANA Considerations
+
+   16.1.  CAP-RRS LRI Profile URI Registry   [NEW in -02]
+
+   This document establishes the "CAP-RRS LRI Profile URI" registry
+   maintained at:
+   https://www.iana.org/assignments/cap-rrs-lri-profiles
+
+   Registration procedure: Specification Required.
+
+   Initial values: per Table 2 (Section 9.7).
+
+   16.2.  CAP-RRS Media Types
+
+   IANA is requested to maintain:
+   application/cap-regulation-record+json
+      Regulation Record conforming to Section 4.
+
+   application/cap-rrs-catalog-version+json   [NEW in -02]
+      catalog_version object conforming to Section 10.5.
+
+   16.3.  CAP-RRS GAR Event Types   [NEW in -02]
+
+   This document registers the following GAR event types in the
+   SOOS ALE registry defined in [I-D.sato-soos-gar]:
+
+   +-------------------------------+------------------------+------+
+   | Event Type                    | Trigger                | Sec. |
+   +-------------------------------+------------------------+------+
+   | CATALOG_VERSION_CONFLICT      | Statutory amendment    | 10.2 |
+   |                               | posterior to           |      |
+   |                               | endorsed_at detected   |      |
+   | INTERPRETATION_SUPERSEDED     | Interpretive ruling    | 10.3 |
+   |                               | supersedes resolution_ |      |
+   |                               | basis without          |      |
+   |                               | statutory change       |      |
+   +-------------------------------+------------------------+------+
+
+   Table 3: New CAP-RRS GAR Event Types
+
+
+17. References
+
+17.1. Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "Constitutional AI Protocol (CAP)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-cap-04, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-cap/>.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "Human Escalation Mechanism (HEM)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-hem-05, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-hem/>.
+
+   [I-D.sato-soos-idp]
+              Sato, T., "Intent Declaration Primitive (IDP)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-idp-05, June 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "Governance Audit Record (GAR)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-gar-03, June 2026.
+
+   [I-D.sato-soos-mad]
+              Sato, T., "Multi-Agent Delegation (MAD)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-mad-03, June 2026.
+
+   [SEMVER]   Preston-Werner, T., "Semantic Versioning 2.0.0",
+              2013, <https://semver.org/>.
+
+17.2. Informative References
+
+   [I-D.sato-soos-aep]
+              Sato, T., "Agent Execution Protocol (AEP)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-aep-02, June 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity and Attestation (KIA)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-kia-03, June 2026.
+
+   [ROME_STATUTE]
+              United Nations, "Rome Statute of the International
+              Criminal Court", 17 July 1998, 2187 UNTS 90.
+
+   [GDPR]     European Parliament and Council, "Regulation (EU)
+              2016/679", 27 April 2016, OJ L 119/1.
+
+   [BSA]      United States Congress, "Bank Secrecy Act",
+              31 U.S.C. 5318(g), 1970.
+
+   [CEDAR]    Amazon Web Services, "Cedar Policy Language
+              Reference", 2023, <https://docs.cedarpolicy.com/>.
+
+   [ELAWS]    Japan Ministry of Internal Affairs and
+              Communications / Digital Agency, "e-LAWS Law
+              Database", <https://laws.e-gov.go.jp/>.
+
+   [ELI]      Publications Office of the European Union,
+              "European Legislation Identifier (ELI)",
+              <http://data.europa.eu/eli>.
+
+   [USLM]     United States Office of the Law Revision Counsel,
+              "United States Legislative Markup (USLM)",
+              <https://uscode.house.gov/>.
+
+
+Acknowledgments
+
+   The Regulation Record schema, Cedar Compilation Profile, and
+   Constitutional Mandate Registry concept emerged from SOOS
+   KernelSpec V3 development sessions in May 2026.  The Law
+   Reference Interface generic model, Statute-Primacy Rule, and
+   Operational Requirements (Sections 9-11) emerged from sessions
+   in June 2026 analyzing real 防災 statutory conflicts in the
+   e-LAWS corpus and the interpretive authority question identified
+   in the AI臨調 ディスカッションペーパー (Themes 21 and 22).  The
+   positioning: "法令のAXが作るのは読める法律です。SOOSが作るのは守られる
+   法律です" (Law AX creates laws that can be read; SOOS creates
+   laws that are enforced) derives from those sessions.
+   CAP-RRS is a companion document to CAP [I-D.sato-soos-cap];
+   it does not revise or supersede it.
+
+
+Appendix A.  Japan e-LAWS LRI Profile Notes
+
+   This appendix documents provisional Japan profile bindings.  The
+   normative Japan LRI Profile will be specified in a separate
+   informational document (draft-sato-soos-cap-rrs-jp-00,
+   post-Vienna).  The content here is informative.
+
+A.1.  law_id Binding
+
+   law_id maps to the e-LAWS 法令ID (e.g., "325AC0000000089" for
+   APPI).
+
+A.2.  article_ref Binding
+
+   article_ref is an XPath 1.0 expression against
+   XMLSchemaForJapaneseLaw_v3.xsd.  @Num attributes use Arabic
+   numerals, not Japanese numerals.  Where a prohibition derives
+   from multiple articles, article_ref is an array.
+
+A.3.  amendment_detection_endpoint
+
+   https://laws.e-gov.go.jp/api/2/updatelawlists/{date}
+
+A.4.  interpretation_endpoint (Provisional)
+
+   https://clawed.soosproject.com/jp/interpretations/{law_id}/
+   {article_ref}
+
+   This is a provisional SOOS-operated registry pending Digital
+   Agency native capability.
+
+A.5.  Endorsement Authority Table (Informative)
+
+   +-------------------+--------------+------------------------------+
+   | Law tier          | LawType      | Designated endorser          |
+   +-------------------+--------------+------------------------------+
+   | Constitution      | Constitution | 内閣法制局                    |
+   | Act (法律)         | Act          | 内閣法制局                    |
+   | Cabinet Order     | CabinetOrder | 内閣法制局                    |
+   | Ministerial       | Ministerial  | 所管省庁法令担当部局           |
+   | Ordinance (省令)   | Ordinance    |                              |
+   | Prefecture        | Misc         | 都道府県法務・法制担当部局     |
+   | Ordinance (条例)   |              |                              |
+   +-------------------+--------------+------------------------------+
+
+   Table A.1: Japan Endorsement Authority Table (Informative)
+
+
+Appendix B.  Related Work
+
+B.1.  Compliance Automation Approaches
+
+   No existing IETF draft specifies a structured schema for
+   representing legal compliance obligations as machine-compilable
+   intermediate representations, a normative compilation profile
+   from such a schema to a formal policy language, or a signed,
+   versioned registry protocol for distributing certified
+   compliance packages.  CAP-RRS is the first document on IETF
+   Datatracker to address this problem space.
+
+B.2.  Relationship to CAP
+
+   CAP [I-D.sato-soos-cap] specifies runtime enforcement.  CAP-RRS
+   specifies the governance of the policy corpus that CAP enforces.
+   CAP-04 receives the catalog_version schema (Section 10.5) and
+   the four-phase propagation workflow as normative content; both
+   documents are normatively coupled for these additions.
+
+B.3.  Relationship to SCITT
+
+   The Constitutional Mandate Registry (CMR) applies SCITT
+   principles -- signed packages, append-only publication, versioned
+   update notifications -- to compliance artifacts (Regulation
+   Records) rather than software artifacts.
+
+B.4.  Relationship to AIPREF
+
+   AIPREF specifies preference and permission signals above the GEC.
+   CAP-RRS specifies the compiled Cedar policy set below AIPREF.
+   The two layers compose without conflict.
+
+B.5.  Relationship to OSCAL   [NEW in -02]
+
+   OSCAL makes regulations machine-readable.  CAP makes them
+   machine-enforceable.  CAP-RRS is the bridge: it consumes
+   OSCAL-formatted regulation records as input to the Cedar
+   Compilation Profile.  SOOS is the first protocol suite designed
+   to enforce OSCAL-expressed controls at AI agent runtime.  The
+   CAP-RRS LRI schema parallels how OSCAL handles framework
+   profiles: jurisdiction-specific bindings (Japan e-LAWS, EU ELI,
+   US USLM) are profiles of the same underlying LRI interface,
+   just as NIST 800-53 and ISO 27001 are profiles of the same
+   underlying OSCAL catalog format.
+
+   CAP-RRS is the first IETF draft to bridge the OSCAL control
+   catalog layer and the IETF enforcement layer.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano
+   Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/

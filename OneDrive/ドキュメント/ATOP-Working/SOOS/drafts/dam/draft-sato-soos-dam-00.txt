@@ -1,0 +1,556 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                         11 July 2026
+Expires: 11 January 2027
+
+
+         The Data Artifact Management (DAM) Protocol for
+                      Agentic AI Systems
+                   draft-sato-soos-dam-00
+
+Abstract
+
+   This document specifies the Data Artifact Management (DAM) protocol
+   for agentic AI systems governed by the Sovereign Object OS (SOOS)
+   framework.  DAM defines a typed taxonomy of data artifacts produced
+   and consumed by AI agents, a governance envelope for each artifact
+   type specifying provenance, access policy, temporal validity, and
+   retention requirements, and the normative interface between agent-
+   generated artifacts and the Governance Audit Record (GAR).
+
+   DAM addresses three classes of data in agentic systems: kernel-
+   generated artifacts (IDP event logs, GAR records, AEP session state),
+   agent-generated artifacts (outputs of agent actions), and externally
+   ingested artifacts (data made available by resources).  DAM specifies
+   the Data Artifact type (DA-Type) taxonomy referenced in the Resource
+   Governance Protocol (RGP) and the Agent Execution Protocol (AEP).
+
+   This document is a placeholder submission establishing the draft
+   identifier and abstract.  Full specification text will be submitted
+   post-IETF 126 Vienna.
+
+   Further information: https://soosproject.ai/drafts/dam
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 11 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Problem Statement
+     1.2.  Scope of This Document
+   2.  Conventions and Definitions
+   3.  Architecture Overview
+     3.1.  DAM Position in the SOOS Stack
+     3.2.  DA-Type Taxonomy
+     3.3.  Artifact Lifecycle States
+     3.4.  GAR Provenance Integration
+   4.  Artifact Classes (Stub)
+     4.1.  KGA — Kernel-Generated Artifacts
+     4.2.  AGA — Agent-Generated Artifacts
+     4.3.  EIA — Externally Ingested Artifacts
+   5.  Graph Write Authority Model (Stub)
+   6.  Governance Envelope (Stub)
+   7.  Open Issues
+   8.  Security Considerations
+   9.  IANA Considerations
+   10. References
+     10.1. Normative References
+     10.2. Informative References
+   Author's Address
+
+1.  Introduction
+
+1.1.  Problem Statement
+
+   Agentic AI systems produce, consume, and transform data continuously
+   across the lifecycle of a governed session.  A booking agent reads
+   availability data from a supplier API, produces an itinerary
+   document, and records its reasoning chain.  A disaster response
+   agent ingests sensor readings, produces routing plans, and generates
+   situation reports.  An enterprise procurement agent queries inventory
+   databases and produces purchase orders.
+
+   In each case, the data is not homogeneous.  Availability data from
+   a supplier API has different provenance, access policy, and retention
+   requirements than a GAR audit record.  A routing plan produced by
+   an agent has different write authority semantics than an IDP event
+   log produced by the kernel.  A sensor reading ingested from an
+   external source has different validation requirements than an agent
+   decision document.
+
+   No existing protocol specifies a unified typed taxonomy for data
+   artifacts in agentic AI systems, a governance envelope that travels
+   with each artifact type, or the normative interface between artifact
+   production and the GAR provenance chain.  Without such a
+   specification, agentic systems cannot make machine-readable claims
+   about what data they produced, under what authority, with what
+   retention obligation, or how that data connects to the governance
+   audit record.
+
+   DAM closes this gap.  DAM does not specify data encoding formats
+   or storage systems.  DAM specifies the governance layer above those
+   concerns: the artifact type taxonomy, the governance envelope fields,
+   the write authority model, and the GAR provenance interface.
+
+1.2.  Scope of This Document
+
+   This document (DAM-00) is a placeholder submission establishing the
+   draft identifier, abstract, problem statement, and architecture
+   overview.  Section headings and stub text are included to reserve
+   the structure of the full specification.  Sections marked "(Stub)"
+   will be replaced with normative text in DAM-01 (post-Vienna).
+
+   The DA-Type taxonomy (Section 3.2), graph write authority model
+   (Section 5), and governance envelope fields (Section 6) are
+   architecturally locked per the SOOS UpgradeSprint Day 7 session
+   record (DR-GRP-DAM-01, June 30, 2026).  The stub sections present
+   these locked decisions at the outline level.
+
+   Full text authoring for DAM is scheduled post-IETF 126 Vienna
+   (after GAR-03 authoring, item 16 in the post-Vienna authoring
+   schedule).
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+   "MAY", and "OPTIONAL" in this document are to be interpreted as
+   described in BCP 14 [RFC2119] [RFC8174] when, and only when, they
+   appear in all capitals, as shown here.
+
+   Data Artifact (DA):
+      Any discrete unit of data produced, consumed, or transformed by
+      an agentic AI system or its governing kernel during a governed
+      session.  A DA is typed (Section 3.2), carries a governance
+      envelope (Section 6), and has a write authority class
+      (Section 5).
+
+   DA-Type:
+      The type identifier for a Data Artifact.  DA-Types are organized
+      into three top-level classes: KGA (Kernel-Generated Artifact),
+      AGA (Agent-Generated Artifact), and EIA (Externally Ingested
+      Artifact).  DA-Types are registered in the IANA DA-Type Registry
+      (Section 9).
+
+   Governance Envelope (GE):
+      The structured metadata record that travels with each Data
+      Artifact, specifying: provenance (who produced it, under what
+      session and mandate), access policy (Cedar policy reference
+      governing read/write), temporal validity (not-before, not-after),
+      and retention requirement (KERNEL_PERMANENT, SESSION_SCOPED,
+      OPERATOR_DEFINED, REGULATORY_MINIMUM).
+
+   KGA (Kernel-Generated Artifact):
+      A DA produced by the GEC kernel as a governance record.  Includes
+      IDP event records, GAR records, AEP session state, SACR objects,
+      and EOD endorsement records.  Subject to kernel-only write
+      authority (Section 5).
+
+   AGA (Agent-Generated Artifact):
+      A DA produced by an AI agent as an output of its action execution.
+      Includes documents, reports, code outputs, decisions, and
+      recommendations.  Subject to agent-write with kernel audit
+      (Section 5).
+
+   EIA (Externally Ingested Artifact):
+      A DA made available to the agent by an external resource.
+      Includes API responses, database query results, file contents,
+      and sensor readings.  Subject to kernel validation against the
+      active RGP Resource Envelope before agent ingestion (Section 5).
+
+   Provenance Chain:
+      The ordered sequence of GAR records that establishes the
+      production history of a Data Artifact: who produced it, in which
+      session, under which mandate, and with which kernel governance
+      events preceding production.
+
+   Retention Requirement:
+      The retention policy class attached to a DA in its Governance
+      Envelope.  Four classes are defined: KERNEL_PERMANENT (GAR
+      records; never deleted except by legal order), SESSION_SCOPED
+      (valid for session duration only), OPERATOR_DEFINED (operator
+      configures retention period), REGULATORY_MINIMUM (minimum
+      retention period specified by applicable regulatory obligation).
+
+3.  Architecture Overview
+
+3.1.  DAM Position in the SOOS Stack
+
+   DAM sits above GAR in the SOOS governance stack and below the
+   agent execution layer (AEP) and resource governance layer (RGP).
+   DAM is the data governance layer: it specifies the types and
+   governance envelopes of the data artifacts that flow between the
+   layers above and the audit record layer below.
+
+   The SOOS stack layers relevant to DAM:
+
+   +----------------------------------------------------------+
+   |         AEP / AOP / RGP (Agent Execution Layer)          |
+   |  Agent produces AGA | Agent ingests EIA | Kernel logs KGA |
+   +----------------------------------------------------------+
+                           |
+                     +----------+
+                     |   DAM    |
+                     | DA-Type  |
+                     | Gov Env  |
+                     | Write    |
+                     | Authority|
+                     +----------+
+                           |
+   +----------------------------------------------------------+
+   |                  GAR (Audit Record Layer)                 |
+   |  Provenance chain | Merkle-signed session block           |
+   +----------------------------------------------------------+
+
+   DAM is not a messaging protocol.  It does not specify how Data
+   Artifacts are transmitted between agents or resources.  It specifies
+   the governance metadata (DA-Type, Governance Envelope, write
+   authority class) that every Data Artifact in a SOOS-governed system
+   MUST carry.
+
+3.2.  DA-Type Taxonomy
+
+   The three top-level DA-Type classes:
+
+   +----------------------------------+---------------------------------+
+   | Class   | Description             | Examples                       |
+   +----------------------------------+---------------------------------+
+   | KGA     | Kernel-Generated        | IDP records, GAR records,      |
+   |         | Artifact: produced by   | AEP session state, SACR        |
+   |         | GEC kernel as governance| objects, EOD endorsements,     |
+   |         | record                  | KEE-1 WAL entries              |
+   +----------------------------------+---------------------------------+
+   | AGA     | Agent-Generated         | Documents, reports, code,      |
+   |         | Artifact: produced by   | decisions, recommendations,    |
+   |         | agent as action output  | itineraries, purchase orders   |
+   +----------------------------------+---------------------------------+
+   | EIA     | Externally Ingested     | API responses, database query  |
+   |         | Artifact: made available| results, file contents, sensor |
+   |         | by external resource    | readings, supplier data        |
+   +----------------------------------+---------------------------------+
+
+   Sub-type registries for each class will be defined in DAM-01.
+   DA-Type strings use the format: {CLASS}/{subtype}, e.g.,
+   "KGA/GAR_SESSION_BLOCK", "AGA/ITINERARY", "EIA/SUPPLIER_API_RESP".
+
+3.3.  Artifact Lifecycle States
+
+   [STUB — to be specified in DAM-01]
+
+   Anticipated states: PENDING | DRAFT | COMMITTED | VALID |
+   EXPIRED | SUPERSEDED | REVOKED.
+
+   Lifecycle transitions will be governed by kernel operations
+   and Cedar policy evaluation.  The GAR provenance chain records
+   each lifecycle transition.
+
+3.4.  GAR Provenance Integration
+
+   Every Data Artifact production or ingestion event in a SOOS-governed
+   session MUST be recorded in the GAR provenance chain.  The mandatory
+   GAR record for artifact production carries:
+
+   (a) da_type: the DA-Type string.
+   (b) da_id: UUID v7 assigned at production time.
+   (c) producing_session_id: the AEP session in which the artifact
+       was produced or ingested.
+   (d) producing_agent_xpid: XPID of the agent that produced/ingested
+       the artifact.  For KGA artifacts, producing_agent_xpid is the
+       GEC's XPID.
+   (e) mandate_ref: the MJWT jti that authorized the action producing
+       this artifact.
+   (f) governance_envelope_hash: SHA-256 over canonical JSON of the
+       artifact's Governance Envelope.
+
+   The mandatory provenance fields on Cedar evaluation records
+   (cedar_policy_id, cap_rrs_control_id, authority_source_uri) defined
+   in [I-D.sato-soos-gar] Section 8.6 apply to all DAM artifact
+   production events that are gated by Cedar policy evaluation.
+
+4.  Artifact Classes (Stub)
+
+4.1.  KGA — Kernel-Generated Artifacts
+
+   [STUB — to be specified in DAM-01]
+
+   KGA artifacts are the authoritative governance record of the SOOS
+   kernel.  They include all records produced by the GEC in the
+   execution of its governance functions: IDP event logs, GAR records,
+   AEP session state, SACR objects, EOD endorsement records, and
+   KEE-1 WAL entries.
+
+   Key properties to be specified in DAM-01:
+   - Kernel-only write authority (no agent may write or delete KGA)
+   - KERNEL_PERMANENT retention class (never deleted except by legal
+     order with court-order attestation record in GAR)
+   - Tamper evidence: each KGA is covered by the Session Block Merkle
+     root per [I-D.sato-soos-gar] Section 14.4
+
+4.2.  AGA — Agent-Generated Artifacts
+
+   [STUB — to be specified in DAM-01]
+
+   AGA artifacts are the operational outputs of agent execution: the
+   documents, decisions, recommendations, itineraries, and other
+   artifacts that the agent produces as the substantive result of
+   its task.  For a booking agent, the final itinerary is an AGA.
+   For a procurement agent, the purchase order is an AGA.  For a
+   disaster response agent, the routing plan is an AGA.
+
+   Key properties to be specified in DAM-01:
+   - Agent-write with kernel audit: agent produces; kernel logs
+     production event and provenance chain in GAR
+   - EOD linkage: each AGA produced as the primary mission output
+     is linked to the EOD that pre-declared it (by da_type match
+     to target_state SO Type)
+   - AGA sub-type registry: to be defined in DAM-01
+
+4.3.  EIA — Externally Ingested Artifacts
+
+   [STUB — to be specified in DAM-01]
+
+   EIA artifacts are data made available to the agent by external
+   resources: API responses, database query results, file contents,
+   sensor readings.  EIA ingestion is governed by the active RGP
+   Resource Envelope [I-D.sato-soos-rgp]: the kernel validates the
+   ingestion event against the Resource Envelope before the agent
+   is permitted to use the data.
+
+   Key properties to be specified in DAM-01:
+   - External-write with kernel validation: external resource produces;
+     kernel validates against active RGP Resource Envelope
+   - EIA poisoning defense: malicious data injected via an EIA that
+     causes the agent to violate CAP prohibitions remains detectable
+     in the GAR provenance chain via the EIA ingestion record
+   - Temporal validity: EIA artifacts carry not-before/not-after
+     bounds in their Governance Envelope; stale EIA ingestion is
+     detectable by audit
+
+5.  Graph Write Authority Model (Stub)
+
+   [STUB — to be specified in DAM-01]
+
+   The three-tier write authority model governs who may create, modify,
+   or delete each class of Data Artifact:
+
+   Tier 1 — Kernel-only write (KGA):
+      Only the GEC kernel may write KGA artifacts.  No agent, operator,
+      or external resource is granted Cedar Action::WriteKGA.  KGA
+      write operations are enforced at the TEE boundary per
+      [I-D.sato-soos-kee] KEE-1 property P1.
+
+   Tier 2 — Agent-write with kernel audit (AGA):
+      The agent may produce AGA artifacts as outputs of authorized
+      actions.  Each AGA production event is logged to GAR by the
+      kernel immediately upon production.  The agent cannot suppress
+      or modify the GAR log entry for an AGA it produced.
+
+   Tier 3 — External-write with kernel validation (EIA):
+      External resources produce EIA artifacts and make them available
+      to the agent.  The kernel validates each EIA against the active
+      RGP Resource Envelope before permitting agent ingestion.
+      The kernel logs the ingestion event to GAR.
+
+   The graph write authority model prevents a core attack class:
+   an agent that attempts to modify its own audit record (KGA) or
+   suppress the provenance record of an artifact it produced (AGA).
+   Both are DENIED by Cedar and enforced at the kernel boundary.
+
+6.  Governance Envelope (Stub)
+
+   [STUB — to be specified in DAM-01]
+
+   Each Data Artifact carries a Governance Envelope specifying:
+
+   provenance:
+      session_id, agent_xpid, mandate_ref, produced_at, da_type.
+      Identical to the GAR provenance chain record for this artifact.
+
+   access_policy:
+      Cedar policy reference governing read access to this artifact.
+      Specifies which principal types may read the artifact and under
+      what conditions.
+
+   temporal_validity:
+      not_before, not_after (ISO 8601 UTC).  For KGA, not_after is
+      unbounded (KERNEL_PERMANENT).  For EIA, not_after reflects
+      the data freshness window specified in the RGP Resource Envelope.
+
+   retention_requirement:
+      One of: KERNEL_PERMANENT | SESSION_SCOPED | OPERATOR_DEFINED |
+      REGULATORY_MINIMUM.
+
+   The Governance Envelope schema will be fully specified in DAM-01,
+   including Cedar evaluation semantics for access_policy and the
+   retention requirement enforcement model.
+
+7.  Open Issues
+
+   OQ-DAM-01: DA-Type sub-type registry design.
+     The three top-level DA-Type classes (KGA, AGA, EIA) are locked.
+     The sub-type registry format, registration procedure, and initial
+     sub-type list are deferred to DAM-01 authoring.  The DA-Type
+     string format {CLASS}/{subtype} is adopted; the authoritative
+     sub-type list for the initial registry is post-Vienna.
+
+   OQ-DAM-02: EIA poisoning defense normative treatment.
+     The EIA poisoning attack vector (malicious data injected via
+     external resource causing CAP prohibition violation) is identified
+     in Section 4.3.  Full normative defense specification (including
+     Cedar evaluation of ingestion events and GAR provenance linkage
+     to CAP DENIED actions triggered by EIA content) is deferred
+     to DAM-01.
+
+   OQ-DAM-03: AGA linkage to EOD target state.
+     Section 4.2 notes that AGA artifacts produced as primary mission
+     outputs should be linked to the EOD that pre-declared them.
+     The normative linkage mechanism (da_type to SO Type mapping in
+     the Mission Plan SO or AEP EOD schema) is deferred to DAM-01,
+     pending resolution against AOP-00 and IDP-05.
+
+8.  Security Considerations
+
+   [PLACEHOLDER — to be completed in DAM-01]
+
+   The primary security properties of DAM, to be specified normatively
+   in DAM-01:
+
+   (a) KGA integrity: Kernel-only write authority (Tier 1 in Section 5)
+       prevents agents from modifying or suppressing governance records.
+       Enforced at TEE boundary per [I-D.sato-soos-kee] KEE-1 P1.
+
+   (b) AGA provenance completeness: Every AGA production event is
+       logged to GAR immediately upon production.  Agent cannot
+       produce an AGA without a corresponding GAR record.
+
+   (c) EIA validation: EIA artifacts are validated against the active
+       RGP Resource Envelope before ingestion.  An EIA that fails
+       Resource Envelope validation is rejected and logged to GAR.
+
+   (d) EIA poisoning: Malicious EIA content that causes a CAP
+       prohibition violation remains detectable in the GAR provenance
+       chain: the EIA ingestion event precedes the CAP DENIED record,
+       providing full traceability from poisoned input to blocked
+       output.
+
+   (e) Governance Envelope integrity: The governance_envelope_hash
+       in the GAR provenance record allows auditors to detect post-
+       production modification of a Data Artifact's Governance
+       Envelope.
+
+9.  IANA Considerations
+
+   [PLACEHOLDER — to be completed in DAM-01]
+
+   DAM-01 will request the following IANA registrations:
+
+   (a) DA-Type Registry.  A new registry "SOOS Data Artifact Types"
+       with the following top-level entries:
+
+       +-------+----------------------------+---------------------+
+       | Class | Description                | Reference           |
+       +-------+----------------------------+---------------------+
+       | KGA   | Kernel-Generated Artifact  | [This document]     |
+       | AGA   | Agent-Generated Artifact   | [This document]     |
+       | EIA   | Externally Ingested        | [This document]     |
+       |       | Artifact                   |                     |
+       +-------+----------------------------+---------------------+
+
+       Sub-type registrations follow first-come-first-served policy
+       with expert review; registration procedure to be specified
+       in DAM-01.
+
+   (b) Governance Envelope Field Names Registry.  A new registry
+       "SOOS Governance Envelope Fields" registering the canonical
+       field names specified in Section 6.
+
+   (c) Retention Requirement Vocabulary Registry.  A new registry
+       "SOOS Retention Requirements" with initial entries:
+       KERNEL_PERMANENT, SESSION_SCOPED, OPERATOR_DEFINED,
+       REGULATORY_MINIMUM.
+
+10.  References
+
+10.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/info/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017,
+              <https://www.rfc-editor.org/info/rfc8174>.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "The Governance Audit Record (GAR) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-gar-03, July 2026.
+
+   [I-D.sato-soos-aep]
+              Sato, T., "The Agent Execution Protocol (AEP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-aep-02, July 2026.
+
+   [I-D.sato-soos-kee]
+              Sato, T., "The Kernel Execution Environment (KEE-1)
+              for the Sovereign Object OS", Internet-Draft
+              draft-sato-soos-kee-00, July 2026.
+
+10.2.  Informative References
+
+   [I-D.sato-soos-rgp]
+              Sato, T., "The Resource Governance Protocol (RGP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-rgp-00, July 2026.
+
+   [I-D.sato-soos-idp]
+              Sato, T., "The Intent Declaration Primitive (IDP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-idp-05, July 2026.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "The Constitutional AI Protocol (CAP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-cap-04, July 2026.
+
+   [I-D.sato-soos-aop]
+              Sato, T., "The Agent Orchestration Protocol (AOP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-aop-00, July 2026.
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI: https://soosproject.ai

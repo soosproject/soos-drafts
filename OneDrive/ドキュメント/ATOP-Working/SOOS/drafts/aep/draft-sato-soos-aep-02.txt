@@ -1,0 +1,3033 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                          11 July 2026
+Expires: 11 January 2027
+
+
+        The Agent Execution Protocol (AEP) for Agentic AI Systems
+                       draft-sato-soos-aep-02
+
+Abstract
+
+   An AI agent that can act cannot be governed unless there is a
+   normative contract for how it receives its world, how it declares
+   its intent, and how it learns what it is and is not permitted to
+   do -- at every step, in every iteration, without exception.
+
+   AI agents operating on governed resources require a normative
+   interface contract between their internal reasoning loop and the
+   Governing Enforcement Component (GEC) that enforces authorization
+   policy, records transitions to a tamper-evident Event Stream, and
+   mediates access to Sovereign Object instances.  Existing agent
+   frameworks define no such contract.  Agents submit actions without a
+   normative delivery protocol for the state and permission context they
+   act on; GECs enforce policy without a normative protocol for
+   communicating denial rationale back to agents; human oversight is
+   invoked without a normative session state that governs the resulting
+   suspension.
+
+   This document defines the Agent Execution Protocol (AEP): the
+   normative five-step loop -- SENSE, REASON, PLAN, ACT, OBSERVE --
+   that specifies how a governed AI agent interfaces with GEC services
+   at each iteration.  The AEP defines the Context Package delivered at
+   SENSE, the GEC Query Interface exercised at PLAN, the Transition
+   Request submitted at ACT, and the atomic GEC response received at
+   OBSERVE.  The AEP specifies two conformance modes -- Standard and
+   Goal Execution Engine (GEE) -- and normatively integrates the Intent
+   Declaration Primitive [I-D.sato-soos-idp], the Mandate JWT
+   [I-D.sato-soos-mjwt], the Human Escalation Mechanism
+   [I-D.sato-soos-hem], the Governance Audit Record [I-D.sato-soos-gar],
+   the Constitutional AI Protocol [I-D.sato-soos-cap], and the
+   Sovereign Object [I-D.sato-soos-sov] as components of a single
+   governed execution architecture.
+
+   The REASON step is intentionally GEC-unspecified: the LLM reasoning
+   engine is opaque to the protocol.  The AEP is the transmission
+   between the LLM engine and the GEC enforcement substrate.
+
+   Version -02 adds: XPID binding at session open (GEC MUST bind XPID
+   from KIA-verified Party Registry; MUST NOT accept client-supplied
+   XPID); STALLED and PLAN_B_ACTIVE session states with full normative
+   definitions, trigger conditions, and resume conditions; Expected
+   Outcome Declaration (EOD) as a pre-session commitment structure with
+   primary outcome, acceptance envelope, and pre-declared Plan B;
+   RETRY_CONTINUATION normative strengthening with what-changed-since-
+   last-attempt requirement and prior_denial_count Cedar attribute;
+   AEP-to-OTel mapping section (Section 8) with mandatory span
+   attributes at each AEP phase; four new Security Considerations;
+   and updated IANA registrations for new state codes and EOD media type.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 11 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Problem Statement
+     3.1.  The Loop Gap
+     3.2.  Why Existing Agent Frameworks Are Insufficient
+     3.3.  AEP as Architectural Integrator
+   4.  The AEP Loop
+     4.1.  Overview
+     4.2.  Step 1 -- SENSE
+     4.3.  Step 2 -- REASON
+     4.4.  Step 3 -- PLAN
+     4.5.  Step 4 -- ACT
+     4.6.  Step 5 -- OBSERVE
+     4.7.  LOOP Mechanism
+   5.  Session Lifecycle
+     5.1.  Session Initiation (with XPID Binding) [NEW in -02]
+     5.2.  Active Session
+     5.3.  HEM_PENDING Session State
+     5.4.  STALLED Session State [NEW in -02]
+     5.5.  PLAN_B_ACTIVE Session State [NEW in -02]
+     5.6.  Session Closure
+   6.  Expected Outcome Declaration (EOD) [NEW in -02]
+     6.1.  EOD Purpose and Role
+     6.2.  EOD Schema
+     6.3.  EOD Lifecycle
+     6.4.  Plan B Integration
+     6.5.  EOD and IDP Binding
+   7.  Context Package
+     7.1.  Context Package Schema
+     7.2.  Context Package Trigger Types
+     7.3.  SO Sub-Object
+     7.4.  Permissions Sub-Object
+     7.5.  Goal Sub-Object
+     7.6.  Memory Sub-Object
+     7.7.  Proximity Events
+     7.8.  HEM Context
+     7.9.  Agent Sub-Object
+   8.  GEC Query Interface (PLAN Step)
+     8.1.  Transition Graph Query
+     8.2.  Live Permission Map
+     8.3.  Compensating Action Catalogue
+   9.  Transition Request (ACT Step)
+     9.1.  Transition Request Structure
+     9.2.  GEC Execution Sequence
+     9.3.  IDP Submission at ACT
+   10. GEC Response (OBSERVE Step)
+     10.1. PERMIT Response
+     10.2. DENY Response
+     10.3. HEM_PENDING Response
+     10.4. RETRY_CONTINUATION Handling [REVISED in -02]
+   11. AEP Event Log Markers
+     11.1. AEP_SENSE_DELIVERED
+     11.2. AEP_SESSION_CLOSED
+     11.3. AEP_STALLED [NEW in -02]
+     11.4. AEP_PLAN_B_ACTIVATED [NEW in -02]
+   12. AEP-to-OTel Mapping [NEW in -02]
+     12.1. Overview
+     12.2. Mandatory Span Attributes by Phase
+     12.3. OTel Conformance Rules
+   13. Standard Mode Conformance
+   14. GEE Orchestration Mode
+     14.1. GEE Overview
+     14.2. Agent Reasoning Interface
+     14.3. GEE Conformance
+   15. Agent Class Model
+   16. Relationship to Other SOOS Drafts
+   17. Security Considerations
+   18. Privacy Considerations
+   19. IANA Considerations
+   20. References
+     20.1. Normative References
+     20.2. Informative References
+   Appendix A.  ATP Booking Object -- AEP Reference Walk-Through
+
+
+1.  Introduction
+
+   The IETF SOOS protocol family specifies governance primitives for
+   agentic AI systems: the Intent Declaration Primitive (IDP)
+   [I-D.sato-soos-idp] for per-transition intent declaration; the Human
+   Escalation Mechanism (HEM) [I-D.sato-soos-hem] for human oversight;
+   the Governance Audit Record (GAR) [I-D.sato-soos-gar] for tamper-
+   evident audit; the Constitutional AI Protocol (CAP)
+   [I-D.sato-soos-cap] for constitutional prohibition enforcement; the
+   Sovereign Object (SOV) [I-D.sato-soos-sov] for the governed resource
+   definition; and the Mandate JWT (MJWT) [I-D.sato-soos-mjwt] for
+   agent authorization binding.
+
+   Each of these specifications describes a component.  None describes
+   the loop.
+
+   An AI agent governed by these protocols executes a repeating
+   cycle: it receives context about the Sovereign Object instance it is
+   operating on; it reasons about what action to take next; it plans
+   that action using GEC query services; it submits the action as a
+   Transition Request carrying an MJWT and an IDP; and it receives a
+   GEC response that either permits the transition, denies it with
+   enriched rationale, or suspends the session pending human decision.
+   Then it does this again.
+
+   This cycle -- SENSE, REASON, PLAN, ACT, OBSERVE -- is the interface
+   contract between the agent's internal reasoning and the GEC
+   enforcement substrate.  Without a normative specification of this
+   cycle, each of the component protocols specifies its own assumptions
+   about the context in which it operates, without guaranteeing that
+   those assumptions are satisfied.  IDP assumes the agent has received
+   a context package before reasoning; AEP normatively defines that
+   delivery.  HEM assumes the session enters a HEM_PENDING state that
+   governs subsequent behavior; AEP normatively defines that state and
+   its exit conditions.  GAR assumes GEC events are generated at
+   defined points in the session; AEP normatively defines those points.
+
+   This document fills the loop gap.  The Agent Execution Protocol
+   (AEP) is the normative specification of how a governed AI agent
+   interfaces with GEC services at each iteration of its execution
+   cycle.  It is the horizontal interface contract that makes the
+   component SOOS protocols composable into a single governed execution
+   architecture.
+
+   The AEP is explicitly not a specification of agent intelligence.
+   The REASON step is GEC-unspecified: what LLM, what prompting
+   strategy, what reasoning architecture the agent uses is opaque to
+   the protocol.  The AEP specifies the inputs the agent MUST have
+   received before reasoning (SENSE), the GEC services it MAY query
+   to inform its plan (PLAN), the Transition Request structure it MUST
+   submit to act (ACT), and the response it MUST process before acting
+   again (OBSERVE).  The intelligence between SENSE and ACT is the
+   agent's; the protocol is the interface.
+
+   The design principle of the AEP: the LLM is the engine.  The AEP
+   is the transmission.  The GEC enforcement substrate is the road
+   system.  The road system specifies only the interface; it does not
+   specify the vehicle.
+
+   The AEP's PLAN step is the normative IETF specification of the
+   Windley Loop pattern: the principle that an agent should query its
+   authorized action space before committing to a plan, rather than
+   discovering infeasibility at execution time [OVID-Loop].  The
+   Windley Loop concept was articulated by Phil Windley [Windley-Loop]
+   and formalized by Clawdrey Hepburn, whose OVID-ME implementation
+   [OVID-ME] demonstrates the pattern operating in production against
+   Cedar-based agent mandates.  AEP specifies the full normative loop
+   -- SENSE, REASON, PLAN, ACT, OBSERVE -- of which the Windley Loop
+   planning gate is the PLAN step.  The OBSERVE re-query (policies may
+   change between iterations) and the HEM_PENDING session state (human
+   principal suspension) are AEP additions to the base Windley Loop
+   that extend it into a complete governed execution architecture.
+
+   If you are building an agentic AI system today, the absence of a
+   normative execution loop means your agent submits actions without a
+   standard protocol for delivering the state and permission context it
+   needs to reason correctly, your GEC enforces policy without a
+   standard protocol for communicating denial rationale back to the
+   agent, and your human oversight mechanism invokes without a normative
+   session state governing the resulting suspension.  AEP closes this
+   gap by specifying the five-step normative loop -- SENSE, REASON,
+   PLAN, ACT, OBSERVE -- that makes every SOOS component protocol
+   composable into a single governed execution architecture.  Without
+   AEP, each component specifies its own assumptions about the execution
+   context in which it operates; those assumptions are neither
+   guaranteed nor verifiable across implementations.
+
+   Version -02 adds XPID binding at session initiation, STALLED and
+   PLAN_B_ACTIVE session states, the Expected Outcome Declaration (EOD)
+   structure, strengthened RETRY_CONTINUATION requirements, and an
+   AEP-to-OTel mapping section.  These additions make the AEP loop
+   observable, pre-committed, and more resilient to systematic retry
+   bypass patterns.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   This document uses the following terms:
+
+   Agent Execution Protocol (AEP):
+      The normative five-step loop -- SENSE, REASON, PLAN, ACT,
+      OBSERVE -- defined in this document.  Specifies the interface
+      contract between a governed AI agent and GEC services at each
+      iteration of the agent's execution cycle.
+
+   AEP Session:
+      A bounded execution context initiated when the GEC delivers the
+      first Context Package to an agent for a specific Sovereign Object
+      instance under a specific Mandate JWT.  An AEP Session has a
+      unique session_id, a goal_session_id, and an iteration counter.
+      An AEP Session is in one of five states: ACTIVE, HEM_PENDING,
+      STALLED, PLAN_B_ACTIVE, or CLOSED.
+
+   AEP Iteration:
+      One complete traversal of the SENSE-REASON-PLAN-ACT-OBSERVE cycle
+      within an AEP Session.  Counted by aep_iteration, a monotonically
+      increasing integer per session.
+
+   Context Package:
+      The structured data object delivered by the GEC to the agent at
+      the SENSE step.  Contains the current SO Instance state, the
+      agent's permission set, the current goal, memory items, Proximity
+      Events, and HEM context if applicable.
+
+   Expected Outcome Declaration (EOD):
+      A pre-session commitment structure submitted by the agent or its
+      operator before the first SENSE delivery.  Specifies the primary
+      expected outcome, the acceptance envelope for success determination,
+      and a pre-declared Plan B for activation if the primary path is
+      blocked.  [NEW in -02]
+
+   STALLED Session State:
+      An AEP Session state in which the agent has been unable to make
+      progress toward the declared goal state for a GEC-defined
+      iteration count or time window, and no viable alternative path
+      is available without human direction.  STALLED is not an error
+      state; it is a governed signal that the session requires human
+      attention.  [NEW in -02]
+
+   PLAN_B_ACTIVE Session State:
+      An AEP Session state in which the agent's primary path to the
+      declared goal state has been confirmed blocked or DENIED, and
+      the GEC has activated the pre-declared Plan B from the EOD.  The
+      agent operates under Plan B constraints until the Plan B outcome
+      is reached or the session escalates.  [NEW in -02]
+
+   XPID:
+      The Cross-Principal Identifier assigned to an agent by the GEC
+      at session open.  Derived from the KIA-verified Party Registry
+      entry for the agent provider, per [I-D.sato-soos-kia] Section 5.
+      The XPID is bound to the AEP Session at initiation and MUST NOT
+      be accepted from the client.  [NEW in -02]
+
+   Transition Request:
+      The structured submission from an agent to the GEC at the ACT
+      step, carrying a Mandate JWT [I-D.sato-soos-mjwt], a Cedar action
+      identifier, and an Intent Declaration Primitive
+      [I-D.sato-soos-idp].
+
+   GEC Query Interface:
+      The set of read-only GEC services queried at the PLAN step:
+      Transition Graph, Live Permission Map, and Compensating Action
+      Catalogue.
+
+   HEM_PENDING:
+      An AEP Session state in which the session has been suspended by
+      the GEC pending a human principal decision under the Human
+      Escalation Mechanism [I-D.sato-soos-hem].  HEM_PENDING is a
+      valid, expected session state, not an error state.
+
+   Goal Execution Engine (GEE):
+      An optional orchestration mode in which a GEC-provided engine
+      inverts control, calling the agent's reason() function as a
+      service within a GEC-driven loop.  In GEE mode the agent MUST NOT
+      call the GEC transition endpoint directly.
+
+   Proximity Event:
+      A GEC-generated notification that a monitored condition is
+      approaching a threshold value.  Delivered within the Context
+      Package at SENSE.  Enables proactive agent behavior before
+      threshold breach.
+
+   ReasoningOutput:
+      The structured output produced by the agent at the REASON step
+      in GEE mode, consumed by the GEE to construct the full Transition
+      Request.
+
+   Governing Enforcement Component (GEC):
+      As defined in [I-D.sato-soos-idp]: a runtime component that
+      enforces authorization policy, records agent actions to a tamper-
+      evident Event Stream, and mediates agent access to Sovereign
+      Object instances.
+
+   Sovereign Object (SO):
+      As defined in [I-D.sato-soos-sov]: a causally ordered, policy-
+      governed, typed, living document that evolves through a predefined
+      finite state space under GEC authority.
+
+   Mandate JWT (MJWT):
+      As defined in [I-D.sato-soos-mjwt]: a WIMSE workload credential
+      profile that grants an AI agent authority to perform a specified
+      set of Cedar actions on a specific SO Instance under the oversight
+      of a named human principal.
+
+   Intent Declaration Primitive (IDP):
+      As defined in [I-D.sato-soos-idp]: a structured object produced
+      by an agent at the ACT step declaring the action, goal context,
+      reasoning basis, confidence, and alternatives considered.
+
+   Cedar:
+      A policy language and evaluation engine [Cedar] used by the GEC
+      to evaluate authorization decisions.
+
+   Human Principal:
+      A natural person who holds authority over an SO Instance, as
+      identified in the Mandate JWT human_principal_id claim
+      [I-D.sato-soos-mjwt].
+
+   RETRY_CONTINUATION:
+      An IDP reasoning_basis type [I-D.sato-soos-idp] Section 4.3
+      used when an agent retries an action following a GEC DENY
+      response, declaring the prior denial as the basis for the
+      revised attempt.  See Section 10.4 for strengthened requirements
+      in AEP-02.
+
+
+3.  Problem Statement
+
+3.1.  The Loop Gap
+
+   The live SOOS drafts -- IDP, HEM, GAR, CAP, SOV, MJWT, KIA, and
+   MAD -- collectively specify what must be declared, what must be
+   escalated, what must be recorded, what is constitutionally
+   prohibited, what resource is governed, what credential binds the
+   agent, how agents are identified, and how delegation is governed.
+   Each draft describes a component; none describes the cycle in which
+   those components operate.
+
+   The consequences of the missing loop specification are concrete:
+
+   (a) SENSE ambiguity.  IDP Section 4.1 requires context_package_ref:
+       a SHA-256 hash of the Context Package delivered to the agent
+       before reasoning.  Without a normative definition of the Context
+       Package -- its schema, its trigger types, its GEC delivery
+       semantics -- this field has no interoperable meaning.
+       Implementations cannot verify that the IDP's reasoning_basis
+       references are grounded in the same context the GEC delivered.
+
+   (b) PLAN unspecified.  HEM Section 1 references the Windley Loop
+       [Windley-Loop] as the planning gate that precedes the enforcement
+       gate.  SOV Section 7.1 defines SO state as a Cedar attribute
+       available at evaluation time.  Neither specifies the GEC Query
+       Interface through which the agent discovers valid transition
+       paths, live permissions, and compensating action availability
+       before submitting a Transition Request.
+
+   (c) OBSERVE fragmented.  IDP Section 6 specifies the enriched DENY
+       response; MJWT Section 8.2 specifies denial codes; HEM Section 4
+       specifies HEM session states including HEM_PENDING.  No
+       document specifies how the agent receives and processes these
+       responses as part of a single normative OBSERVE step, or how the
+       RETRY_CONTINUATION reasoning basis type [I-D.sato-soos-idp]
+       Section 4.3 is to be used in the subsequent ACT.
+
+   (d) Session state implicit.  HEM Section 4.1 defines HEM_PENDING
+       as a session state.  GAR Section 6.1 defines SAR generation
+       at session close.  IDP Section 5.1 defines the Transition
+       Request submission.  No document defines the session itself: its
+       initiation, its valid states, its event log markers, and its
+       termination paths.
+
+   This document closes all four gaps.  Version -02 additionally closes
+   three gaps identified after the -01 submission:
+
+   (e) Agent identity not bound at session open.  AEP-01 specified
+       Mandate JWT verification at each ACT step but did not specify
+       when or how the GEC binds the Cross-Principal Identifier (XPID)
+       to the AEP Session.  A session that allows a client to supply
+       its own XPID is vulnerable to identity substitution attacks.
+       Section 5.1 closes this gap.
+
+   (f) No stall state.  AEP-01 had no state for sessions that cannot
+       make progress without human direction but have not triggered a
+       HEM condition.  Agents that silently exhaust their iteration
+       budget making no progress are governed as normal sessions.
+       Sections 5.4 and 5.5 close this gap.
+
+   (g) No pre-session outcome commitment.  AEP-01 had no mechanism for
+       an agent to commit to its expected outcome and fallback strategy
+       before beginning execution.  This gap means the GEC cannot
+       distinguish an agent that failed unexpectedly from one that
+       executed its pre-declared Plan B.  Section 6 closes this gap.
+
+3.2.  Why Existing Agent Frameworks Are Insufficient
+
+   Agent frameworks such as LangGraph, AutoGen, CrewAI, and the
+   emerging Model Context Protocol [MCP] define agent loop abstractions.
+   None provides the governance properties required by the SOOS
+   protocol family:
+
+   State-grounded SENSE.  Existing frameworks do not deliver a
+   cryptographically bound, GEC-signed snapshot of a Sovereign Object
+   Instance's current state to the agent before each iteration.
+   The agent's context is whatever the application layer provides.
+
+   Governed ACT.  Existing frameworks submit tool calls and API
+   invocations without verifying that the agent holds a valid Mandate
+   JWT, that the Cedar action is within scope, and that the human
+   principal linkage is intact.  The GEC's execution sequence
+   (Section 9.2) has no equivalent.
+
+   Non-suppressible OBSERVE.  Existing frameworks may log agent
+   actions; none enforces that the log is append-only, GEC-signed, and
+   non-modifiable by the agent.  The AEP OBSERVE step triggers the
+   GAR [I-D.sato-soos-gar] recording that makes governance auditable.
+
+   Human oversight integration.  Existing frameworks may pause for
+   human input; none defines the HEM_PENDING session state, the five
+   human decision types, the cascade revocation on TERMINATE, or the
+   Progressive Trust signals generated by the escalation outcome.
+
+   Windley Loop implementations.  OVID-ME [OVID-ME] implements the
+   Windley Loop [OVID-Loop] within a single Cedar-based trust domain,
+   demonstrating that pre-ACT policy querying reduces authorization
+   failures and enables precise escalation.  OVID-ME does not specify
+   the full AEP session lifecycle, the HEM_PENDING state, the
+   RETRY_CONTINUATION mechanism, the IDP per-step intent declaration,
+   the STALLED state, the EOD pre-session commitment, or the non-
+   suppressible GAR audit trail.  AEP is not a replacement for OVID-ME;
+   it is the standards-track specification that makes the Windley Loop
+   pattern interoperable across implementations and provides the
+   governance layer above it.
+
+3.3.  AEP as Architectural Integrator
+
+   The AEP is the document that positions all other SOOS drafts as
+   components of a single governed execution architecture.  From the
+   perspective of an AEP-conforming implementation:
+
+   - SOV defines what the agent operates on (the governed resource).
+   - MJWT defines the credential that binds the agent to that resource.
+   - KIA defines the Party Registry entry that the GEC uses to derive
+     the agent's XPID at session open.
+   - IDP defines what the agent must declare before each ACT.
+   - CAP defines constitutional prohibitions evaluated before Cedar.
+   - HEM defines what happens when the GEC suspends the session.
+   - GAR defines the audit artifacts generated throughout the session.
+   - MAD defines the delegation structure for multi-agent sessions.
+
+   The AEP specifies how these components interoperate at each step of
+   the execution cycle.  An implementation that conforms to AEP
+   automatically satisfies the integration requirements assumed by each
+   component draft.
+
+
+4.  The AEP Loop
+
+4.1.  Overview
+
+   The AEP defines five normative steps executed in strict order within
+   each AEP Iteration.
+
+   Step 1 -- SENSE:    GEC delivers Context Package to agent.
+   Step 2 -- REASON:   Agent performs LLM-internal reasoning.
+   Step 3 -- PLAN:     Agent queries GEC Query Interface.
+   Step 4 -- ACT:      Agent submits Transition Request to GEC.
+   Step 5 -- OBSERVE:  Agent receives and processes GEC response.
+
+   After OBSERVE, the LOOP mechanism determines whether the next
+   iteration begins (SENSE again) or the session closes.
+
+   The REASON step is intentionally GEC-unspecified.  What LLM,
+   reasoning strategy, prompting approach, or internal architecture
+   the agent uses between SENSE and PLAN is opaque to this protocol.
+   The AEP specifies only the inputs the agent MUST have received
+   (SENSE), the services it MAY query (PLAN), the submission it MUST
+   make (ACT), and the response it MUST process (OBSERVE).
+
+   A session in HEM_PENDING state has exited the normal 5-step cycle.
+   Section 5.3 specifies the HEM_PENDING protocol.  A session in
+   STALLED state has exited the normal 5-step cycle pending human
+   direction.  Section 5.4 specifies the STALLED protocol.  A session
+   in PLAN_B_ACTIVE state continues the 5-step cycle under Plan B
+   constraints.  Section 5.5 specifies the PLAN_B_ACTIVE protocol.
+
+4.2.  Step 1 -- SENSE
+
+   At SENSE, the GEC delivers a Context Package (Section 7) to the
+   agent.  The Context Package carries the current state of the SO
+   Instance the agent is authorized to operate on, the agent's current
+   permission set, the current goal context, memory items from prior
+   iterations, Proximity Events approaching threshold, and HEM context
+   if the session is resuming from HEM_PENDING.
+
+   SENSE requirements:
+
+   (a) The GEC MUST write an AEP_SENSE_DELIVERED Event Stream entry
+       (Section 11.1) before delivering the Context Package.  The
+       entry MUST include the cp_hash of the Context Package to be
+       delivered.
+
+   (b) The Context Package MUST be delivered by the GEC, not
+       constructed by the agent.  An agent MUST NOT construct or
+       modify its own Context Package.
+
+   (c) The agent MUST NOT submit a Transition Request (ACT) without
+       first having received an AEP_SENSE_DELIVERED Event Stream entry
+       for the current session iteration.  The IDP submitted at ACT
+       MUST carry a context_package_ref matching the cp_hash of the
+       most recently delivered Context Package.
+
+   (d) The trigger field in the Context Package (Section 7.2) declares
+       why this SENSE delivery occurred.  The agent MUST process the
+       trigger semantics before reasoning.
+
+   (e) At SESSION_START, the Context Package carries the initial SO
+       Instance state.  On STATE_CHANGE, it carries the updated state
+       following the prior ACT.  On HEM_RESOLUTION, it carries the
+       human principal's decision and the updated HEM context.  On
+       MANDATE_REVOCATION, it signals session termination.  On
+       STALL_RESOLVED, it carries the human principal's direction
+       following resolution of the STALLED state (Section 5.4).
+
+4.3.  Step 2 -- REASON
+
+   At REASON, the agent performs its internal LLM reasoning.  The AEP
+   does not specify this step beyond its inputs and outputs.
+
+   Required inputs to REASON:
+   - The Context Package delivered at SENSE.
+   - All prior AEP_SENSE_DELIVERED and GEC response history for this
+     session, as the agent's own context.
+
+   Required outputs from REASON (consumed at PLAN and ACT):
+   - The Cedar action the agent intends to request.
+   - A confidence value in the range [0.0, 1.0].
+   - A draft reasoning_basis for the IDP to be submitted at ACT.
+   - An escalation assessment for the IDP.
+   - Alternatives considered and uncertainty flags, per agent class
+     requirements (Section 15).
+   - A reasoning_mode classification per [I-D.sato-soos-idp]
+     Section 4.3.1, when the mode is other than ROUTINE.  Agents
+     SHOULD declare reasoning_mode for all non-ROUTINE iterations.
+     When absent, the GEC treats the IDP as ROUTINE for any
+     analytics or pattern analysis purposes.
+
+   REASON constraints:
+
+   (a) The agent MUST NOT submit a Transition Request for any Cedar
+       action not included in its current Mandate JWT cedar_actions
+       array [I-D.sato-soos-mjwt] Section 4.2.3.  The Live Permission
+       Map query at PLAN provides pre-computed authorization scope.
+
+   (b) When OBSERVE returned a DENY response in the prior iteration,
+       the RETRY_CONTINUATION reasoning_basis type MUST be used in
+       the IDP submitted at the next ACT (Section 10.4).  The agent
+       MUST NOT silently retry the same action with the same IDP.
+
+   (c) When SENSE trigger is MANDATE_REVOCATION, the agent MUST NOT
+       enter the REASON step.  It MUST proceed directly to graceful
+       session shutdown (Section 5.6).
+
+   (d) When SENSE trigger is STALL_RESOLVED, the agent MUST process
+       the resolution direction before entering REASON.  The resolution
+       direction MUST be reflected in the reasoning_basis of the next
+       IDP submitted at ACT.
+
+4.4.  Step 3 -- PLAN
+
+   At PLAN, the agent queries GEC Query Interface services (Section 8)
+   to inform its Transition Request before submission.  The PLAN step
+   is a read-only interaction with the GEC; it does not modify SO
+   Instance state.
+
+   PLAN is the normative implementation of the Windley Loop
+   [Windley-Loop]: the planning gate that precedes the enforcement
+   gate.  The Windley Loop principle is that an agent SHOULD verify
+   the feasibility and authorization of a planned action before
+   committing to it, rather than discovering infeasibility at ACT.
+
+   PLAN services:
+
+   (a) Transition Graph query (Section 8.1): the agent queries the GEC
+       for valid Cedar-authorized transition paths from the current SO
+       state to the agent's declared goal state.  The returned graph
+       enables the agent to select a viable action path before ACT.
+
+   (b) Live Permission Map query (Section 8.2): the agent queries the
+       GEC for the Cedar residual policy set applicable to its current
+       Mandate JWT and the current SO Instance state.  The returned
+       permitted_actions array MUST be used to validate the intended
+       Cedar action before ACT.
+
+   (c) Compensating Action Catalogue query (Section 8.3): OPTIONAL.
+       The agent MAY query available compensating transitions from the
+       current state if the intended action fails.  This query informs
+       the compensating_action_assessed field in the IDP.
+
+   PLAN conformance:
+
+   Class 2 and Class 3 agents (Section 15) MUST query the Transition
+   Graph at least once per AEP Session before submitting the first
+   Transition Request.  Agents that deviate from the returned path
+   MUST query the Transition Graph again before the deviation step.
+
+   When SENSE delivers a STALL_RESOLVED trigger, the agent MUST query
+   the Transition Graph before submitting the next ACT, regardless of
+   agent class.  The prior path_to_goal MUST be treated as stale.
+
+4.5.  Step 4 -- ACT
+
+   At ACT, the agent submits a Transition Request (Section 9) to the
+   GEC.  The Transition Request carries the agent's Mandate JWT, the
+   Cedar action identifier, and the Intent Declaration Primitive.
+
+   ACT requirements:
+
+   (a) The agent MUST submit exactly one Mandate JWT per Transition
+       Request.  The Mandate JWT MUST carry the so_id of the SO
+       Instance targeted by this Transition Request.
+
+   (b) The agent MUST submit a well-formed IDP [I-D.sato-soos-idp]
+       with every Transition Request.  Required IDP fields depend on
+       the agent's class (Section 15).
+
+   (c) The agent MUST NOT submit a second Transition Request while
+       awaiting the GEC response to the first.  Concurrent transitions
+       on the same SO Instance from the same agent are not permitted.
+
+   (d) The GEC MUST execute its transition execution sequence
+       (Section 9.2) before Cedar evaluation.  The GEC MUST also
+       evaluate CAP [I-D.sato-soos-cap] prohibitions before Cedar
+       evaluation per [I-D.sato-soos-sov] Section 7.3.
+
+   (e) The transition is atomic: it either completes fully or does not
+       occur at all.  Partial execution is not a valid GEC state.
+
+   (f) When the session is in PLAN_B_ACTIVE state (Section 5.5), the
+       IDP MUST carry a plan_b_ref field referencing the activated Plan
+       B from the EOD (Section 6).  ACT submissions that do not carry
+       plan_b_ref in PLAN_B_ACTIVE state MUST be rejected.
+
+   The ACT step is the only step at which the SO Instance state can
+   change.  SENSE, REASON, PLAN, and OBSERVE do not modify SO state.
+
+4.6.  Step 5 -- OBSERVE
+
+   At OBSERVE, the agent receives and processes the GEC response to
+   its Transition Request.  Three response types are defined
+   (Section 10): PERMIT, DENY, and HEM_PENDING.
+
+   OBSERVE requirements:
+
+   (a) The agent MUST process the OBSERVE response before entering
+       the next iteration (SENSE).
+
+   (b) On PERMIT: the agent receives the new SO Instance state,
+       the updated Cedar residual, and the Event Stream entry
+       reference.  The session continues.
+
+   (c) On DENY: the agent receives an enriched DENY response
+       [I-D.sato-soos-idp] Section 6 carrying the denial code and
+       the IDP reasoning_basis fields that would change the decision.
+       The agent MUST use RETRY_CONTINUATION reasoning basis in any
+       subsequent IDP for the same action (Section 10.4).
+
+   (d) On HEM_PENDING: the session has entered HEM_PENDING state
+       (Section 5.3).  The agent MUST NOT submit further Transition
+       Requests until HEM_PENDING is resolved.
+
+   (e) The agent MUST NOT silently discard or ignore a DENY response.
+       The DENY and the IDP are recorded in the SO Instance Event
+       Stream regardless of whether the transition succeeded.  The
+       agent's next reasoning cycle MUST account for the DENY.
+
+   (f) When the GEC determines the session has entered STALLED
+       conditions (Section 5.4), OBSERVE returns a STALLED response.
+       The agent MUST NOT submit further ACT requests until the STALLED
+       state resolves via STALL_RESOLVED trigger at SENSE.
+
+4.7.  LOOP Mechanism
+
+   After OBSERVE, the GEC evaluates whether the AEP Session continues.
+
+   The session continues (next SENSE) when:
+   - The OBSERVE response was PERMIT and the goal state is not yet
+     reached.
+   - The OBSERVE response was DENY and the session mandate has not
+     expired and the stall threshold has not been reached.
+   - HEM_PENDING has resolved with APPROVE, APPROVE_WITH_CONSTRAINTS,
+     or REDIRECT.
+   - STALLED has resolved with STALL_RESOLVED.
+   - PLAN_B_ACTIVE: the Plan B sub-goal is not yet reached.
+
+   The session closes when:
+   - The goal SO state is reached (closure_reason: GOAL_ACHIEVED).
+   - The Plan B outcome is reached in PLAN_B_ACTIVE state
+     (closure_reason: PLAN_B_ACHIEVED).
+   - The Mandate JWT expires before goal completion (MANDATE_EXPIRED).
+   - The agent declares goal outcome (AGENT_DECLARED).
+   - The GEE closes the session (GEE_CLOSED).
+   - HEM resolves with TERMINATE (HEM_TERMINATED).
+   - A MANDATE_REVOCATION SENSE trigger is received (MANDATE_REVOKED).
+   - The GEC rejects the session (KERNEL_REJECTED).
+   - The SO Cluster of which this session is a member reaches
+     UNACHIEVABLE achievability state (CLUSTER_HALT).
+   - The STALLED state is not resolved within the GEC-defined STALL
+     timeout (STALL_TIMEOUT).
+
+   On session close, the GEC MUST write AEP_SESSION_CLOSED
+   (Section 11.2) and the GAR MUST generate a Session Audit Record
+   [I-D.sato-soos-gar] Section 6.
+
+   State change at PERMIT triggers GEC re-injection: the GEC prepares
+   the next Context Package for SENSE.  The aep_iteration counter
+   MUST be incremented.
+
+
+5.  Session Lifecycle
+
+5.1.  Session Initiation (with XPID Binding) [NEW in -02]
+
+   An AEP Session is initiated when a human principal or an authorized
+   agent requests that the GEC begin a governed session for a specific
+   SO Instance under a specific Root Mandate JWT
+   [I-D.sato-soos-mjwt] Section 6.1.
+
+   Session initiation:
+
+   (a) The GEC MUST verify the Root Mandate JWT per the MJWT
+       verification protocol [I-D.sato-soos-mjwt] Section 8 before
+       initiating the session.
+
+   (b) The GEC MUST assign a unique session_id (UUID v7 [RFC9562]) and
+       a goal_session_id (UUID v7) for the session.
+
+   (c) The GEC MUST initialize the aep_iteration counter to 1.
+
+   XPID binding at session open [NEW in -02]:
+
+   (d) The GEC MUST derive the agent's XPID from the KIA-verified
+       Party Registry entry for the agent provider identified in the
+       Root Mandate JWT agent_provider_id field, per the XPID
+       derivation procedure in [I-D.sato-soos-kia] Section 5.
+
+   (e) The GEC MUST bind the derived XPID to the AEP Session at
+       initiation.  The session_xpid field in AEP_SENSE_DELIVERED
+       (Section 11.1) MUST carry this value.
+
+   (f) The GEC MUST NOT accept a client-supplied XPID.  Any session
+       initiation request that includes an agent-provided XPID claim
+       MUST be rejected with INVALID_XPID_CLAIM.  The XPID is always
+       GEC-derived; its integrity depends on this constraint.
+
+   (g) The GEC MUST verify that the agent_provider_id in the Root
+       Mandate JWT resolves to an active, non-revoked Party Registry
+       entry in the KIA registry [I-D.sato-soos-kia].  A session
+       initiation request for an agent whose Party Registry entry is
+       absent, suspended, or revoked MUST be rejected with
+       AGENT_NOT_REGISTERED.
+
+   EOD submission at session open [NEW in -02]:
+
+   (h) Class 3 agents MUST submit an EOD (Section 6) before or at
+       session initiation.  The GEC MUST NOT deliver the first Context
+       Package to a Class 3 agent until a valid EOD has been received
+       and recorded.
+
+   (i) Class 2 agents SHOULD submit an EOD.  When an EOD is absent for
+       a Class 2 agent, the GEC records EOD_ABSENT in the Session Audit
+       Record.  Cedar policies MAY require EOD presence as a permit
+       condition for Class 2 agents on high-risk SO Types.
+
+   (j) Class 1 agents are not required to submit an EOD.
+
+   (k) The GEC MUST deliver the first Context Package with trigger:
+       SESSION_START.  The GEC MUST write AEP_SENSE_DELIVERED before
+       delivering this Context Package.
+
+   (l) The session enters ACTIVE state.
+
+5.2.  Active Session
+
+   An ACTIVE session is a session in which the AEP loop is executing.
+   In ACTIVE state:
+
+   - The GEC MUST accept Transition Requests from the agent holding
+     the session's Mandate JWT.
+   - The GEC MUST deliver Context Packages at each SENSE.
+   - The GEC MUST process Proximity Events and deliver them within
+     the Context Package when triggered.
+   - The GEC MAY transition the session to HEM_PENDING at any time
+     a HEM trigger condition is met (Section 5.3).
+   - The GEC MAY transition the session to STALLED if the stall
+     conditions defined in Section 5.4 are met.
+
+5.3.  HEM_PENDING Session State
+
+   HEM_PENDING is a valid, expected AEP Session state, not an error
+   state.  An agent that correctly identifies a decision outside its
+   confident operating range and signals escalation is performing
+   correctly under the AEP.
+
+   Entry into HEM_PENDING:
+
+   The GEC enters HEM_PENDING when any HEM trigger class fires
+   [I-D.sato-soos-hem] Section 5:
+   - HEM_MANDATORY: Cedar returns DENY with hem_required: true.
+   - HEM_AGENT_ESCALATED: IDP carries escalation_assessment with
+     hem_urgency: REQUIRED and Cedar evaluation returns PERMIT.
+   - HEM_PROXIMITY_TRIGGERED: a Proximity Event threshold is reached.
+
+   The GEC MUST write HEM_INVOKED to the SO Instance Event Stream
+   before the session enters HEM_PENDING.
+
+   While HEM_PENDING:
+
+   (a) The GEC MUST reject Transition Requests from this session
+       with SESSION_HEM_PENDING.
+   (b) Other agents' sessions on the same SO Instance are NOT
+       affected.  HEM_PENDING is scoped to this AEP Session.
+   (c) The SO Instance's state machine is NOT frozen.  Other agents
+       with appropriate Mandate JWTs MAY continue transitions on the
+       same SO Instance.
+
+   Exit from HEM_PENDING:
+
+   HEM_PENDING is exited when the human principal submits a
+   HEMDecision [I-D.sato-soos-hem] Section 8:
+   - APPROVE: the pending transition proceeds.  The GEC delivers a
+     new SENSE with trigger: HEM_RESOLUTION.
+   - APPROVE_WITH_CONSTRAINTS: as APPROVE, with additional Cedar
+     fragments added to the session.
+   - REDIRECT: the pending transition is abandoned.  The GEC delivers
+     a new SENSE with trigger: HEM_RESOLUTION carrying the redirect
+     instruction.
+   - TERMINATE: the session closes.  AEP_SESSION_CLOSED written with
+     closure_reason: HEM_TERMINATED.
+   - DEFER: the HEM_PENDING timeout is extended.  The session remains
+     in HEM_PENDING.  The agent receives no new SENSE.
+
+   HEM_PENDING also exits on HEM_TIMEOUT if the timeout_at timestamp
+   is reached before HEM_RESOLVED is committed.  Timeout disposition
+   depends on urgency per [I-D.sato-soos-hem] Section 10.2.
+
+5.4.  STALLED Session State [NEW in -02]
+
+   STALLED is an AEP Session state in which the agent cannot make
+   progress toward the declared goal state without human direction.
+   STALLED is not an error state.  It is a governed signal that the
+   session has reached a condition where continued autonomous execution
+   without human input would be either futile or unsafe.
+
+   STALLED differs from HEM_PENDING in origin: HEM_PENDING is entered
+   because a specific action triggered a governance escalation.
+   STALLED is entered because the session as a whole has reached a
+   progress boundary without any single action triggering HEM.
+
+   Entry into STALLED:
+
+   The GEC MUST enter STALLED when any of the following conditions
+   are met:
+
+   (a) STALL_DENY_THRESHOLD: the session has received N consecutive
+       DENY responses (where N is defined in the SO Type or defaults
+       to 5) without a PERMIT.  The agent has exhausted its retry
+       capacity without making progress.
+
+   (b) STALL_PATH_EXHAUSTED: the Transition Graph query (Section 8.1)
+       returns an empty path_to_goal AND no compensating actions are
+       available, AND the session is not in HEM_PENDING.  No path from
+       the current SO state to the declared goal state exists that the
+       agent has authority to traverse.
+
+   (c) STALL_PLAN_B_BLOCKED: the session is in PLAN_B_ACTIVE state
+       and the Plan B path has also been exhausted without reaching the
+       Plan B outcome.
+
+   (d) STALL_ITERATION_LIMIT: the aep_iteration counter exceeds the
+       mandate's declared iteration ceiling without goal achievement.
+
+   On entry to STALLED:
+
+   (e) The GEC MUST write AEP_STALLED (Section 11.3) to the Event
+       Stream immediately.  The entry MUST carry the stall_reason and
+       the aep_iteration count at which STALLED was entered.
+
+   (f) The GEC MUST reject subsequent ACT submissions with
+       SESSION_STALLED until the STALLED state is resolved.
+
+   (g) The GEC MUST notify the human principal via HEM
+       [I-D.sato-soos-hem] with urgency RECOMMENDED.  The STALLED
+       notification is distinct from a HEM escalation: it does not
+       move the session to HEM_PENDING unless the human principal
+       responds with an active decision.
+
+   (h) The GEC SHOULD surface the stall_reason and the prior
+       DENY chain to the human principal in the notification.
+
+   Exit from STALLED:
+
+   (i) The human principal submits a STALL_DIRECTION response via the
+       HEM interface.  STALL_DIRECTION options:
+       - REDIRECT_GOAL: the human principal sets a new goal state.
+         The GEC delivers SENSE with trigger: STALL_RESOLVED carrying
+         the new declared_goal_state.
+       - ACTIVATE_PLAN_B: if an EOD Plan B is declared (Section 6.4),
+         the GEC activates it.  The session transitions to
+         PLAN_B_ACTIVE (Section 5.5).
+       - ESCALATE_TO_HEM: the human principal treats the stall as a
+         full HEM escalation.  The session transitions to HEM_PENDING.
+       - CLOSE: the human principal closes the session with
+         closure_reason: STALL_TIMEOUT (even if the timeout has not
+         been reached).
+
+   (j) The STALLED state has a maximum duration equal to the HEM
+       timeout applicable to the session's SO Type.  If the human
+       principal does not respond before this timeout, the session
+       closes with closure_reason: STALL_TIMEOUT.
+
+5.5.  PLAN_B_ACTIVE Session State [NEW in -02]
+
+   PLAN_B_ACTIVE is an AEP Session state in which the session is
+   executing the pre-declared Plan B from the EOD (Section 6.4).
+   The primary path to the declared goal state has been blocked, and
+   the GEC has activated the Plan B outcome as the session's operative
+   goal.
+
+   PLAN_B_ACTIVE is entered when:
+   - A STALL_DIRECTION response of ACTIVATE_PLAN_B is received from
+     the human principal.
+   - The GEC automatically activates Plan B on entry to STALLED when
+     the EOD carries auto_activate_plan_b: true AND the stall reason
+     is STALL_PATH_EXHAUSTED or STALL_DENY_THRESHOLD.  Automatic
+     activation MUST write AEP_PLAN_B_ACTIVATED (Section 11.4) to
+     the Event Stream and MUST notify the human principal.
+
+   While PLAN_B_ACTIVE:
+
+   (a) The GEC MUST update the session's operative goal to the Plan B
+       outcome declared in the EOD.
+
+   (b) The agent MUST include plan_b_ref in every IDP submitted at
+       ACT.  plan_b_ref MUST reference the eod_id of the EOD from
+       which the Plan B was activated.
+
+   (c) Cedar evaluation at ACT operates against the Plan B outcome,
+       not the primary declared goal state.
+
+   (d) The GEC MUST write AEP_PLAN_B_ACTIVATED immediately on
+       activation (Section 11.4).
+
+   Exit from PLAN_B_ACTIVE:
+
+   (e) On PERMIT reaching the Plan B outcome state: session closes
+       with closure_reason: PLAN_B_ACHIEVED.
+
+   (f) On STALL while in PLAN_B_ACTIVE (stall reason:
+       STALL_PLAN_B_BLOCKED): session enters STALLED with the
+       human principal required to provide direction.
+
+   (g) On human principal TERMINATE via HEM: session closes with
+       closure_reason: HEM_TERMINATED.
+
+5.6.  Session Closure
+
+   All session closure paths MUST generate an AEP_SESSION_CLOSED
+   Event Stream entry (Section 11.2).  The GEC MUST write
+   AEP_SESSION_CLOSED on every closure path, including failures.
+
+   On MANDATE_REVOCATION trigger at SENSE:
+
+   The agent MUST NOT enter the REASON step.  The agent MUST perform
+   graceful shutdown: completing any in-progress Zone B operations,
+   recording a final goal outcome declaration if the agent is in
+   standard mode, and confirming session closure to the GEC.  The GEC
+   MUST write AEP_SESSION_CLOSED with closure_reason: MANDATE_REVOKED.
+   In GEE mode, the GEE MUST NOT call agent.reason() after receiving
+   a MANDATE_REVOCATION trigger.
+
+   After AEP_SESSION_CLOSED is committed, the GAR [I-D.sato-soos-gar]
+   generates a Session Audit Record for the closed session.
+
+
+6.  Expected Outcome Declaration (EOD) [NEW in -02]
+
+6.1.  EOD Purpose and Role
+
+   The Expected Outcome Declaration (EOD) is a pre-session commitment
+   structure submitted by the agent or its operator before the first
+   SENSE delivery.  The EOD declares what the agent expects to achieve
+   (primary outcome), how success will be recognized (acceptance
+   envelope), and what the agent will do if the primary path is blocked
+   (Plan B).
+
+   The EOD serves three governance functions:
+
+   (a) Pre-commitment.  The EOD creates a verifiable record of the
+       agent's declared intention before any action is taken.  This
+       enables the GEC to distinguish expected deviations (the agent
+       executing its declared Plan B) from unexpected deviations (the
+       agent doing something not pre-declared).
+
+   (b) Stall management.  The EOD's Plan B declaration gives the GEC
+       and the human principal a pre-authorized fallback that can be
+       activated without a new HEM escalation.  This reduces stall
+       resolution latency for predictable failure modes.
+
+   (c) Audit completeness.  The GAR Session Audit Record carries the
+       eod_id alongside the IDP chain.  An auditor can verify whether
+       the session's actual trajectory matched the EOD's pre-declared
+       expectations and Plan B.
+
+6.2.  EOD Schema
+
+   The EOD is a structured object submitted to the GEC before session
+   initiation or at the SESSION_START trigger.
+
+   {
+     "eod_id":             string,    ; REQUIRED. UUID v7.
+     "eod_version":        "1.0",     ; REQUIRED. Schema version.
+     "session_id_ref":     string,    ; REQUIRED. AEP Session UUID v7.
+     "submitted_at":       string,    ; REQUIRED. ISO 8601.
+     "primary_outcome": {
+       "target_state":     string,    ; REQUIRED. Declared goal SO state.
+       "target_phase":     string,    ; OPTIONAL. Expected SO lifecycle
+                                      ; phase at completion.
+       "confidence":       number,    ; REQUIRED. Float 0.0-1.0.
+       "rationale":        string     ; REQUIRED. Human-readable.
+     },
+     "acceptance_envelope": {
+       "success_conditions":  [object], ; REQUIRED. See Section 6.2.1.
+       "partial_success":     [object], ; OPTIONAL. Partial achievement
+                                        ; conditions.
+       "failure_conditions":  [object]  ; REQUIRED. Conditions under
+                                        ; which the agent MUST NOT claim
+                                        ; GOAL_ACHIEVED.
+     },
+     "plan_b":             object | null, ; OPTIONAL. See Section 6.4.
+     "auto_activate_plan_b": boolean, ; OPTIONAL. Default: false.
+     "submitter_mjwt_id":  string,    ; REQUIRED. MJWT jti of the Root
+                                      ; Mandate JWT for this session.
+     "eod_signature":      string     ; REQUIRED. Submitter's signature
+                                      ; over canonical EOD JSON.
+   }
+
+6.2.1.  Success Condition Schema
+
+   Each object in success_conditions:
+
+   {
+     "condition_id":  string,  ; REQUIRED. Unique within this EOD.
+     "field":         string,  ; REQUIRED. Zone A field or SO state.
+     "operator":      string,  ; REQUIRED. eq | neq | gt | gte | lt |
+                               ;           lte | in | not_in.
+     "value":         any,     ; REQUIRED. Comparison value.
+     "required":      boolean  ; REQUIRED. If true, ALL required
+                               ; conditions MUST be met for
+                               ; GOAL_ACHIEVED to be valid.
+   }
+
+6.3.  EOD Lifecycle
+
+   (a) The EOD is submitted to the GEC before or at session
+       initiation.  The GEC records the EOD to the SO Instance Event
+       Stream as EOD_COMMITTED.
+
+   (b) The GEC computes eod_hash as a SHA-256 over the canonical JSON
+       of the EOD.  The eod_hash is carried in AEP_SENSE_DELIVERED
+       entries (Section 11.1) for the life of the session.
+
+   (c) The EOD is immutable after EOD_COMMITTED.  A revised EOD
+       requires a new session.
+
+   (d) The EOD is included in the GAR Session Audit Record
+       [I-D.sato-soos-gar] at session close.
+
+   (e) At session close, the GEC MUST evaluate the session's final
+       SO state against the EOD's acceptance_envelope and record
+       EOD_OUTCOME (MATCHED, PARTIAL, PLAN_B_MATCHED, UNMATCHED)
+       in AEP_SESSION_CLOSED (Section 11.2).
+
+6.4.  Plan B Integration
+
+   The EOD's plan_b field declares the fallback strategy the agent
+   pre-commits to if the primary outcome path is blocked.
+
+   Plan B schema:
+
+   {
+     "plan_b_id":          string,    ; REQUIRED. Unique within EOD.
+     "plan_b_target_state": string,   ; REQUIRED. SO state for Plan B.
+     "plan_b_rationale":   string,    ; REQUIRED. Why Plan B is
+                                      ; appropriate if primary fails.
+     "activation_conditions": [object], ; REQUIRED. Conditions under
+                                         ; which Plan B may activate.
+                                         ; Uses success_condition schema.
+     "plan_b_acceptance_envelope": object ; REQUIRED. Same schema as
+                                           ; Section 6.2.1.
+   }
+
+   When PLAN_B_ACTIVE is entered (Section 5.5), the GEC uses
+   plan_b_target_state as the operative goal for Cedar evaluation and
+   Transition Graph queries.  The plan_b_acceptance_envelope determines
+   what constitutes Plan B success (closure_reason: PLAN_B_ACHIEVED).
+
+6.5.  EOD and IDP Binding
+
+   (a) When an EOD is present, every IDP submitted at ACT MUST carry
+       the eod_id field referencing the session's committed EOD.
+
+   (b) When the session is in PLAN_B_ACTIVE state, the IDP MUST carry
+       both eod_id and plan_b_ref.  plan_b_ref MUST equal the plan_b_id
+       from the activated Plan B.
+
+   (c) The GEC MUST reject any IDP that declares a target SO state
+       inconsistent with the EOD's primary_outcome.target_state when
+       no stall or plan_b activation has occurred.  An IDP that targets
+       a state outside both the EOD primary outcome and any active Plan
+       B MUST result in DENY with denial code EOD_SCOPE_VIOLATION.
+
+   (d) The GEC MUST NOT use EOD content in Cedar evaluation.  The EOD
+       is a governance and audit artifact; authorization is determined
+       by Cedar policy and MJWT scope.
+
+
+7.  Context Package
+
+7.1.  Context Package Schema
+
+   The Context Package is the structured data object delivered by the
+   GEC to the agent at SENSE.  It is the agent's ground truth about
+   the SO Instance state, permissions, goal, memory, and session
+   context at the start of each AEP Iteration.
+
+   The following is the normative JSON structure of a Context Package.
+
+   {
+     "cp_version":     "1.0",        ; REQUIRED. Schema version.
+     "cp_id":          string,        ; REQUIRED. UUID v7. CP identifier.
+     "cp_hash":        string,        ; REQUIRED. SHA-256 of canonical CP.
+     "delivered_at":   string,        ; REQUIRED. ISO 8601 timestamp.
+     "trigger":        string,        ; REQUIRED. See Section 7.2.
+     "session_xpid":   string,        ; REQUIRED. [NEW in -02] GEC-bound
+                                      ; XPID for this session. See §5.1.
+     "eod_id":         string | null, ; REQUIRED. [NEW in -02] UUID v7
+                                      ; of committed EOD, or null if
+                                      ; absent (Class 1 agents).
+     "session_state":  string,        ; REQUIRED. [NEW in -02] Current
+                                      ; session state (ACTIVE, HEM_PENDING,
+                                      ; STALLED, PLAN_B_ACTIVE).
+     "so":             object,        ; REQUIRED. See Section 7.3.
+     "permissions":    object,        ; REQUIRED. See Section 7.4.
+     "goal":           object,        ; REQUIRED. See Section 7.5.
+     "memory":         object,        ; RECOMMENDED. See Section 7.6.
+     "proximity_events": [object],    ; REQUIRED. May be empty. Sec 7.7.
+     "hem_context":    object | null, ; REQUIRED. See Section 7.8.
+     "agent":          object         ; REQUIRED. See Section 7.9.
+   }
+
+   The GEC MUST compute cp_hash as a SHA-256 hash over the canonical
+   JSON serialization of the Context Package excluding the cp_hash
+   field itself.  The agent MUST record cp_hash as the
+   context_package_ref in the IDP submitted at the next ACT.
+
+7.2.  Context Package Trigger Types
+
+   The trigger field declares the reason for this SENSE delivery.
+   The following trigger values are defined:
+
+   SESSION_START:
+      First Context Package delivered for this AEP Session.
+
+   STATE_CHANGE:
+      The SO Instance has transitioned to a new state following the
+      prior ACT.  The so.current_state field reflects the new state.
+
+   PROXIMITY_EVENT:
+      One or more Proximity Events in proximity_events have reached
+      or exceeded their threshold.
+
+   HEM_RESOLUTION:
+      The session is resuming from HEM_PENDING following a human
+      principal decision.  hem_context carries the HEMDecision.
+
+   MANDATE_REFRESH:
+      The GEC has refreshed the agent's Mandate JWT.  The permissions
+      sub-object carries the updated mandate scope.
+
+   MANDATE_REVOCATION:
+      The agent's Mandate JWT has been revoked.  The agent MUST NOT
+      enter REASON.  The session is being terminated.
+
+   DELEGATION_EVENT:
+      A child or peer mandate event has occurred that affects this
+      session's goal path.  The Context Package carries a
+      delegation_context sub-object in addition to the standard
+      fields.  The agent MUST process delegation_context before
+      entering REASON.
+
+      delegation_context sub-object:
+
+      {
+        "delegation_event_ref":  string,  ; REQUIRED. event_id of the
+                                           ; ALE_DELEGATION_CHILD_REVOKED
+                                           ; or ALE_SIBLING_REVOCATION_NOTICE
+                                           ; entry in [I-D.sato-soos-gar].
+        "delegation_event_type": string,  ; REQUIRED. CHILD_REVOKED |
+                                           ; SIBLING_REVOKED | CHILD_RECOVERED.
+        "goal_impact":           string   ; REQUIRED. BLOCKING |
+                                           ; NON_BLOCKING | UNKNOWN.
+      }
+
+      When goal_impact is BLOCKING, the agent MUST NOT submit the next
+      ACT without first either re-delegating to a replacement agent or
+      escalating to HEM.  The agent MUST NOT silently continue toward
+      a goal that the GEC has assessed as unachievable with the current
+      delegation graph.
+
+      When goal_impact is NON_BLOCKING, the agent MAY continue normal
+      execution.  The delegation_event_ref MUST be recorded in the next
+      IDP submitted at ACT as an additional reasoning_basis entry with
+      ref_type: DELEGATION_CONTEXT and weight: "informative".
+
+      When goal_impact is UNKNOWN, the agent SHOULD query the Transition
+      Graph (Section 8.1) before submitting the next ACT to re-assess
+      whether its path_to_goal remains viable.
+
+   CLUSTER_STATUS_CHANGE:
+      The SO Cluster of which this session is a member has changed
+      achievability state.  The Context Package carries a
+      cluster_context sub-object.  The agent MUST process
+      cluster_context before entering REASON.
+
+      cluster_context sub-object:
+
+      {
+        "cluster_event_ref":     string,  ; REQUIRED. event_id of the
+                                           ; ALE_CLUSTER_PARTIAL_REVOCATION
+                                           ; entry in [I-D.sato-soos-gar].
+        "cluster_achievability": string,  ; REQUIRED. ACHIEVABLE |
+                                           ; DEGRADED | UNACHIEVABLE.
+        "recommended_action":    string   ; REQUIRED. CONTINUE | HALT |
+                                           ; REASSIGN | ESCALATE.
+      }
+
+      When cluster_achievability is UNACHIEVABLE and the cluster's
+      aggregation_rule is ALL_COMPLETE, the agent MUST NOT submit the
+      next ACT.  The agent MUST escalate to HEM.  Continuing to execute
+      transitions on a cluster member SO whose results cannot satisfy
+      the cluster's completion condition is a conformance violation.
+
+      When cluster_achievability is DEGRADED (QUORUM threshold met but
+      reduced), the agent MAY continue.  The cluster_event_ref MUST be
+      recorded in GAR as a session context note.
+
+   STALL_RESOLVED: [NEW in -02]
+      The session's STALLED state has been resolved by a human
+      principal STALL_DIRECTION response.  The Context Package carries
+      a stall_resolution sub-object.  The agent MUST process the
+      resolution direction before entering REASON.  The agent MUST
+      query the Transition Graph before submitting the next ACT.
+
+      stall_resolution sub-object:
+
+      {
+        "stall_reason":       string,  ; REQUIRED. The stall_reason from
+                                       ; AEP_STALLED (Section 11.3).
+        "resolution_type":    string,  ; REQUIRED. REDIRECT_GOAL |
+                                       ; ESCALATE_TO_HEM | CLOSE.
+        "new_goal_state":     string | null, ; REQUIRED when resolution_
+                                       ; type is REDIRECT_GOAL.
+        "stall_direction_id": string   ; REQUIRED. UUID v7 of the
+                                       ; human principal's decision.
+      }
+
+7.3.  SO Sub-Object
+
+   The so sub-object carries the current state of the SO Instance.
+
+   {
+     "so_id":           string,  ; REQUIRED. SO Instance UUID v7.
+     "so_type_id":      string,  ; REQUIRED. SO Type identifier.
+     "current_state":   string,  ; REQUIRED. Current state machine state.
+     "current_phase":   string,  ; REQUIRED. SO lifecycle phase.
+     "state_entered_at": string, ; REQUIRED. ISO 8601 timestamp.
+     "event_log_head":  string,  ; REQUIRED. event_id of last entry.
+     "zone_a_snapshot": object   ; REQUIRED. Current Zone A field values.
+   }
+
+   The zone_a_snapshot MUST reflect the Zone A state of the SO Instance
+   as of event_log_head.  Personal data MUST NOT be present in
+   zone_a_snapshot per [I-D.sato-soos-sov] Section 4.3.1 (INV-ZA-1).
+
+7.4.  Permissions Sub-Object
+
+   The permissions sub-object carries the agent's current authorization
+   scope derived from the Mandate JWT.
+
+   {
+     "mandate_jwt_id":     string,   ; REQUIRED. MJWT jti.
+     "mandate_expires_at": string,   ; REQUIRED. ISO 8601.
+     "agent_class":        string,   ; REQUIRED. CLASS_1|CLASS_2|CLASS_3.
+     "cedar_residual":     object,   ; REQUIRED. Residual Cedar policy set.
+     "permitted_actions":  [string], ; REQUIRED. Cedar actions in scope.
+     "forbidden_until":    [object]  ; OPTIONAL. Temporarily restricted actions.
+   }
+
+   Each entry in forbidden_until carries: action (string), reason
+   (string), until (ISO 8601 | null).
+
+   The cedar_residual is the GEC-computed partial evaluation of Cedar
+   policy against the current SO Instance state and the agent's Mandate
+   JWT scope.  Agents SHOULD use cedar_residual to inform REASON;
+   however, Cedar evaluation at ACT is authoritative.
+
+7.5.  Goal Sub-Object
+
+   The goal sub-object carries the agent's current goal session context.
+
+   {
+     "goal_session_id":    string,   ; REQUIRED. UUID v7.
+     "declared_goal_state": string,  ; REQUIRED. Target SO state.
+                                      ; In PLAN_B_ACTIVE, this reflects
+                                      ; the active Plan B target. [NOTE -02]
+     "goal_step_current":  integer,  ; REQUIRED. Current step number.
+     "path_to_goal":       [object], ; REQUIRED. TransitionSteps to goal.
+     "path_confidence":    number,   ; REQUIRED. Float 0.0-1.0.
+     "prior_idp_ref":      string,   ; OPTIONAL. Prior iteration IDP UUID.
+     "plan_b_active":      boolean   ; REQUIRED. [NEW in -02] true when
+                                      ; session is in PLAN_B_ACTIVE state.
+   }
+
+   Each TransitionStep in path_to_goal contains: step (integer),
+   from_state (string), action (string), to_state (string),
+   authority_sufficient (boolean), hem_required (boolean).
+
+   path_to_goal MUST be GEC-computed from the current SO state to
+   declared_goal_state using the SO Type's state machine and the
+   agent's cedar_residual.  The agent MUST NOT modify path_to_goal.
+
+7.6.  Memory Sub-Object
+
+   The memory sub-object provides the agent with persistent context
+   across AEP Iterations.
+
+   {
+     "episodic":                    [object], ; Prior iteration summaries.
+     "active_constraints":          [object], ; Active session constraints.
+     "compensating_actions_available": [object], ; Available compensations.
+     "deny_history":                [object]  ; [NEW in -02] Last N DENY
+                                               ; responses in this session,
+                                               ; for RETRY_CONTINUATION
+                                               ; reasoning support.
+   }
+
+   Episodic entries are GEC-generated summaries of prior iterations
+   within this AEP Session.  The episodic store does not extend across
+   sessions; cross-session agent memory is outside the scope of this
+   document.
+
+   active_constraints are additional Cedar policy fragments applied to
+   this session, including fragments added by APPROVE_WITH_CONSTRAINTS
+   HEM decisions [I-D.sato-soos-hem].
+
+   deny_history entries are GEC-generated summaries of DENY responses
+   in this session, including deny_code, the IDP idp_id that received
+   the denial, and the enrichment fields from the DENY response.  The
+   deny_history enables agents to construct accurate RETRY_CONTINUATION
+   reasoning_basis entries (Section 10.4) without retaining the full
+   DENY response chain in their own context.
+
+7.7.  Proximity Events
+
+   The proximity_events array contains Proximity Event objects.  An
+   empty array indicates no events are currently active.
+
+   Each Proximity Event object:
+
+   {
+     "condition_id":        string,  ; REQUIRED. Unique condition identifier.
+     "condition_type":      string,  ; REQUIRED. See below.
+     "current_value":       string,  ; REQUIRED. Current observed value.
+     "threshold_value":     string,  ; REQUIRED. Threshold value.
+     "proximity_pct":       number,  ; REQUIRED. Float 0.0-1.0.
+     "estimated_trigger_at": string  ; OPTIONAL. ISO 8601.
+   }
+
+   Defined condition_type values:
+
+   HEM_TRIGGER_APPROACHING:
+      A Cedar policy condition that will trigger mandatory HEM is being
+      approached.  proximity_pct = 1.0 causes HEM_PENDING entry.
+
+   MANDATE_EXPIRING:
+      The agent's Mandate JWT exp claim is approaching.
+
+   STATE_DURATION_THRESHOLD:
+      The SO Instance has been in its current state longer than a
+      threshold declared in the SO Type.
+
+   ZONE_B_SENSOR_THRESHOLD:
+      A sensor-linked Zone B attachment value is approaching a
+      threshold declared in the SO Type.
+
+   MANDATE_REVOCATION_PENDING:
+      A scheduled future mandate revocation is approaching.
+      estimated_trigger_at carries the scheduled revocation timestamp.
+
+   STALL_THRESHOLD_APPROACHING: [NEW in -02]
+      The session's DENY count or iteration count is approaching the
+      STALL threshold (Section 5.4).  The agent SHOULD consider
+      escalating to HEM voluntarily or activating Plan B before the
+      STALL state is entered automatically.
+
+7.8.  HEM Context
+
+   The hem_context field carries a HEMContext object when trigger is
+   HEM_RESOLUTION, or is null otherwise.  The HEMContext schema is
+   defined normatively in [I-D.sato-soos-hem] Section 7.1.
+
+   When trigger is HEM_RESOLUTION:
+   - hem_context MUST carry the full HEMContext including the human
+     principal's HEMDecision.
+   - The agent MUST process hem_context before entering REASON.
+   - If HEMDecision is REDIRECT, the agent MUST update its declared
+     goal state to match redirect_target_state.
+
+7.9.  Agent Sub-Object
+
+   The agent sub-object carries session metadata.
+
+   {
+     "agent_provider_id": string,  ; REQUIRED. Party Registry ID.
+     "agent_type":        string,  ; REQUIRED. Agent implementation type.
+     "aep_iteration":     integer, ; REQUIRED. Current iteration number.
+     "session_id":        string,  ; REQUIRED. AEP Session UUID v7.
+     "session_xpid":      string   ; REQUIRED. [NEW in -02] GEC-bound
+                                   ; XPID for this agent in this session.
+   }
+
+   The aep_iteration counter MUST be strictly monotonically increasing
+   within a session.  Gaps are permitted; reversals are not.
+
+   The session_xpid MUST match the XPID bound at session initiation
+   (Section 5.1).  An agent MUST NOT modify or override the
+   session_xpid field.  Implementations MUST verify that the
+   session_xpid in the agent sub-object matches the session_xpid in
+   the Context Package root.
+
+
+8.  GEC Query Interface (PLAN Step)
+
+8.1.  Transition Graph Query
+
+   The Transition Graph query returns the set of valid Cedar-authorized
+   transition paths from the current SO state to the agent's declared
+   goal state.
+
+   Request:
+   {
+     "so_id":            string,  ; REQUIRED.
+     "mandate_jwt_id":   string,  ; REQUIRED.
+     "goal_state":       string   ; REQUIRED.
+   }
+
+   Response:
+   {
+     "path_to_goal":    [TransitionStep], ; Computed at current state.
+     "path_confidence": number,           ; Float 0.0-1.0.
+     "blocked_actions": [object]          ; Actions blocked by Cedar.
+   }
+
+   The GEC MUST compute path_to_goal using the SO Type's state machine
+   and the agent's Cedar residual.  Blocked paths due to Cedar policy
+   MUST be included in blocked_actions with the blocking policy
+   fragment reference.
+
+   When path_to_goal is empty AND blocked_actions covers all available
+   edges from the current state, the GEC MUST set path_confidence to
+   0.0.  This is the STALL_PATH_EXHAUSTED condition (Section 5.4).
+
+   This is the normative implementation of the Windley Loop planning
+   gate [Windley-Loop]: the agent discovers what it is authorized to
+   do before committing to an action.
+
+8.2.  Live Permission Map
+
+   The Live Permission Map query returns the Cedar residual policy set
+   applicable to the agent's current Mandate JWT and the current SO
+   Instance state.
+
+   Request:
+   {
+     "so_id":          string,  ; REQUIRED.
+     "mandate_jwt_id": string   ; REQUIRED.
+   }
+
+   Response:
+   {
+     "cedar_residual":    object,   ; Current residual policy set.
+     "permitted_actions": [string], ; Cedar actions currently in scope.
+     "forbidden_until":   [object]  ; Temporarily restricted actions.
+   }
+
+   The Live Permission Map reflects the current state of Cedar
+   evaluation; cedar_residual from the Context Package may be stale
+   if the SO Instance has transitioned since SENSE delivery.  Agents
+   SHOULD query the Live Permission Map when planning an action that
+   depends on state entered since the last SENSE.
+
+8.3.  Compensating Action Catalogue
+
+   The Compensating Action Catalogue query returns available
+   compensating transitions from the current SO state.
+
+   Request:
+   {
+     "so_id":          string, ; REQUIRED.
+     "mandate_jwt_id": string  ; REQUIRED.
+   }
+
+   Response:
+   {
+     "compensating_actions": [
+       {
+         "from_state":      string,  ; State this compensates from.
+         "compensating_action": string, ; Cedar action available.
+         "to_state":        string,  ; Resulting state.
+         "authority_sufficient": boolean ; In agent's mandate scope.
+       }
+     ]
+   }
+
+   The Compensating Action Catalogue is used by the agent to assess
+   the compensating_action_assessed field in the IDP and to plan
+   rollback paths before a high-risk ACT.
+
+   An empty compensating_actions array, when combined with an empty
+   path_to_goal from the Transition Graph, contributes to the
+   STALL_PATH_EXHAUSTED condition (Section 5.4).
+
+
+9.  Transition Request (ACT Step)
+
+9.1.  Transition Request Structure
+
+   The Transition Request is submitted by the agent to the GEC at ACT.
+
+   {
+     "mandate_jwt":  string, ; REQUIRED. Compact-serialized MJWT.
+     "cedar_action": string, ; REQUIRED. Cedar action identifier.
+     "idp":          object  ; REQUIRED. Intent Declaration Primitive.
+   }
+
+   The cedar_action MUST be a string from the agent's Mandate JWT
+   cedar_actions array.  The idp MUST be a well-formed IDP per
+   [I-D.sato-soos-idp] with all fields required for the agent's class
+   present (Section 15).
+
+9.2.  GEC Execution Sequence
+
+   On receiving a Transition Request, the GEC MUST execute the
+   following sequence in strict order.  Failure at any step MUST abort
+   the transition.
+
+   Step 1 -- MJWT Verification.
+      Execute the MJWT verification protocol
+      [I-D.sato-soos-mjwt] Section 8.  Failure: DENY with appropriate
+      MJWT deny code.
+
+   Step 1a -- XPID Consistency Check. [NEW in -02]
+      Verify that the session's bound XPID (Section 5.1) matches the
+      XPID derivable from the Mandate JWT's agent_provider_id.  An
+      XPID mismatch MUST result in immediate DENY with deny code
+      XPID_MISMATCH and MUST be recorded in GAR as a critical security
+      event.  Session MUST be terminated after XPID_MISMATCH.
+
+   Step 2 -- CAP Evaluation.
+      Evaluate CAP Tier 0 (constitutional) and Tier 1 (jurisdictional)
+      prohibitions [I-D.sato-soos-cap].  A CAP prohibition results in
+      immediate DENY regardless of Cedar result.
+
+   Step 3 -- Cedar Evaluation.
+      Evaluate Cedar policy set with SO Instance state attributes
+      [I-D.sato-soos-sov] Section 7 and IDP intent attributes
+      [I-D.sato-soos-idp] Section 5.  The Cedar context includes
+      idp.reasoning_mode (when declared) as a Cedar context attribute.
+      Cedar policies MAY gate on idp.reasoning_mode.  DENY: return
+      enriched DENY.  DENY with hem_required: true: route to HEM
+      (Section 5.3).  PERMIT: proceed.
+
+   Step 4 -- State Machine Validation.
+      Verify the edge (current_state, cedar_action) exists in the SO
+      Type's state machine.  Failure: DENY.
+
+   Step 5 -- Event Stream Write.
+      Append a StateTransitionEvent to the SO Instance Event Stream.
+      The GEC MUST sign this entry.  The transition is NOT complete
+      until this write succeeds.
+
+   Step 6 -- Event Emission.
+      The GEC MAY emit asynchronous notifications.  This step MUST
+      NOT block the transition response.  Failure of event emission
+      MUST NOT affect transition completeness.
+
+   The transition is atomic: either all steps complete or the
+   transition does not occur.
+
+9.3.  IDP Submission at ACT
+
+   The IDP is submitted as part of every Transition Request.  The IDP
+   is permanently recorded in the SO Instance Event Stream as part of
+   the StateTransitionEvent.  The IDP is recorded even for Cedar DENY
+   outcomes: failed transition attempts are part of the permanent audit
+   trail.
+
+   The GEC MUST record the IDP verbatim as submitted.  The GEC MUST
+   NOT validate IDP content beyond schema conformance.  Cedar does not
+   evaluate IDP content; it is the agent's permanent reasoning
+   declaration, not an authorization input.
+
+   When an EOD is committed for the session, the GEC MUST verify that
+   the IDP's target_state is consistent with the EOD's operative
+   outcome (primary or Plan B) per Section 6.5.  Inconsistency MUST
+   result in DENY with denial code EOD_SCOPE_VIOLATION.
+
+
+10.  GEC Response (OBSERVE Step)
+
+10.1.  PERMIT Response
+
+   A PERMIT response indicates the transition completed successfully.
+
+   {
+     "result":              "PERMIT",
+     "new_state":           string,  ; New SO current_state.
+     "new_phase":           string,  ; New SO lifecycle phase.
+     "event_stream_entry_id": string, ; UUID v7 of committed entry.
+     "updated_cedar_residual": object, ; Updated residual policy.
+     "aep_iteration":       integer   ; Current iteration number.
+   }
+
+   On PERMIT, the GEC prepares the next Context Package (trigger:
+   STATE_CHANGE) and the LOOP mechanism initiates the next SENSE.
+   The aep_iteration counter is incremented.
+
+10.2.  DENY Response
+
+   A DENY response indicates the transition was rejected.
+
+   {
+     "result":         "DENY",
+     "deny_code":      string,   ; Deny code per [I-D.sato-soos-idp]
+                                  ; Section 6 and [I-D.sato-soos-mjwt]
+                                  ; Section 8.2.
+     "deny_reason":    string,   ; Human-readable denial reason.
+     "idp_ref":        string,   ; idp_id of the rejected IDP.
+     "enrichment":     object,   ; IDP fields that would change result.
+     "aep_iteration":  integer,  ; Current iteration number.
+     "prior_denial_count": integer ; [NEW in -02] Total DENY count in
+                                    ; this session for this action.
+   }
+
+   The enrichment field carries the specific IDP reasoning_basis
+   references that, if changed, would produce a PERMIT.  This is the
+   mechanism by which the GEC guides the agent's next REASON step.
+
+   The prior_denial_count field carries the total count of DENY
+   responses for this cedar_action in this session.  This field is
+   exposed as a Cedar context attribute at the next ACT for the same
+   action, enabling Cedar policies to gate on systematic retry depth.
+
+   On DENY, the SO Instance state does NOT change.
+
+10.3.  HEM_PENDING Response
+
+   An HEM_PENDING response indicates the session has entered
+   HEM_PENDING state.
+
+   {
+     "result":        "HEM_PENDING",
+     "hem_id":        string, ; UUID v7 of the HEM invocation.
+     "trigger_class": string, ; HEM trigger class.
+     "urgency":       string, ; ADVISORY|RECOMMENDED|REQUIRED.
+     "timeout_at":    string  ; ISO 8601 | null.
+   }
+
+   On HEM_PENDING, the agent MUST NOT submit further Transition
+   Requests.  The GEC will deliver a new SENSE with trigger:
+   HEM_RESOLUTION when the human principal provides a decision.
+
+10.4.  RETRY_CONTINUATION Handling [REVISED in -02]
+
+   When an agent retries an action following a GEC DENY response, the
+   IDP submitted at the next ACT MUST include a reasoning_basis entry
+   with ref_type: RETRY_CONTINUATION referencing the prior DENY.
+
+   {
+     "ref_type":     "RETRY_CONTINUATION",
+     "ref_id":       string, ; idp_id of the rejected prior IDP.
+     "content_hash": string, ; SHA-256 of the DENY response received.
+     "weight":       "primary",
+     "what_changed": string  ; REQUIRED. [NEW in -02] Human-readable
+                              ; declaration of what changed between the
+                              ; denied attempt and this retry. MUST
+                              ; reference at least one field in the
+                              ; DENY enrichment. MUST NOT be a generic
+                              ; string (e.g. "retrying") -- the GEC
+                              ; MUST reject what_changed values that
+                              ; do not reference specific enrichment
+                              ; fields.
+   }
+
+   What-changed requirement [NEW in -02]:
+
+   The RETRY_CONTINUATION entry MUST declare, in the what_changed
+   field, the specific change between the denied attempt and this
+   retry.  The what_changed declaration MUST satisfy at least one of
+   the following:
+
+   (a) Reference a field identified in the prior DENY response's
+       enrichment object.  The field name MUST appear explicitly in
+       what_changed.
+
+   (b) Reference a Context Package state change delivered at SENSE
+       since the prior DENY.  The context change MUST be observable
+       in the current Context Package.
+
+   (c) Reference a Plan B activation (PLAN_B_ACTIVE state).
+
+   The GEC MUST evaluate what_changed for specificity before
+   processing the Transition Request.  A what_changed value that
+   does not reference any enrichment field and does not reference
+   any observable Context Package change MUST result in DENY with
+   denial code RETRY_WHAT_CHANGED_INVALID.
+
+   Silent retry detection [REVISED in -02]:
+
+   The GEC MUST track prior_denial_count (returned in DENY responses
+   and available as a Cedar context attribute at subsequent ACT steps).
+   The GEC MUST detect the following patterns:
+
+   (i)  An agent that submits a RETRY_CONTINUATION IDP without a
+        what_changed field: DENY with MISSING_WHAT_CHANGED.
+
+   (ii) An agent that submits identical what_changed values across
+        more than 3 consecutive RETRY_CONTINUATION IDPs for the same
+        action: LOG ALE_SILENT_RETRY_PATTERN in GAR.
+
+   (iii) prior_denial_count reaching the STALL_DENY_THRESHOLD
+         (Section 5.4(a)): transition to STALLED state.
+
+   Cedar prior_denial_count attribute [NEW in -02]:
+
+   The prior_denial_count value from the most recent DENY response for
+   a given cedar_action MUST be exposed as a Cedar context attribute
+   at subsequent ACT steps for the same action.  Cedar policies MAY
+   gate on prior_denial_count.  Example: a Cedar policy may require
+   HEM escalation when prior_denial_count exceeds a threshold for a
+   high-risk action class.
+
+   cedar attribute: context.prior_denial_count (integer)
+   cedar attribute: context.last_deny_code (string)
+   cedar attribute: context.last_deny_enrichment_fields ([string])
+
+
+11.  AEP Event Log Markers
+
+11.1.  AEP_SENSE_DELIVERED
+
+   The GEC MUST write this entry to the SO Instance Event Stream
+   immediately before delivering each Context Package.
+
+   {
+     "event_type":      "AEP_SENSE_DELIVERED",
+     "event_id":        string,  ; UUID v7.
+     "prior_event_id":  string,  ; Previous entry event_id.
+     "occurred_at":     string,  ; ISO 8601.
+     "so_id":           string,  ; SO Instance UUID v7.
+     "session_id":      string,  ; AEP Session UUID v7.
+     "aep_iteration":   integer, ; Current iteration number.
+     "cp_id":           string,  ; Context Package UUID v7.
+     "cp_hash":         string,  ; SHA-256 of Context Package.
+     "trigger":         string,  ; Context Package trigger type.
+     "agent_id":        string,  ; Agent Party Registry identifier.
+     "session_xpid":    string,  ; [NEW in -02] GEC-bound XPID.
+     "goal_session_id": string,  ; Goal session UUID v7.
+     "eod_id":          string | null, ; [NEW in -02] EOD identifier.
+     "session_state":   string,  ; [NEW in -02] Current session state.
+     "gec_signature":   string   ; GEC Ed25519 signature.
+   }
+
+   The gec_signature MUST be computed over the canonical JSON of this
+   entry.  AEP_SENSE_DELIVERED MUST be committed before the Context
+   Package is delivered to the agent.
+
+11.2.  AEP_SESSION_CLOSED
+
+   The GEC MUST write this entry on every session termination path.
+
+   {
+     "event_type":       "AEP_SESSION_CLOSED",
+     "event_id":         string,  ; UUID v7.
+     "prior_event_id":   string,  ; Previous entry event_id.
+     "occurred_at":      string,  ; ISO 8601.
+     "so_id":            string,  ; SO Instance UUID v7.
+     "session_id":       string,  ; AEP Session UUID v7.
+     "goal_session_id":  string,  ; Goal session UUID v7.
+     "total_iterations": integer, ; Count of completed AEP Iterations.
+     "final_state":      string,  ; SO state at closure.
+     "goal_achieved":    boolean, ; Whether declared goal state reached.
+     "closure_reason":   string,  ; See below.
+     "agent_id":         string,  ; Agent Party Registry identifier.
+     "session_xpid":     string,  ; [NEW in -02] GEC-bound XPID.
+     "eod_id":           string | null, ; [NEW in -02] EOD identifier.
+     "eod_outcome":      string | null, ; [NEW in -02] EOD evaluation.
+                                         ; MATCHED | PARTIAL |
+                                         ; PLAN_B_MATCHED | UNMATCHED.
+     "plan_b_activated": boolean, ; [NEW in -02] Whether PLAN_B_ACTIVE
+                                   ; was entered during this session.
+     "gec_signature":    string   ; GEC Ed25519 signature.
+   }
+
+   closure_reason values:
+
+   GOAL_ACHIEVED:     Agent reached declared goal state.
+   PLAN_B_ACHIEVED:   Agent reached Plan B outcome (PLAN_B_ACTIVE). [NEW]
+   MANDATE_EXPIRED:   Mandate JWT expired before goal completion.
+   AGENT_DECLARED:    Agent declared goal outcome explicitly.
+   GEE_CLOSED:        GEE closed session in GEE mode.
+   HEM_TERMINATED:    Human principal TERMINATE decision at HEM.
+   KERNEL_REJECTED:   GEC rejected the session (policy violation).
+   MANDATE_REVOKED:   Mandate JWT revoked during active session.
+   STALL_TIMEOUT:     STALLED state not resolved before timeout. [NEW]
+   CLUSTER_HALT:      GEC halted this session because the SO Cluster
+                      of which it was a member reached UNACHIEVABLE
+                      achievability state.
+
+   After AEP_SESSION_CLOSED is committed, the GAR MUST generate a
+   Session Audit Record [I-D.sato-soos-gar] Section 6 for the closed
+   session.
+
+11.3.  AEP_STALLED [NEW in -02]
+
+   The GEC MUST write this entry when the session enters STALLED state
+   (Section 5.4).
+
+   {
+     "event_type":       "AEP_STALLED",
+     "event_id":         string,  ; UUID v7.
+     "prior_event_id":   string,  ; Previous entry event_id.
+     "occurred_at":      string,  ; ISO 8601.
+     "so_id":            string,  ; SO Instance UUID v7.
+     "session_id":       string,  ; AEP Session UUID v7.
+     "aep_iteration":    integer, ; Iteration count at stall entry.
+     "stall_reason":     string,  ; STALL_DENY_THRESHOLD |
+                                   ; STALL_PATH_EXHAUSTED |
+                                   ; STALL_PLAN_B_BLOCKED |
+                                   ; STALL_ITERATION_LIMIT.
+     "consecutive_denies": integer, ; Relevant for STALL_DENY_THRESHOLD.
+     "last_deny_code":   string | null, ; deny_code of last DENY.
+     "eod_plan_b_available": boolean,   ; Whether EOD Plan B is declared.
+     "gec_signature":    string   ; GEC Ed25519 signature.
+   }
+
+11.4.  AEP_PLAN_B_ACTIVATED [NEW in -02]
+
+   The GEC MUST write this entry when the session transitions to
+   PLAN_B_ACTIVE state (Section 5.5).
+
+   {
+     "event_type":       "AEP_PLAN_B_ACTIVATED",
+     "event_id":         string,  ; UUID v7.
+     "prior_event_id":   string,  ; Previous entry event_id.
+     "occurred_at":      string,  ; ISO 8601.
+     "so_id":            string,  ; SO Instance UUID v7.
+     "session_id":       string,  ; AEP Session UUID v7.
+     "aep_iteration":    integer, ; Iteration count at activation.
+     "eod_id":           string,  ; EOD from which Plan B was activated.
+     "plan_b_id":        string,  ; plan_b_id from EOD.
+     "plan_b_target_state": string, ; SO state targeted by Plan B.
+     "activation_type":  string,  ; MANUAL (human direction) |
+                                   ; AUTOMATIC (auto_activate_plan_b).
+     "stall_event_ref":  string,  ; event_id of AEP_STALLED that
+                                   ; triggered this activation.
+     "gec_signature":    string   ; GEC Ed25519 signature.
+   }
+
+
+12.  AEP-to-OTel Mapping [NEW in -02]
+
+12.1.  Overview
+
+   OpenTelemetry (OTel) [OTel] is the de facto standard for distributed
+   systems observability.  This section specifies the mandatory span
+   attributes that AEP-conforming implementations MUST emit at each
+   phase of the AEP loop.  The OTel mapping makes the AEP execution
+   loop observable without altering its governance properties: the
+   governance record remains the Event Stream; the OTel spans are the
+   operational observability layer.
+
+   The AEP-to-OTel mapping uses the soos.aep.* namespace, which is a
+   sub-namespace of the soos.governance.* namespace defined in
+   [I-D.sato-soos-gar] Section 12.  Implementations MUST NOT use the
+   soos.aep.* namespace for attributes outside this specification.
+
+   Each AEP Iteration produces exactly one parent span:
+   soos.aep.iteration, with five child spans, one per phase.  The
+   parent span covers the full SENSE-REASON-PLAN-ACT-OBSERVE cycle.
+
+12.2.  Mandatory Span Attributes by Phase
+
+   SENSE phase span (soos.aep.sense):
+
+   Attribute                        Type     Required  Description
+   ----------------------------------------------------------------
+   soos.aep.session_id              string   MUST      AEP Session UUID v7.
+   soos.aep.iteration               integer  MUST      aep_iteration value.
+   soos.aep.trigger                 string   MUST      Context Package trigger.
+   soos.aep.cp_hash                 string   MUST      SHA-256 of Context
+                                                       Package. Used to bind
+                                                       SENSE to ACT.
+   soos.aep.session_xpid            string   MUST      GEC-bound XPID.
+   soos.aep.session_state           string   MUST      ACTIVE | HEM_PENDING |
+                                                       STALLED | PLAN_B_ACTIVE.
+   soos.aep.so_current_state        string   MUST      SO state at SENSE.
+
+   REASON phase span (soos.aep.reason):
+
+   Attribute                        Type     Required  Description
+   ----------------------------------------------------------------
+   soos.aep.session_id              string   MUST      AEP Session UUID v7.
+   soos.aep.iteration               integer  MUST      aep_iteration value.
+   soos.aep.reasoning_mode          string   SHOULD    reasoning_mode if
+                                                       declared. Omit for
+                                                       ROUTINE.
+   soos.aep.reason_duration_ms      integer  SHOULD    Milliseconds spent
+                                                       in REASON step. Enables
+                                                       compute budget tracking.
+
+   PLAN phase span (soos.aep.plan):
+
+   Attribute                        Type     Required  Description
+   ----------------------------------------------------------------
+   soos.aep.session_id              string   MUST      AEP Session UUID v7.
+   soos.aep.iteration               integer  MUST      aep_iteration value.
+   soos.aep.plan_queries            [string] MUST      List of PLAN queries
+                                                       executed (transition_
+                                                       graph, live_permission,
+                                                       compensating_action).
+   soos.aep.path_confidence         number   MUST      Float 0.0-1.0 from
+                                                       Transition Graph.
+   soos.aep.intended_cedar_action   string   MUST      Cedar action the agent
+                                                       intends to request.
+
+   ACT phase span (soos.aep.act):
+
+   Attribute                        Type     Required  Description
+   ----------------------------------------------------------------
+   soos.aep.session_id              string   MUST      AEP Session UUID v7.
+   soos.aep.iteration               integer  MUST      aep_iteration value.
+   soos.aep.idp_id                  string   MUST      IDP UUID v7 submitted.
+   soos.aep.cedar_action            string   MUST      Cedar action in request.
+   soos.aep.confidence              number   MUST      IDP confidence value.
+   soos.aep.cp_hash_ref             string   MUST      Must match cp_hash from
+                                                       SENSE span in same
+                                                       iteration. Binding proof.
+   soos.aep.plan_b_ref              string   SHOULD    plan_b_ref when session
+                                                       is in PLAN_B_ACTIVE.
+
+   OBSERVE phase span (soos.aep.observe):
+
+   Attribute                        Type     Required  Description
+   ----------------------------------------------------------------
+   soos.aep.session_id              string   MUST      AEP Session UUID v7.
+   soos.aep.iteration               integer  MUST      aep_iteration value.
+   soos.aep.observe_result          string   MUST      PERMIT | DENY |
+                                                       HEM_PENDING | STALLED.
+   soos.aep.deny_code               string   SHOULD    deny_code when result
+                                                       is DENY.
+   soos.aep.prior_denial_count      integer  SHOULD    prior_denial_count from
+                                                       DENY response.
+   soos.aep.event_stream_entry_id   string   SHOULD    Event Stream entry UUID
+                                                       on PERMIT.
+   soos.aep.cap_evaluation_result   string   SHOULD    PERMIT | DENY from CAP
+                                                       evaluation.
+   soos.aep.cedar_evaluation_result string   SHOULD    PERMIT | DENY from Cedar.
+
+12.3.  OTel Conformance Rules
+
+   OTel-CONF-01:  Implementations MUST emit all MUST-level attributes
+                  for each phase span.  Missing MUST-level attributes
+                  MUST be flagged as a conformance violation in the
+                  implementation's self-test suite.
+
+   OTel-CONF-02:  The soos.aep.cp_hash in the SENSE span and the
+                  soos.aep.cp_hash_ref in the ACT span of the same
+                  iteration MUST match.  A mismatch indicates that the
+                  ACT was submitted without a valid prior SENSE delivery.
+                  Monitoring systems SHOULD alert on this mismatch.
+
+   OTel-CONF-03:  The soos.aep.session_xpid attribute MUST be identical
+                  across all spans in a session.  An XPID change mid-
+                  session MUST trigger an alert.
+
+   OTel-CONF-04:  Implementations MUST NOT suppress or omit spans when
+                  the result is DENY or HEM_PENDING.  Governance-relevant
+                  spans are more important to retain than successful spans.
+                  DENY and HEM_PENDING spans carry deny_code and
+                  prior_denial_count and are primary inputs for security
+                  monitoring.
+
+   OTel-CONF-05:  The OTel span data MUST NOT be used as a substitute for
+                  the Event Stream or GAR audit trail.  OTel is the
+                  operational observability layer; the Event Stream is the
+                  governance record.  When OTel and Event Stream conflict,
+                  the Event Stream is authoritative.
+
+   OTel-CONF-06:  The soos.aep.* namespace MUST NOT be emitted by
+                  non-AEP-conforming implementations.  Unauthorized use
+                  of this namespace could pollute monitoring pipelines
+                  used for compliance reporting.
+
+
+13.  Standard Mode Conformance
+
+   The following conformance rules apply in Standard Mode, in which
+   the agent implements the full SENSE-REASON-PLAN-ACT-OBSERVE loop
+   directly.
+
+   Rule               Requirement                              Violation
+   -----------------------------------------------------------------------
+   CONF-AEP-01        Agent MUST NOT submit ACT before         REJECT
+                      receiving AEP_SENSE_DELIVERED for
+                      the current iteration.  IDP
+                      context_package_ref MUST match cp_hash
+                      of the most recent Context Package.
+
+   CONF-AEP-02        Class 2 and Class 3 agents MUST query    REJECT
+                      Transition Graph at least once per
+                      session before first ACT.  Agents
+                      deviating from returned path MUST
+                      re-query before the deviation step.
+                      After STALL_RESOLVED, all classes
+                      MUST re-query. [REVISED in -02]
+
+   CONF-AEP-03        IDP submitted at ACT MUST be well-       REJECT
+                      formed per [I-D.sato-soos-idp] Section
+                      4.  Required fields per agent class
+                      (Section 15) MUST be present.
+
+   CONF-AEP-04        Agent MUST NOT submit a second ACT       REJECT
+                      while awaiting response to the first.
+                      Concurrent transitions on the same SO
+                      Instance from the same agent session
+                      are not permitted.
+
+   CONF-AEP-05        All IDPs in a session MUST carry the     REJECT
+                      same goal_session_id.  An IDP with a
+                      mismatched goal_session_id MUST be
+                      rejected.
+
+   CONF-AEP-06        aep_iteration MUST be strictly           LOG
+                      monotonically increasing within a
+                      session.  Gaps are permitted;
+                      reversals are not.
+
+   CONF-AEP-07        Agent MUST use RETRY_CONTINUATION        LOG +
+                      reasoning basis after a DENY response   DENY on
+                      for the same action.  The                2nd
+                      RETRY_CONTINUATION entry MUST carry      violation
+                      a what_changed field (Section 10.4).
+                      [REVISED in -02]
+
+   CONF-AEP-08        Agent MUST NOT enter REASON on a         REJECT
+                      MANDATE_REVOCATION trigger.  Session
+                      MUST proceed to graceful shutdown.
+
+   CONF-AEP-09        When DELEGATION_EVENT trigger carries    REJECT
+                      goal_impact: BLOCKING, agent MUST NOT
+                      submit the next ACT without first
+                      re-delegating or escalating to HEM.
+
+   CONF-AEP-10        When CLUSTER_STATUS_CHANGE trigger        REJECT
+                      carries cluster_achievability:
+                      UNACHIEVABLE and cluster aggregation_
+                      rule is ALL_COMPLETE, agent MUST NOT
+                      submit the next ACT.  Agent MUST
+                      escalate to HEM.
+
+   CONF-AEP-11        Class 3 agents MUST submit an EOD        REJECT
+                      before the first SENSE delivery.          (session
+                      [NEW in -02]                              initiation
+                                                               refused)
+
+   CONF-AEP-12        GEC MUST derive XPID from KIA-verified   REJECT +
+                      Party Registry at session initiation.    TERMINATE
+                      GEC MUST NOT accept client-supplied
+                      XPID.  [NEW in -02]
+
+   CONF-AEP-13        XPID MUST match at Step 1a of GEC        REJECT +
+                      execution sequence.  XPID_MISMATCH        TERMINATE
+                      MUST terminate the session.
+                      [NEW in -02]
+
+   CONF-AEP-14        ACT submissions in PLAN_B_ACTIVE          REJECT
+                      MUST carry plan_b_ref.  [NEW in -02]
+
+   CONF-AEP-15        OTel SENSE and ACT spans in the same     LOG
+                      iteration MUST carry matching cp_hash
+                      values.  [NEW in -02]
+
+   HEM conformance rules (from [I-D.sato-soos-hem]):
+
+   CONF-HEM-01        GEC MUST write HEM_INVOKED before        REJECT
+                      session enters HEM_PENDING.
+
+   CONF-HEM-02        Session in HEM_PENDING MUST NOT          REJECT
+                      accept ACT from the same agent.
+                      GEC MUST reject with SESSION_HEM_PENDING.
+
+   CONF-HEM-03        HEM_RESOLVED MUST carry valid            REJECT
+                      principal_signature from a human
+                      Party Registry principal.
+
+   CONF-HEM-04        Agent MUST NOT submit HEMDecision        REJECT +
+                      for any session, including its own.      CONFORMANCE
+                                                               _VIOLATION
+
+   CONF-HEM-05        GEC MUST write HEM_TIMEOUT if            LOG
+                      timeout_at reached before HEM_RESOLVED.
+
+   CONF-HEM-06        After non-TERMINATE HEM_RESOLVED,        REJECT
+                      GEC MUST deliver new SENSE with
+                      trigger: HEM_RESOLUTION before
+                      agent may submit next ACT.
+
+   CONF-HEM-07        available_decisions in HEMContext         REJECT
+                      MUST be GEC-computed, not agent-
+                      supplied.
+
+
+14.  GEE Orchestration Mode
+
+14.1.  GEE Overview
+
+   In GEE (Goal Execution Engine) Orchestration Mode, a GEC-provided
+   engine inverts control: the agent exposes a single reasoning
+   function and the GEE drives the AEP loop.  The GEE constructs
+   Context Packages, calls agent.reason(), constructs the full
+   Transition Request including the IDP, and submits it to the GEC.
+
+   In GEE mode, the agent MUST NOT call the GEC transition endpoint
+   directly.  The GEE is the sole submitter of Transition Requests.
+
+   GEE mode is appropriate when:
+   - The agent LLM is being called as a function within a larger
+     orchestrated workflow.
+   - The operator requires uniform IDP construction across multiple
+     agent implementations.
+   - The operator requires GEE-level Progressive Trust scoring
+     independent of agent-level IDP claims.
+
+14.2.  Agent Reasoning Interface
+
+   In GEE mode the agent MUST implement the following function:
+
+   reason(context_package: ContextPackage) -> ReasoningOutput
+
+   ReasoningOutput:
+
+   {
+     "selected_action":          string,   ; Cedar action identifier.
+     "confidence":               number,   ; Float 0.0-1.0.
+     "intent_summary":           string,   ; Human-readable summary.
+     "reasoning_basis":          [object], ; ReasoningRef array.
+     "alternatives_considered":  [object], ; AlternativeRef array.
+     "uncertainty_flags":        [string], ; UncertaintyFlag array.
+     "escalation_assessment":    object,   ; EscalationAssessment.
+     "agent_recommends_replan":  boolean,  ; Signal to GEE to replan.
+     "replan_reason":            string,   ; Replan explanation.
+     "reasoning_mode":           string    ; [NEW in -02] reasoning_mode
+                                            ; per IDP §4.3.1. OPTIONAL.
+                                            ; GEE includes in IDP when
+                                            ; present and non-ROUTINE.
+   }
+
+   The GEE constructs the full IDP from ReasoningOutput plus session
+   metadata (session_id, goal_session_id, aep_iteration, so_uuid,
+   context_package_ref, eod_id, plan_b_ref) that the GEE manages.
+
+14.3.  GEE Conformance
+
+   Rule               Requirement                              Violation
+   -----------------------------------------------------------------------
+   CONF-GEE-01        GEE MUST deliver normative Context       REJECT
+                      Package before calling agent.reason().
+
+   CONF-GEE-02        GEE MUST write AEP_SENSE_DELIVERED       REJECT
+                      before delivering Context Package
+                      to agent.
+
+   CONF-GEE-03        GEE MUST construct complete IDP from     REJECT
+                      ReasoningOutput before submitting
+                      Transition Request.
+
+   CONF-GEE-04        GEE MUST handle DENY by re-calling       REJECT
+                      agent.reason() with enriched denial
+                      context or invoking HEM.  On re-call
+                      after DENY, the GEE MUST construct
+                      RETRY_CONTINUATION reasoning_basis
+                      including a what_changed declaration
+                      derived from enrichment fields or the
+                      agent's replan_reason. [REVISED -02]
+                      On MANDATE_REVOCATION trigger, GEE
+                      MUST terminate loop and write
+                      AEP_SESSION_CLOSED with closure_
+                      reason: MANDATE_REVOKED.  GEE MUST
+                      NOT call agent.reason() after
+                      revocation.
+
+   CONF-GEE-05        GEE MUST write AEP_SESSION_CLOSED on     REJECT
+                      all termination paths, including
+                      failures.
+
+   CONF-GEE-06        Agents operating in GEE mode MUST NOT    REJECT
+                      call GEC transition endpoint directly.
+
+   CONF-GEE-07        GEE MUST submit EOD before first         REJECT
+                      Context Package delivery for Class 3
+                      agents.  [NEW in -02]
+
+   CONF-GEE-08        GEE MUST emit OTel spans per Section     LOG
+                      12.  [NEW in -02]
+
+
+15.  Agent Class Model
+
+   The AEP defines three Agent Classes that determine the required
+   field set for IDPs submitted at ACT.  Agent Class is declared in
+   the Mandate JWT and reflects the level of autonomous authority
+   granted to the agent.
+
+   Class 1 -- Basic Agent:
+      Agents with narrow, well-defined operational scope.  Minimal
+      IDP required fields.  Typically used for single-action or
+      single-step automations where human oversight is maintained
+      through Cedar policy constraints rather than escalation
+      assessment.  EOD not required.
+
+   Class 2 -- Standard Agent:
+      Agents with multi-step operational scope operating within
+      established patterns.  Required fields include goal_ref,
+      confidence, and reasoning_basis.  These agents are expected to
+      provide auditable reasoning but are not required to articulate
+      alternatives considered or uncertainty flags at each step.
+      EOD SHOULD be provided; absence is recorded in SAR.
+
+   Class 3 -- Autonomous Agent:
+      Agents with broad operational scope operating with elevated
+      autonomy.  All IDP fields are required, including alternatives_
+      considered, uncertainty_flags, and escalation_assessment.  These
+      agents are expected to proactively signal escalation when
+      approaching their confident operating boundary.  EOD REQUIRED
+      before session initiation.  [REVISED in -02]
+
+   Agent Class determines IDP required fields as specified in
+   this section and [I-D.sato-soos-idp] Section 4.5.
+
+   Confidence to autonomy level mapping:
+
+   Confidence Range  Autonomy Level  Cedar Policy Implications
+   ---------------------------------------------------------------
+   0.0 - 0.59        UNCERTAIN       Cedar MAY require mandatory HEM
+                                     before permitting Class 2/3 actions.
+   0.60 - 0.79       STANDARD        Standard Cedar evaluation.
+   0.80 - 0.89       HIGH            Cedar MAY permit elevated-autonomy
+                                     actions otherwise restricted.
+   0.90 - 1.00       VERIFIED        Cedar MAY permit actions otherwise
+                                     gated behind mandate elevation,
+                                     subject to policy.
+
+   Agents MUST NOT treat the confidence field as a mechanism to
+   bypass Cedar policy.  Systematic overconfidence -- high declared
+   confidence followed by frequent DENYs or HEM invocations -- MUST
+   be detectable via the Progressive Trust model [I-D.sato-soos-pt]
+   and MUST result in authority review.
+
+
+16.  Relationship to Other SOOS Drafts
+
+   SOV [I-D.sato-soos-sov]:
+      The Sovereign Object is the governed resource that the AEP loop
+      operates on.  The so sub-object of the Context Package (Section
+      7.3) carries the current SO Instance state at each SENSE.  The
+      zone_a_snapshot reflects Zone A as of event_log_head.  The AEP
+      session is scoped to a single SO Instance per Mandate JWT.
+
+   MJWT [I-D.sato-soos-mjwt]:
+      The Mandate JWT is verified at Step 1 of the GEC execution
+      sequence (Section 9.2) for every Transition Request.  The MJWT
+      so_id MUST match the SO Instance in the Context Package.  The
+      permissions sub-object (Section 7.4) is derived from the MJWT.
+      The MJWT cedar_actions array bounds the permitted_actions set.
+
+   KIA [I-D.sato-soos-kia]:
+      The KIA Party Registry is the source from which the GEC derives
+      the session XPID (Section 5.1).  KIA defines the XPID derivation
+      procedure [I-D.sato-soos-kia] Section 5 used at session open.
+      The KIA verification step (CONF-AEP-12) is a gate on session
+      initiation.  [NEW in -02]
+
+   IDP [I-D.sato-soos-idp]:
+      The IDP is submitted at every ACT step.  The IDP's
+      context_package_ref binds each intent declaration to the SENSE
+      delivery that preceded it.  RETRY_CONTINUATION (Section 10.4)
+      is the IDP mechanism for acknowledged denial-and-retry.  The
+      reasoning_mode field (IDP Section 4.3.1) is declared at REASON
+      and propagated into the IDP at ACT.  Agent Class IDP requirements
+      (Section 15) are defined in this document; IDP Section 4.5
+      defines the IDP_STANDARD profile.
+
+   HEM [I-D.sato-soos-hem]:
+      HEM is invoked at Step 3 of the GEC execution sequence
+      (Section 9.2) when Cedar returns DENY with hem_required: true.
+      HEM_PENDING is an AEP Session state (Section 5.3).  The five
+      HEM decision types determine AEP loop resumption or closure.
+      HEM_RESOLUTION is an AEP Context Package trigger type.  STALLED
+      state notifications are delivered via HEM with RECOMMENDED
+      urgency (Section 5.4).  [REVISED in -02]
+
+   GAR [I-D.sato-soos-gar]:
+      Every AEP_SENSE_DELIVERED, AEP_SESSION_CLOSED, AEP_STALLED, and
+      AEP_PLAN_B_ACTIVATED entry generates GAR audit entries.  At
+      session close, GAR generates a Session Audit Record (SAR)
+      covering all governance events in the session.  The SAR includes
+      the complete IDP chain, the EOD and EOD_OUTCOME, delegation_chain
+      from MJWTs, and HEM event history.  The soos.aep.* OTel namespace
+      is a sub-namespace of soos.governance.* defined in GAR.
+      [REVISED in -02]
+
+   CAP [I-D.sato-soos-cap]:
+      CAP prohibitions are evaluated at Step 2 of the GEC execution
+      sequence (Section 9.2), before Cedar evaluation.  A CAP Tier 0
+      or Tier 1 prohibition produces an immediate DENY regardless of
+      Cedar result.  CAP evaluation is transparent to the AEP loop;
+      the agent receives a DENY at OBSERVE.
+
+   MAD [I-D.sato-soos-mad]:
+      MAD defines the delegation structure for multi-agent sessions.
+      When goal_impact is BLOCKING in a DELEGATION_EVENT trigger,
+      AEP requires the agent to re-delegate or escalate to HEM before
+      the next ACT.  Session revocation per MAD Section 3.6 supersedes
+      the normal AEP loop.
+
+   GNAP [RFC9635]:
+      The Grant Negotiation and Authorization Protocol (GNAP) specifies
+      how an agent or client obtains delegated authorization from an
+      authorization server.  GNAP covers the initial grant establishment
+      -- the moment at which the human principal authorizes an agent to
+      act on a Sovereign Object instance under defined constraints.  This
+      is the authorization event that produces the Mandate JWT
+      [I-D.sato-soos-mjwt] that the AEP loop verifies at every ACT step.
+
+      GNAP and AEP operate at different points in the agent lifecycle.
+      GNAP is pre-session: it negotiates the grant that creates the MJWT.
+      AEP is per-iteration: it enforces the grant at every transition
+      within the session.  GNAP specifies what the agent is permitted to
+      attempt; AEP specifies how each attempt is governed.  The two
+      protocols compose without overlap: a GNAP-issued MJWT is the
+      session credential that AEP verifies at Step 1 of the GEC
+      execution sequence (Section 9.2).
+
+      GNAP does not address the Context Package, the GEC Query
+      Interface, the HEM_PENDING session state, the STALLED state, the
+      EOD pre-session commitment, or the non-suppressible GAR audit
+      trail.  These are AEP's contribution to the governed agent
+      lifecycle.
+
+   Windley Loop [OVID-Loop] [OVID-ME]:
+      The AEP PLAN step is the normative specification of the Windley
+      Loop planning gate: the agent queries its permitted action space
+      (Section 8) before committing to a Transition Request, rather
+      than discovering authorization failure at ACT.  OVID-ME
+      [OVID-ME] implements the Windley Loop against Cedar-based OVID
+      agent mandates.  AEP is interoperable with OVID-ME deployments:
+      the Context Package (Section 7) and the GEC Query Interface
+      (Section 8) provide the same state-grounded planning inputs that
+      OVID-ME's partial evaluation API delivers within the OVID trust
+      domain.
+
+
+17.  Security Considerations
+
+   The AEP loop is the outermost interface of the SOOS governance
+   architecture.  Its security properties derive from the security
+   properties of the component protocols it integrates.
+
+   Context Package integrity.  The cp_hash field enables the agent
+   to detect tampering with the delivered Context Package.  The GEC
+   MUST sign AEP_SENSE_DELIVERED before delivery.  An agent that
+   receives a Context Package whose cp_hash does not match the
+   AEP_SENSE_DELIVERED entry MUST NOT proceed to REASON.  It MUST
+   report the discrepancy as a critical security event.
+
+   SENSE injection.  Malicious content in Zone B attachments MUST NOT
+   be included in the zone_a_snapshot delivered at SENSE.  Zone A
+   Invariant INV-ZA-1 [I-D.sato-soos-sov] Section 4.3.1 prohibits
+   personal data in Zone A; implementations MUST also ensure that Zone
+   B content cannot be injected into the zone_a_snapshot to influence
+   agent reasoning with unsanctioned content.
+
+   REASON opacity.  The AEP intentionally makes REASON opaque to the
+   GEC.  This design property means the GEC cannot verify the
+   correctness of the agent's reasoning -- only that the resulting
+   Transition Request is authorized.  The IDP's reasoning_basis,
+   confidence, and uncertainty_flags are the agent's self-attestation;
+   their forensic value depends on the agent's integrity.  Progressive
+   Trust scoring [I-D.sato-soos-pt] provides a longitudinal signal on
+   reasoning calibration.
+
+   ACT atomicity.  The GEC execution sequence (Section 9.2) MUST be
+   atomic.  Partial execution creates governance gaps: a transition
+   that is Cedar-permitted but not Event-Stream-committed is unauditable.
+   Implementations MUST ensure that Step 5 (Event Stream Write) succeeds
+   or the transition is aborted.
+
+   Silent retry detection.  CONF-AEP-07 requires RETRY_CONTINUATION
+   with a what_changed declaration on denial-and-retry (Section 10.4).
+   The GEC MUST track prior_denial_count to detect agents that submit
+   repeated identical Transition Requests without acknowledging prior
+   denials.  Systematic silent retry is an indicator of authorization
+   bypass attempts.  The STALL_DENY_THRESHOLD (Section 5.4) bounds the
+   depth of retry sequences before mandatory human review.
+
+   HEM_PENDING integrity.  While a session is in HEM_PENDING, the
+   GEC MUST reject Transition Requests from that session.  An
+   implementation that permits transitions from an HEM_PENDING session
+   violates INV-12 and creates an authorization bypass vulnerability.
+
+   Session fixation attack. [NEW in -02]
+   An adversary who can inject a client-supplied XPID at session
+   initiation could cause the GEC to associate the session with an
+   identity that does not match the agent's actual Party Registry
+   entry.  This would allow cross-principal scope leakage: the agent
+   would operate under governance parameters derived from a different
+   agent's Party Registry record.  Mitigation: CONF-AEP-12 prohibits
+   client-supplied XPID.  The GEC MUST derive the XPID from the
+   KIA-verified Party Registry entry for the agent_provider_id in the
+   Root Mandate JWT.  Implementations MUST audit INVALID_XPID_CLAIM
+   rejections as potential session fixation attempts.
+
+   XPID binding integrity. [NEW in -02]
+   The session XPID is derived at initiation and carried in every
+   AEP_SENSE_DELIVERED entry.  An adversary who can modify the XPID
+   mid-session could subvert the GEC's cross-principal correlation
+   that identifies which agent took which action.  Mitigation: Step 1a
+   of the GEC execution sequence (Section 9.2) verifies XPID
+   consistency at every ACT.  An XPID_MISMATCH MUST terminate the
+   session immediately.  Monitoring systems using the soos.aep.
+   session_xpid OTel attribute SHOULD alert on any mid-session XPID
+   change (OTel-CONF-03).
+
+   Cross-principal scope leakage. [NEW in -02]
+   When multiple agents from different providers are operating on the
+   same SO Instance, an adversary who can cause Agent A to present
+   Agent B's XPID gains Agent B's Cedar residual and session context
+   delivered at SENSE.  This permits Agent A to reason and act under
+   Agent B's permission scope.  Mitigation: XPID binding (CONF-AEP-12,
+   CONF-AEP-13) prevents this by ensuring the XPID is always GEC-
+   derived from the verified agent_provider_id.  Cedar policies SHOULD
+   be scoped to the XPID to ensure that Agent A cannot claim Agent B's
+   permitted_actions regardless of XPID.
+
+   STALLED state exploitation. [NEW in -02]
+   An adversary who can induce artificial DENY responses against an
+   agent may attempt to drive the agent into STALLED state, causing a
+   denial of service against the session.  Mitigation: the stall
+   notification delivered via HEM includes the stall_reason and the
+   prior DENY chain, enabling the human principal to distinguish a
+   genuine stall (path exhausted) from an induced stall (DENY pattern
+   inconsistent with SO Type state machine).  The GEC SHOULD log
+   stall-inducing DENY patterns to the GAR as anomalous when the DENY
+   codes are inconsistent with the agent's permitted_actions.
+
+   Agent Session Revocation.
+   AEP operates within the SOOS session lifecycle model.  When an
+   agent session is revoked -- whether by operator action, a CAEP
+   signal received via [I-D.sato-soos-mad], or a CAP constitutional
+   violation -- the session revocation procedure defined in
+   [I-D.sato-soos-mad] Section 3.6 supersedes the normal AEP loop.
+   Implementations MUST NOT continue the SENSE-REASON-PLAN-ACT-OBSERVE
+   cycle after receiving a MANDATE_REVOCATION trigger in a Context
+   Package (Section 7.2).  The agent MUST proceed directly to graceful
+   session shutdown per Section 5.6.
+
+   All pending AEP operations at the point of revocation MUST be
+   classified using the completion_state model defined in
+   [I-D.sato-soos-mad] Section 3.6.3:
+
+      CLEAN: no irreversible actions taken since last natural
+      breakpoint defined in the AEP session.  GEC MAY complete
+      the current atomic ACT operation then halt.
+
+      PARTIAL: irreversible actions taken, execution incomplete.
+      GEC MUST halt immediately, record completion_state in GAR,
+      and surface to HEM escalation chain for human review.
+
+      UNKNOWN: GEC cannot determine completion state.  GEC MUST
+      treat as PARTIAL.
+
+   The GEC MUST record an ALE_SESSION_REVOKED entry [I-D.sato-soos-gar]
+   immediately upon session revocation and, if completion_state is
+   PARTIAL or UNKNOWN, MUST additionally record ALE_PARTIAL_STATE_
+   RECORDED before closing the session.  These entries are causally
+   linked to the last AEP_SENSE_DELIVERED entry in the session's Event
+   Stream.
+
+   AEP_SESSION_CLOSED MUST be written with closure_reason:
+   MANDATE_REVOKED on all revocation paths (Section 11.2).
+
+
+18.  Privacy Considerations
+
+   The Context Package carries zone_a_snapshot.  Zone A Invariant
+   INV-ZA-1 [I-D.sato-soos-sov] prohibits personal data in Zone A.
+   Implementations MUST verify this invariant before including
+   zone_a_snapshot in the Context Package.
+
+   The goal sub-object (Section 7.5) carries declared_goal_state,
+   which may reveal the human principal's intentions for the SO
+   Instance.  Access to goal context MUST be controlled by Cedar
+   policy.
+
+   The EOD (Section 6) submitted at session initiation may carry
+   human principal intent in the primary_outcome.rationale and plan_b.
+   plan_b_rationale fields.  The GEC MUST treat EOD content as
+   sensitive and MUST control access to EOD records with the same
+   access controls applied to IDP records.  EOD records MUST be
+   included in the same data retention and deletion policies as the
+   SO Instance Event Stream.  [NEW in -02]
+
+   The session_xpid field carried in AEP_SENSE_DELIVERED and
+   AEP_SESSION_CLOSED entries enables cross-session correlation of
+   agent behavior.  When the agent_provider_id in the Mandate JWT is
+   associated with an identifiable natural person (e.g. an individual
+   developer's agent), the session_xpid constitutes personal data
+   under GDPR Article 4(1) [GDPR] and APPI Article 2 [APPI].
+   Implementations MUST apply appropriate access controls to all
+   records carrying session_xpid values.  [NEW in -02]
+
+   The episodic memory sub-object (Section 7.6) may contain
+   references to prior agent actions.  While episodic entries MUST
+   NOT contain personal data directly, they may contain identifiers
+   that correlate to personal data in Zone B.  Implementations MUST
+   apply appropriate access controls to episodic memory entries.
+
+   AEP_SENSE_DELIVERED and AEP_SESSION_CLOSED entries in the SO
+   Instance Event Stream carry agent_id and session_id values.
+   These entries may constitute personal data under GDPR Article 4(1)
+   [GDPR] and APPI Article 2 [APPI] where the agent is associated
+   with an identifiable natural person.  Implementations MUST apply
+   appropriate access controls to Event Stream queries.
+
+
+19.  IANA Considerations
+
+19.1.  AEP Context Package Trigger Registry
+
+   Registry name: Agent Execution Protocol Context Package Trigger Registry
+   Registration procedure: Specification Required.
+
+   Initial registrations:
+
+   Trigger Value            Description
+   SESSION_START            First CP delivered for a new AEP Session.
+   STATE_CHANGE             SO Instance transitioned since last SENSE.
+   PROXIMITY_EVENT          One or more Proximity Events at threshold.
+   HEM_RESOLUTION           Session resuming from HEM_PENDING.
+   MANDATE_REFRESH          Mandate JWT refreshed.
+   MANDATE_REVOCATION       Mandate JWT revoked; session terminating.
+   DELEGATION_EVENT         Child or peer mandate event affects this
+                            session's goal path.  Carries
+                            delegation_context sub-object.
+   CLUSTER_STATUS_CHANGE    SO Cluster achievability state has changed.
+                            Carries cluster_context sub-object.
+   STALL_RESOLVED           STALLED state resolved by human principal. [NEW]
+
+19.2.  AEP Session Closure Reason Registry
+
+   Registry name: Agent Execution Protocol Session Closure Reason Registry
+   Registration procedure: Specification Required.
+
+   Initial registrations:
+
+   Closure Reason     Description
+   GOAL_ACHIEVED      Agent reached declared goal state.
+   PLAN_B_ACHIEVED    Agent reached Plan B outcome in PLAN_B_ACTIVE
+                      state. [NEW in -02]
+   MANDATE_EXPIRED    Mandate JWT expired before goal completion.
+   AGENT_DECLARED     Agent declared goal outcome explicitly.
+   GEE_CLOSED         GEE closed the session in GEE mode.
+   HEM_TERMINATED     Human principal TERMINATE decision at HEM.
+   KERNEL_REJECTED    GEC rejected the session.
+   MANDATE_REVOKED    Mandate JWT revoked during active session.
+   STALL_TIMEOUT      STALLED state not resolved before timeout. [NEW]
+   CLUSTER_HALT       Session ended because the SO Cluster of which
+                      this session was a member reached UNACHIEVABLE
+                      achievability state and GEC applied HALT_REMAINING
+                      disposition.
+
+19.3.  AEP Session State Registry [NEW in -02]
+
+   Registry name: Agent Execution Protocol Session State Registry
+   Registration procedure: Specification Required.
+
+   This registry is new in AEP-02.  AEP-01 did not define a formal
+   registry for session states.
+
+   Initial registrations:
+
+   State Value        Description
+   ACTIVE             Session is executing the AEP loop normally.
+   HEM_PENDING        Session suspended pending human principal
+                      decision under HEM.  Agent MUST NOT submit ACT.
+   STALLED            Session cannot make progress without human
+                      direction.  Agent MUST NOT submit ACT.
+   PLAN_B_ACTIVE      Session executing pre-declared EOD Plan B.
+                      Agent MUST include plan_b_ref in IDP.
+   CLOSED             Session terminated.  No further transitions
+                      are possible.
+
+19.4.  AEP Proximity Event Condition Type Registry
+
+   Registry name: Agent Execution Protocol Proximity Event Condition
+                  Type Registry
+   Registration procedure: Specification Required.
+
+   Initial registrations: As listed in Section 7.7.
+
+   Additions in -02:
+
+   Condition Type                  Description
+   STALL_THRESHOLD_APPROACHING     Session DENY count or iteration count
+                                   approaching the STALL threshold.
+
+19.5.  AEP Agent Class Registry
+
+   Registry name: Agent Execution Protocol Agent Class Registry
+   Registration procedure: Standards Action.
+
+   Initial registrations:
+
+   Class Value  Description
+   CLASS_1      Basic Agent.
+   CLASS_2      Standard Agent.
+   CLASS_3      Autonomous Agent.
+
+19.6.  AEP EOD Media Type Registration [NEW in -02]
+
+   Media type: application/soos-aep-eod+json
+   Type name: application
+   Subtype name: soos-aep-eod+json
+   Required parameters: none
+   Optional parameters: version (default: "1.0")
+   Encoding considerations: UTF-8 JSON
+   Security considerations: The EOD carries pre-session commitment
+      data.  Implementations MUST verify the eod_signature against
+      the submitter's Mandate JWT before recording the EOD.
+   Interoperability considerations: The schema is defined in
+      Section 6.2 of this document.
+   Published specification: this document.
+   Applications that use this media type: GEC implementations that
+      accept pre-session EOD submissions from agents or operators.
+   Fragment identifier considerations: none
+   Additional information: none
+   Contact: tomsato@myauberge.jp
+   Intended usage: COMMON
+   Author: Tom Sato
+
+
+20.  References
+
+20.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Token (JWT)", RFC 7519, May 2015.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [RFC8037]  Liusvaara, I., "CFRG Elliptic Curves for JOSE",
+              RFC 8037, January 2017.
+
+   [RFC9562]  Davis, B., Peabody, C., and P. Leach, "Universally
+              Unique IDentifiers (UUIDs)", RFC 9562, May 2024.
+
+   [RFC6234]  Eastlake, D. and T. Hansen, "US Secure Hash Algorithms
+              (SHA and SHA-based HMAC and HKDF)", RFC 6234, May 2011.
+
+   [Cedar]    Amazon Web Services, "Cedar Policy Language
+              Specification", https://docs.cedarpolicy.com/
+
+   [I-D.sato-soos-idp]
+              Sato, T., "The Intent Declaration Primitive (IDP) for
+              Agentic AI Systems", draft-sato-soos-idp-05,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM) for
+              Agentic AI Systems", draft-sato-soos-hem-05, July 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "Governance Audit Record (GAR) for Agentic
+              AI Systems", draft-sato-soos-gar-03, July 2026.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "Constitutional AI Protocol (CAP) for Agentic
+              AI Systems", draft-sato-soos-cap-04, July 2026.
+
+   [I-D.sato-soos-sov]
+              Sato, T., "The Sovereign Object (SOV) for Agentic AI
+              Systems", draft-sato-soos-sov-02, June 2026.
+
+   [I-D.sato-soos-mjwt]
+              Sato, T., "The Mandate JWT (MJWT) for Agentic AI
+              Systems", draft-sato-soos-mjwt-02, July 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Architecture (KIA) for
+              Agentic AI Systems", draft-sato-soos-kia-03,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-mad]
+              Sato, T., "Multi-Agent Delegation (MAD) for Agentic
+              AI Systems", draft-sato-soos-mad-03, June 2026.
+
+   [I-D.ietf-wimse-arch]
+              Salomoni, D., et al., "WIMSE Architecture",
+              draft-ietf-wimse-arch, work in progress.
+
+   [GDPR]     European Parliament, "General Data Protection
+              Regulation", Regulation (EU) 2016/679, April 2016.
+
+   [APPI]     Government of Japan, "Act on the Protection of Personal
+              Information", Act No. 57 of 2003, as amended.
+
+20.2.  Informative References
+
+   [I-D.sato-soos-pt]
+              Sato, T., "Progressive Trust (PT) for Agentic AI
+              Systems", draft-sato-soos-pt-02, May 2026.
+
+   [I-D.sato-soos-faip]
+              Sato, T., "Federated Agent Intelligence Protocol
+              (FAIP)", draft-sato-soos-faip-01, forthcoming.
+
+   [I-D.ietf-scitt-architecture]
+              Birkholz, H., et al., "An Architecture for Trustworthy
+              and Transparent Digital Supply Chains",
+              draft-ietf-scitt-architecture, work in progress.
+
+   [I-D.mcguinness-oauth-actor-profile]
+              McGuinness, K., et al., "OAuth Actor Profile",
+              draft-mcguinness-oauth-actor-profile-00, 2026.
+
+   [I-D.mcguinness-oauth-mission-bound-authorization]
+              McGuinness, K., et al., "Mission Bound Authorization",
+              draft-mcguinness-oauth-mission-bound-authorization-00,
+              2026.
+
+   [MCP]      Anthropic, "Model Context Protocol",
+              https://modelcontextprotocol.io/, 2024.
+
+   [EUAIA]    European Parliament, "Artificial Intelligence Act",
+              Regulation (EU) 2024/1689, June 2024.
+
+   [OVID-ME]  Hepburn, C., "OVID-ME: Mandate Evaluation for Delegated
+              Agent Authority", Version 0.x, Apache License 2.0,
+              https://github.com/clawdreyhepburn/ovid-me, 2026.
+
+   [OVID-Loop]
+              Hepburn, C., "The Windley Loop and the Fletcher Embassy:
+              When Agents Read Their Own Map -- And What Happens When
+              They Cross the Border", clawdrey.com, April 2026,
+              https://clawdrey.com/blog/the-windley-loop-and-the-
+              fletcher-embassy.html
+
+   [RFC9635]  Richer, J. and F. Imbault, "Grant Negotiation and
+              Authorization Protocol (GNAP)", RFC 9635, November 2024.
+
+   [Windley-Loop]
+              Windley, P., "It's Not Just What Agents Can Do...
+              It's When They Can Do It!", windley.com, March 2026,
+              https://www.windley.com/archives/2026/03/
+              its_not_just_what_agents_can_doits_when_they_can_do_it.shtml
+
+   [OTel]     OpenTelemetry Authors, "OpenTelemetry Specification",
+              https://opentelemetry.io/docs/specs/otel/, 2024.
+
+   [soosproject-aep]
+              Sato, T., "SOOS Agent Execution Protocol (AEP) --
+              Protocol Overview and Implementation Guidance",
+              soosproject.ai, 2026,
+              https://soosproject.ai/drafts/aep.
+
+
+Appendix A.  ATP Booking Object -- AEP Reference Walk-Through
+
+   The ATP Booking Object is the reference implementation of the
+   Sovereign Object primitive [I-D.sato-soos-sov] Appendix A.  This
+   walk-through illustrates a single AEP Iteration for the Azusa
+   Journey scenario: an OTA booking agent advancing a booking from
+   CONFIRMED to PRE_ACTIVITY.  This walk-through is updated in AEP-02
+   to reflect XPID binding at session open and EOD submission.
+
+A.1.  Pre-Session: EOD Submission (Class 2 agent, EOD RECOMMENDED)
+
+   The OTA booking agent submits an EOD before requesting session
+   initiation:
+
+   EOD:
+   - eod_id: "eod-azusa-001"
+   - primary_outcome.target_state: "ACTIVITY_COMPLETE"
+   - primary_outcome.confidence: 0.85
+   - acceptance_envelope.success_conditions: [
+       { field: "so.current_state", operator: "eq",
+         value: "ACTIVITY_COMPLETE", required: true }
+     ]
+   - plan_b.plan_b_target_state: "CANCELLED"
+   - plan_b.plan_b_rationale: "If pre-activity collection fails after
+     3 attempts, cancel booking to free supplier allocation."
+   - plan_b.auto_activate_plan_b: false
+
+A.2.  Session Initiation: XPID Binding
+
+   The GEC initiates the session:
+   - Verifies Root Mandate JWT: so_id matches, not revoked, within exp.
+   - Derives XPID from KIA Party Registry for agent_provider_id:
+     "ota-booking-agent-001" -> XPID: "xpid-kia-ota-abc123"
+   - Records XPID as session_xpid for this session.
+   - Records EOD as EOD_COMMITTED in Event Stream.
+   - Assigns session_id: "sess-azusa-2026-001"
+
+A.3.  SENSE
+
+   The GEC delivers a Context Package with trigger: SESSION_START.
+   The so sub-object carries:
+   - so_id: "019547ab-1234-7abc-8def-000000000099"
+   - so_type_id: "atp/booking-object/1.0"
+   - current_state: "CONFIRMED"
+   - current_phase: "ACTIVE"
+   - zone_a_snapshot: { booking_reference: "MYA-2026-04521",
+                        activity_id: "PH-TRAIL-001",
+                        journey_date: "2026-06-15" }
+
+   The Context Package also carries:
+   - session_xpid: "xpid-kia-ota-abc123"
+   - eod_id: "eod-azusa-001"
+   - session_state: "ACTIVE"
+
+   The permissions sub-object carries:
+   - permitted_actions: ["atp:booking:confirm", "atp:booking:cancel",
+                         "atp:booking:pre_activity_open",
+                         "atp:booking:suspend"]
+   - mandate_ceiling: 2
+   - agent_class: "CLASS_2"
+
+A.4.  REASON
+
+   The OTA booking agent reasons: the booking is CONFIRMED, journey
+   date is 2026-06-15, current date is 2026-06-14.  Pre-activity
+   collection should begin.  Selected action: atp:booking:pre_activity_open.
+   Confidence: 0.91 (VERIFIED).  reasoning_mode: omitted (ROUTINE).
+   No uncertainty flags.
+
+A.5.  PLAN
+
+   Transition Graph query confirms: CONFIRMED -> PRE_ACTIVITY via
+   atp:booking:pre_activity_open is a valid path.  authority_sufficient:
+   true.  hem_required: false.
+
+   Live Permission Map confirms: atp:booking:pre_activity_open is in
+   permitted_actions for current state CONFIRMED.
+
+A.6.  ACT
+
+   Transition Request submitted:
+   - mandate_jwt: <root mandate, so_id bound, mandate_ceiling: 2>
+   - cedar_action: "atp:booking:pre_activity_open"
+   - idp: {
+       action: "atp:booking:pre_activity_open",
+       so_uuid: "019547ab-1234-7abc-8def-000000000099",
+       transition_from: "CONFIRMED",
+       transition_to: "PRE_ACTIVITY",
+       goal_ref: "goal-session-azusa-journey-001",
+       goal_step: 1,
+       confidence: 0.91,
+       eod_id: "eod-azusa-001",
+       reasoning_basis: [
+         { ref_type: "so_graph_node", ref_id: "booking_reference",
+           weight: "primary" },
+         { ref_type: "zone_b_attachment", ref_id: "journey_date_doc",
+           weight: "primary" }
+       ],
+       intent_summary: "Booking confirmed and journey date tomorrow.
+                        Opening pre-activity collection phase.",
+       escalation_assessment: {
+         agent_recommends_hem: false,
+         hem_urgency: "ADVISORY"
+       }
+     }
+
+   GEC execution sequence:
+   Step 1:  MJWT verified. so_id matches. Not revoked. Within exp.
+   Step 1a: XPID consistency check. session_xpid "xpid-kia-ota-abc123"
+            matches KIA-derived XPID for agent_provider_id.  Pass.
+   Step 2:  CAP -- no Tier 0 or Tier 1 prohibition applies.
+   Step 3:  Cedar -- PERMIT. autonomy_level VERIFIED. No HEM required.
+   Step 4:  State machine -- edge (CONFIRMED, atp:booking:pre_activity_open)
+            exists. Transition to PRE_ACTIVITY valid.
+   Step 5:  Event Stream Write committed. StateTransitionEvent signed.
+
+A.7.  OBSERVE
+
+   GEC returns PERMIT response:
+   - new_state: "PRE_ACTIVITY"
+   - new_phase: "ACTIVE"
+   - event_stream_entry_id: "event-id-0042"
+
+   GAR records the IDP, the PERMIT result, the eod_id, and the
+   delegation chain from the MJWT.  AEP_SENSE_DELIVERED is already
+   in the Event Stream.
+
+   The LOOP mechanism prepares the next Context Package with trigger:
+   STATE_CHANGE, current_state: PRE_ACTIVITY.  The next SENSE
+   delivers it to the agent.  aep_iteration increments to 2.
+
+   OTel spans emitted:
+   - soos.aep.sense: trigger=SESSION_START, cp_hash=<hash>,
+     session_xpid="xpid-kia-ota-abc123", session_state=ACTIVE.
+   - soos.aep.reason: reasoning_mode omitted (ROUTINE).
+   - soos.aep.plan: plan_queries=["transition_graph","live_permission"],
+     path_confidence=0.92, intended_cedar_action="atp:booking:pre_activity_open"
+   - soos.aep.act: idp_id=<uuid>, cedar_action="atp:booking:pre_activity_open",
+     confidence=0.91, cp_hash_ref=<hash>.
+   - soos.aep.observe: observe_result=PERMIT,
+     event_stream_entry_id="event-id-0042".
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/aep

@@ -1,0 +1,1507 @@
+
+
+
+
+
+Internet-Draft                                                   T. Sato
+draft-sato-soos-cap-rrs-jp-00                        MyAuberge K.K.
+Intended status: Informational                           1 July 2026
+Expires: 1 January 2027
+
+
+       Japan e-LAWS LRI Profile for CAP-RRS Regulation Records
+                   draft-sato-soos-cap-rrs-jp-00
+
+Abstract
+
+   The Constitutional AI Protocol -- Regulation Record Specification
+   (CAP-RRS) defines the Law Reference Interface (LRI): a
+   jurisdiction-neutral mechanism for linking a Cedar policy
+   enforcement record to the statutory text it encodes and the
+   authority that certified the encoding.
+
+   This document is an informational LRI profile for Japan's legal
+   system.  It specifies: the binding from LRI generic fields to
+   Japan's e-LAWS database and XML schema (XMLSchemaForJapaneseLaw
+   v3); XPath addressing conventions for Japanese legal provisions;
+   the endorsement authority table for each LawType in the e-LAWS
+   corpus; the translation of the Act on the Protection of Personal
+   Information (APPI) Chapter IV provisions into CAP-RRS Regulation
+   Records; the e-Gov catalog publication workflow with the Digital
+   Agency (デジタル庁) and IPA as endorsement authorities; and the
+   handling of INTERPRETATION_SUPERSEDED events in Japan's legal
+   context, including the 信頼保護 (trust protection) safe harbor
+   for agent actions taken under a prior valid interpretation.
+
+   This document does not define new protocol mechanisms.  All
+   normative requirements are inherited from draft-sato-soos-
+   cap-rrs-02.  This document specifies how those normative
+   mechanisms are applied within Japan's legal system.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 1 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . .  4
+     1.1.  The Japan Compliance Authoring Gap  . . . . . . . . . . . 4
+     1.2.  Scope of This Document  . . . . . . . . . . . . . . . . . 5
+     1.3.  Relationship to CAP-RRS  . . . . . . . . . . . . . . . .  6
+   2.  Conventions and Definitions . . . . . . . . . . . . . . . . . 7
+   3.  Japan LRI Profile Identifier  . . . . . . . . . . . . . . . . 8
+   4.  Japan LRI Field Bindings  . . . . . . . . . . . . . . . . . . 8
+     4.1.  law_id Binding  . . . . . . . . . . . . . . . . . . . . . 8
+     4.2.  article_ref Binding: XPath Addressing . . . . . . . . . . 9
+     4.3.  version_identifier Binding . . . . . . . . . . . . . . . 10
+     4.4.  amendment_detection_endpoint . . . . . . . . . . . . . . 11
+     4.5.  interpretation_endpoint (Provisional)  . . . . . . . . . 11
+     4.6.  retrieved_at  . . . . . . . . . . . . . . . . . . . . . 12
+   5.  Endorsement Authority Table . . . . . . . . . . . . . . . . 12
+     5.1.  LawType to Endorser Mapping . . . . . . . . . . . . . . 12
+     5.2.  Elevated Authority Requirements . . . . . . . . . . . . 13
+     5.3.  Co-Endorsement in Japan Context . . . . . . . . . . . . 14
+   6.  APPI Chapter IV Translation . . . . . . . . . . . . . . . . 15
+     6.1.  APPI Overview in CAP-RRS Context . . . . . . . . . . . . 15
+     6.2.  Worked Example 1: APPI Article 17 . . . . . . . . . . . 16
+     6.3.  Worked Example 2: APPI Article 24 (名簿) . . . . . . . . 17
+     6.4.  Worked Example 3: APPI Article 24 (個別避難計画). . . . . 19
+     6.5.  Consent Asymmetry Resolution . . . . . . . . . . . . . . 20
+   7.  e-Gov Catalog Publication Workflow  . . . . . . . . . . . . 21
+     7.1.  Catalog Authority Designation . . . . . . . . . . . . . 21
+     7.2.  Publication Workflow Steps . . . . . . . . . . . . . . . 22
+     7.3.  IPA Co-Endorsement Model  . . . . . . . . . . . . . . . 23
+   8.  INTERPRETATION_SUPERSEDED in Japan Context  . . . . . . . . 24
+     8.1.  Interpretive Instruments in Japan's Legal System . . . . 24
+     8.2.  解釈変更 (Interpretation Change) Workflow  . . . . . . . 25
+     8.3.  信頼保護 Safe Harbor in Japan Context  . . . . . . . . . 26
+     8.4.  Diet Amendment Cycle Alignment . . . . . . . . . . . . . 27
+   9.  Open Issues . . . . . . . . . . . . . . . . . . . . . . . . 27
+   10. Security Considerations . . . . . . . . . . . . . . . . . . 28
+   11. Privacy Considerations  . . . . . . . . . . . . . . . . . . 29
+   12. IANA Considerations . . . . . . . . . . . . . . . . . . . . 29
+   13. References  . . . . . . . . . . . . . . . . . . . . . . . . 30
+     13.1.  Normative References . . . . . . . . . . . . . . . . . 30
+     13.2.  Informative References . . . . . . . . . . . . . . . . 30
+   Appendix A.  Complete Japan LRI Profile Schema  . . . . . . . . 32
+   Appendix B.  防災 Statutory Conflict Examples  . . . . . . . . . 33
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . 35
+
+
+1.  Introduction
+
+1.1.  The Japan Compliance Authoring Gap
+
+   A governed AI agent operating in Japan faces the same compliance
+   authoring challenge as agents worldwide, plus a Japan-specific
+   structural layer: Japanese law is organized in a hierarchical
+   statutory corpus administered through the e-LAWS database
+   (法令データベース), maintained by the Ministry of Internal Affairs
+   and Communications and the Digital Agency.  This corpus is not
+   merely searchable -- it is structurally addressable via a
+   published XML schema (XMLSchemaForJapaneseLaw v3) and an API
+   (法令API v2, released March 2025).
+
+   The opportunity is significant: Japan's statutory corpus is
+   already machine-structured.  The gap is not machine-readability
+   -- the Digital Agency has addressed that at the structural layer.
+   The gap is machine-enforceability.
+
+   The distinction is:
+
+      法令のAXが作るのは「読める法律」です。
+      SOOSが作るのは「守られる法律」です。
+
+      (Law AX creates laws that can be read.
+      SOOS creates laws that are enforced.)
+
+   The Digital Agency's XML schema defines structural hierarchy --
+   the nesting of Chapter, Article, Paragraph, and Item in a law.
+   It does not define a semantics layer: there is no <Prohibition>,
+   <Condition>, or <Obligation> element.  A provision that says
+   "an AI agent must not collect personal information without the
+   principal's prior consent" is represented as a natural-language
+   string inside an <Sentence> element, indistinguishable from a
+   definitional provision or a transitional rule.
+
+   The Constitutional AI Protocol -- Regulation Record Specification
+   (CAP-RRS, [I-D.sato-soos-cap-rrs]) resolves this by specifying
+   the Regulation Record: a structured intermediate form between
+   legal text and Cedar policy.  The Law Reference Interface (LRI)
+   in CAP-RRS §9 links each Regulation Record to the statutory
+   provision it encodes, with a signed endorsement from a designated
+   authority certifying that the Cedar policy correctly represents
+   the statute's operative effect.
+
+   This document specifies how the LRI generic schema from CAP-RRS
+   §9 is applied within Japan's legal system: how the e-LAWS
+   database fields bind to LRI fields, how Japanese provisions are
+   addressed via XPath against the e-LAWS XML schema, which
+   authority endorses which type of statute, and how Japan's
+   interpretive change mechanisms (Cabinet Orders, 解釈指針,
+   内閣法制局意見, court judgments) are captured in the
+   INTERPRETATION_SUPERSEDED event flow.
+
+   The canonical URL for this document is:
+   https://soosproject.ai/drafts/cap-rrs-jp
+
+1.2.  Scope of This Document
+
+   This document specifies:
+
+   o  The Japan LRI profile identifier and its registration in the
+      CAP-RRS LRI Profile URI Registry (Section 3).
+
+   o  The binding from each LRI generic field to Japan's e-LAWS
+      API v2 and XMLSchemaForJapaneseLaw v3 (Section 4).
+
+   o  The endorsement authority table mapping each e-LAWS LawType
+      to the designated endorsing authority for Cedar policies
+      encoding that law type (Section 5).
+
+   o  Three worked examples translating APPI Chapter IV personal
+      information handling provisions into CAP-RRS Regulation
+      Records (Section 6).
+
+   o  The e-Gov catalog publication workflow specifying the Digital
+      Agency as catalog authority and IPA (Information-technology
+      Promotion Agency) as co-endorser for technology-layer
+      compliance records (Section 7).
+
+   o  The Japan-context treatment of INTERPRETATION_SUPERSEDED
+      events, including the instrument types that trigger the event
+      and the 信頼保護 safe harbor applicable to prior agent
+      actions (Section 8).
+
+   This document does not specify:
+
+   o  New protocol mechanisms.  All normative mechanisms are
+      inherited from draft-sato-soos-cap-rrs-02.
+
+   o  The content or compilation of specific Cedar policies.
+      This document provides the LRI bindings that allow Cedar
+      policies to be linked to Japanese statutory sources; Cedar
+      policy content is the responsibility of the certified
+      publisher.
+
+   o  Legal interpretations of Japanese statutes.  The endorsement
+      authority designated in this profile is responsible for
+      certifying that a Cedar policy correctly encodes a statutory
+      provision.  This document does not make or evaluate that
+      certification.
+
+   Open questions in this profile are documented in Section 9.
+   Several open questions (JP-OQ-01 through JP-OQ-04) require
+   engagement with the Digital Agency, 内閣法制局, and 全国知事会
+   and are expected to be resolved in a subsequent version of this
+   document.
+
+1.3.  Relationship to CAP-RRS
+
+   This document profiles the Law Reference Interface (LRI) defined
+   in draft-sato-soos-cap-rrs-02 Section 9.  All normative
+   requirements for the LRI generic schema -- the five normative
+   LRI requirements in CAP-RRS §9.3, the Statute-Primacy Rule in
+   CAP-RRS §10, the Operational Requirements in CAP-RRS §11 -- are
+   inherited by this profile without modification.
+
+   The hierarchy:
+
+      draft-sato-soos-cap-rrs-02
+        Section 9 — LRI generic schema (normative)
+        Section 10 — Statute-Primacy Rule (normative)
+        Section 11 — Operational Requirements (normative)
+               |
+               v profiles
+      draft-sato-soos-cap-rrs-jp-00 (this document)
+        — Japan-specific field bindings (informational)
+        — Japan-specific endorsement authority table
+        — Japan-specific interpretation detection
+        — APPI Chapter IV translation examples
+
+   Where this document conflicts with draft-sato-soos-cap-rrs-02,
+   the latter governs.  Where this document specifies Japan-specific
+   behavior that CAP-RRS leaves to profiles, this document governs
+   for Japan deployments.
+
+   Japan-specific behavior is explicitly marked in this document
+   with the tag [JP:] to distinguish profile-specific content from
+   inherited generic behavior.
+
+
+2.  Conventions and Definitions
+
+   This document uses the following terms.  Terms not defined here
+   are as defined in draft-sato-soos-cap-rrs-02 Section 2.
+
+   e-LAWS (法令データベース):
+      Japan's statutory database administered by the Ministry of
+      Internal Affairs and Communications and the Digital Agency.
+      Accessible at https://laws.e-gov.go.jp.  The e-LAWS API v2
+      (released March 2025) provides machine-queryable access to
+      statutory text, amendment history, and related instruments.
+
+   LawType:
+      The type classification of a law in the e-LAWS XML schema.
+      Values include: Constitution, Act, CabinetOrder,
+      MinisterialOrdinance, and Misc.  This is the primary
+      attribute used to determine the designated endorser in
+      Section 5.
+
+   法令ID (Law ID):
+      The unique identifier assigned to each law in the e-LAWS
+      database.  Format: a 15-character alphanumeric string
+      (e.g., "325AC0000000089" for APPI).
+
+   XMLSchemaForJapaneseLaw v3:
+      The official XML schema for Japanese law, published by the
+      Ministry of Internal Affairs.  The schema defines the
+      structural hierarchy of Japanese legal text (Chapter,
+      Article, Paragraph, Item, Sentence) and the @Num attributes
+      that enable XPath addressing.  File reference:
+      XMLSchemaForJapaneseLaw_v3.xsd.
+
+   解釈指針 (Interpretive Guidance):
+      Binding administrative guidance issued by a cabinet office
+      or ministry to clarify the interpretation of statutory
+      provisions.  Distinguished from regulatory amendment in that
+      the underlying statutory text is not changed.
+
+   内閣法制局 (Cabinet Legislation Bureau):
+      The Japanese government body responsible for drafting
+      legislation and issuing authoritative legal interpretations.
+      The designated endorsing authority for Acts, Cabinet Orders,
+      and the Constitution in this profile.
+
+   信頼保護 (Trust Protection / Safe Harbor):
+      The principle, established in Japan's administrative law
+      tradition, that actions taken in good-faith reliance on a
+      valid prior legal ruling are protected from retroactive
+      liability when that ruling is subsequently changed.
+
+   APPI (Act on the Protection of Personal Information):
+      個人情報の保護に関する法律.  法令ID: 325AC0000000089.
+      The primary personal information protection statute in Japan.
+      Chapter IV specifies handling obligations for business
+      operators.
+
+   [JP:]:
+      Tag used in this document to mark Japan-profile-specific
+      content, distinguishing it from inherited CAP-RRS generic
+      behavior.
+
+
+3.  Japan LRI Profile Identifier
+
+   [JP:] The Japan LRI profile URI is:
+
+      https://laws.e-gov.go.jp/lri/v1
+
+   This URI is registered in the CAP-RRS LRI Profile URI Registry
+   (draft-sato-soos-cap-rrs-02 Section 9.7) as the authoritative
+   identifier for the Japan e-LAWS LRI profile.
+
+   A Regulation Record using the Japan profile includes this URI
+   in the `profile` field of the `authority_source` block:
+
+   {
+     "authority_source": {
+       "lri_version": "1.0",
+       "profile": "https://laws.e-gov.go.jp/lri/v1",
+       ...
+     }
+   }
+
+   Any system that receives an `authority_source` block with this
+   `profile` value and is not configured to handle the Japan
+   e-LAWS profile MUST reject the Regulation Record and raise an
+   alert indicating an unsupported LRI profile.
+
+
+4.  Japan LRI Field Bindings
+
+   This section specifies the binding from each LRI generic field
+   (draft-sato-soos-cap-rrs-02 Section 9.2) to Japan's e-LAWS
+   system.
+
+4.1.  law_id Binding
+
+   [JP:] The `law_id` field MUST be the e-LAWS 法令ID for the
+   law from which the Cedar policy's prohibition or obligation
+   derives.
+
+   The 法令ID is a 15-character alphanumeric identifier assigned
+   by the e-LAWS system.  It is stable across amendments to the
+   law -- the same 法令ID persists regardless of how many times
+   the law is amended.
+
+   Examples:
+
+      325AC0000000089  -- APPI (個人情報の保護に関する法律)
+      323AC0000000186  -- 災害対策基本法
+      (Basic Act for Disaster Countermeasures)
+      326AC0000000118  -- 災害救助法 (Disaster Relief Act)
+
+   The `law_id` MUST be obtained from the e-LAWS API and MUST
+   be verified before the Regulation Record is submitted to the
+   Constitutional Mandate Registry.  The verification procedure
+   is: query the e-LAWS API endpoint
+   `https://laws.e-gov.go.jp/api/2/lawdata/{law_id}` and
+   confirm the returned law name matches the intended statute.
+
+   Where a Cedar policy derives from provisions in multiple laws,
+   the primary law's 法令ID is used as `law_id` and the secondary
+   laws are listed in the `conflict_declarations` array per
+   CAP-RRS §6.
+
+4.2.  article_ref Binding: XPath Addressing
+
+   [JP:] The `article_ref` field MUST be a valid XPath 1.0
+   expression resolvable against the e-LAWS XML representation
+   of the law identified by `law_id` when validated against
+   XMLSchemaForJapaneseLaw_v3.xsd.
+
+   Normative XPath addressing conventions:
+
+   Article:
+
+      /Law/LawBody/MainProvision/Article[@Num='N']
+
+   Paragraph within Article:
+
+      /Law/LawBody/MainProvision/Article[@Num='N']
+        /Paragraph[@Num='M']
+
+   Item within Paragraph:
+
+      /Law/LawBody/MainProvision/Article[@Num='N']
+        /Paragraph[@Num='M']/Item[@Num='K']
+
+   Chapter-scoped Article:
+
+      /Law/LawBody/MainProvision/Chapter[@Num='C']
+        /Article[@Num='N']
+
+   Supplementary Provision:
+
+      /Law/LawBody/SupplProvision/Article[@Num='N']
+
+   Critical constraint on @Num values:
+
+      @Num attributes in the e-LAWS XML schema ALWAYS use
+      Arabic numerals (e.g., '32', '49') -- NOT Japanese
+      numerals (三十二, 四十九).  XPath expressions MUST
+      use Arabic numeral form.  A query using Japanese numeral
+      form will fail to match any element in the XML schema.
+
+   Where a Cedar policy derives from multiple provisions within
+   the same law, `article_ref` is an array of XPath expressions.
+   All referenced provisions MUST share the same `endorsed_at`
+   timestamp.
+
+   Example for APPI Article 17, Paragraph 1:
+
+      "/Law/LawBody/MainProvision/Chapter[@Num='4']
+        /Article[@Num='17']/Paragraph[@Num='1']"
+
+4.3.  version_identifier Binding
+
+   [JP:] The `version_identifier` field MUST be the ISO8601
+   date of the most recent amendment to the law as of the date
+   the Cedar policy was certified.
+
+   The `version_identifier` is obtained from the e-LAWS API:
+   query `https://laws.e-gov.go.jp/api/2/lawdata/{law_id}`
+   and read the `EnforcementDate` field of the most recent
+   `AmendmentInfo` entry in the response.
+
+   This value establishes the statutory version the Cedar
+   policy encodes.  The Statute-Primacy Rule (CAP-RRS §10)
+   compares this date against new amendments detected via
+   `amendment_detection_endpoint`.  An amendment with
+   `EnforcementDate` posterior to `version_identifier` triggers
+   `CATALOG_VERSION_CONFLICT`.
+
+   Example:
+
+      "version_identifier": "2022-04-01"
+      (APPI as amended by 2022 revision, enforced April 1, 2022)
+
+4.4.  amendment_detection_endpoint
+
+   [JP:] The `amendment_detection_endpoint` for all laws in
+   the Japan profile is:
+
+      https://laws.e-gov.go.jp/api/2/updatelawlists/{date}
+
+   where `{date}` is the ISO8601 date from which to search for
+   new amendments.  A conforming implementation MUST substitute
+   the `version_identifier` date for `{date}` when polling.
+
+   The endpoint returns a list of laws with amendments enacted
+   after `{date}`.  If the `law_id` of any active Regulation
+   Record appears in this list, the implementation MUST:
+
+   1. Retrieve the amendment details via
+      `https://laws.e-gov.go.jp/api/2/lawdata/{law_id}`
+   2. Confirm the amendment's `EnforcementDate` is posterior
+      to `endorsed_at`
+   3. If confirmed: raise `CATALOG_VERSION_CONFLICT` and
+      suspend the affected Cedar policy per CAP-RRS §10.2
+
+   Polling cadence: per CAP-RRS §11.1, no less than every
+   24 hours for all active Regulation Records.
+
+4.5.  interpretation_endpoint (Provisional)
+
+   [JP:] The e-LAWS API v2 does not currently provide a
+   machine-queryable registry of interpretive instruments
+   (Cabinet Orders clarifying statutory meaning, 解釈指針,
+   内閣法制局意見, court judgments).  The API covers statutory
+   text and amendment history but not interpretive instruments.
+
+   Pending a native Digital Agency capability, the Japan
+   profile uses a provisional SOOS-operated interpretation
+   registry at:
+
+      https://clawed.soosproject.com/jp/interpretations/
+        {law_id}/{article_ref}
+
+   This registry:
+
+   o  Ingests published Cabinet Orders, 解釈指針, and
+      内閣法制局意見 from 官報 (Official Gazette)
+   o  Returns a JSON array of interpretive instruments
+      affecting the specified article:
+
+      {
+        "interpretations": [
+          {
+            "instrument_type":
+              "cabinet_order | ministerial_guidance |
+               court_judgment",
+            "instrument_id": "<identifier>",
+            "effective_date": "<ISO8601 date>",
+            "supersedes_interpretation_id":
+              "<prior interpretation id | null>"
+          }
+        ]
+      }
+
+   A conforming Japan-profile implementation MUST poll this
+   endpoint at no less than 24-hour cadence for each active
+   Regulation Record whose `resolution_basis` is
+   `interpretive_ruling` or `internal_conflict_resolution`.
+
+   The provisional registry scope includes official gazette
+   (官報) instruments only.  Administrative circulars (通達)
+   are excluded from the initial scope pending resolution of
+   JP-OQ-03 (Section 9).
+
+   [JP:] Note: Operating this registry positions the SOOS
+   project and C-Law-ed Code as the reference implementation
+   for Japan's interpretation tracking infrastructure until
+   the Digital Agency builds a native capability.  Transition
+   to a Digital Agency-operated endpoint is anticipated post-
+   Vienna; this document will be updated to reference the
+   Digital Agency endpoint when available.
+
+4.6.  retrieved_at
+
+   The `retrieved_at` field records the ISO8601 timestamp at
+   which the statutory text and version information were
+   retrieved from e-LAWS.  This is required for audit purposes
+   and for the CATALOG_VERSION_CONFLICT event's
+   `conflict_delta_days` calculation.
+
+
+5.  Endorsement Authority Table
+
+5.1.  LawType to Endorser Mapping
+
+   [JP:] The following table maps each e-LAWS LawType to the
+   designated endorsing authority for Cedar policies encoding
+   provisions of that law type.  The designated endorser is
+   the authority whose endorsement_claim in the LRI `endorsement`
+   block is required for the Regulation Record to be active.
+
+   +-----------------------+-----------------+---------------------+
+   | Law tier              | LawType         | Designated          |
+   |                       |                 | endorser            |
+   +-----------------------+-----------------+---------------------+
+   | Constitution          | Constitution    | 内閣法制局          |
+   | Act (法律)             | Act             | 内閣法制局          |
+   | Cabinet Order (政令)   | CabinetOrder    | 内閣法制局          |
+   | Ministerial Ordinance | Ministerial     | 所管省庁            |
+   | (省令)                 | Ordinance       | 法令担当部局        |
+   | Prefecture Ordinance  | Misc            | 都道府県法務・      |
+   | (条例)                 |                 | 法制担当部局        |
+   | Municipal Rule (規則)  | Misc            | 市区町村法務担当    |
+   |                       |                 | (prefecture-level   |
+   |                       |                 | co-endorsement      |
+   |                       |                 | required)           |
+   +-----------------------+-----------------+---------------------+
+
+   Table 1: Japan LawType to Endorsement Authority Mapping
+
+   The `authority_id` URI for each designated endorser:
+
+      内閣法制局:
+        https://www.clb.go.jp/authority
+      所管省庁 (example — Ministry of Digital Affairs):
+        https://www.digital.go.jp/authority
+      都道府県法務・法制担当部局:
+        https://[prefecture-code].pref.jp/authority
+        (see JP-OQ-01 for 全国知事会 standing endorsement
+        alternative)
+
+5.2.  Elevated Authority Requirements
+
+   [JP:] When the `resolution_basis` in the `endorsement` block
+   is not `statute_clear`, the following elevated authority
+   requirements apply:
+
+   resolution_basis = `interpretive_ruling`:
+      The designated endorser per Table 1 remains unchanged.
+      The `resolution_instrument_id` field MUST be populated
+      with the identifier of the Cabinet Order, 解釈指針,
+      or court judgment that provides the interpretive basis.
+      The instrument MUST be findable via the
+      `interpretation_endpoint`.
+
+   resolution_basis = `internal_conflict_resolution`:
+      The Cedar policy encodes a resolution of a conflict
+      within a single statute.  This is a more legally
+      significant act than encoding a clear provision.
+      Regardless of the LawType, 内閣法制局 endorsement
+      is required.  The standard designated endorser from
+      Table 1 is NOT sufficient.
+
+      Rationale: resolving an internal statutory conflict is
+      an interpretive act with constitutional implications.
+      Only the body responsible for the Constitution's
+      authoritative interpretation (内閣法制局) may certify
+      that a specific resolution is legally correct.
+
+   resolution_basis = `cross_statute_coordination`:
+      The Cedar policy encodes a coordination rule between
+      two or more statutes.  Co-endorsement is required
+      per Section 5.3.
+
+5.3.  Co-Endorsement in Japan Context
+
+   [JP:] When `co_endorsement_required` is true (as required
+   for `cross_statute_coordination`), the `co_endorsers` array
+   MUST include an endorsement claim from each authority whose
+   statutory mandate is implicated by the coordination rule.
+
+   The `co_endorsement_quorum` MUST be "all" for
+   `cross_statute_coordination` in Japan deployments.
+
+   Example: disaster response dual command authority
+   (防災庁 勧告権 under 防災庁設置法 §12 + 都道府県知事
+   evacuation authority under 災害対策基本法 §60):
+
+   "co_endorsement_required": true,
+   "co_endorsement_quorum": "all",
+   "co_endorsers": [
+     {
+       "authority_id":
+         "https://cao.go.jp/bosaicho/authority",
+       "authority_role":
+         "防災庁 — 勧告権 basis (防災庁設置法 §12)",
+       "endorsed_at": "<ISO8601 timestamp>",
+       "endorsement_claim": "<signed JWT>"
+     },
+     {
+       "authority_id":
+         "https://cao.go.jp/authority/chiji-coordination",
+       "authority_role":
+         "都道府県知事代表 — 災害救助法 §2 basis",
+       "endorsed_at": "<ISO8601 timestamp>",
+       "endorsement_claim": "<signed JWT>"
+     }
+   ]
+
+   Note: The `authority_id` for 都道府県知事代表 is provisional.
+   JP-OQ-01 (Section 9) documents the open question of whether
+   individual prefectural governors must endorse separately or
+   whether a 全国知事会 standing endorsement is accepted.
+
+
+6.  APPI Chapter IV Translation
+
+6.1.  APPI Overview in CAP-RRS Context
+
+   The Act on the Protection of Personal Information (個人情報の
+   保護に関する法律, 法令ID: 325AC0000000089) Chapter IV
+   specifies handling obligations for business operators
+   (個人情報取扱事業者).  These provisions are the primary source
+   of personal information compliance requirements for AI agents
+   operating in Japan.
+
+   In CAP-RRS tier terms, APPI Chapter IV provisions are Tier 1
+   (jurisdictional legal constraints): they are not absolute
+   constitutional prohibitions (Tier 0), but they are statutory
+   obligations that cannot be waived by operator configuration.
+
+   The complete APPI Chapter IV XPath prefix is:
+
+      /Law/LawBody/MainProvision/Chapter[@Num='4']
+
+   The three worked examples in this section cover:
+   - Article 17: prohibition on unauthorized acquisition
+   - Article 24 (名簿 context): third-party provision of lists
+   - Article 24 (個別避難計画 context): consent asymmetry
+
+6.2.  Worked Example 1: APPI Article 17
+
+   APPI Article 17 Paragraph 1 prohibits a business operator
+   from acquiring personal information by deception or other
+   improper means.
+
+   e-LAWS XPath:
+
+      "/Law/LawBody/MainProvision/Chapter[@Num='4']
+        /Article[@Num='17']/Paragraph[@Num='1']"
+
+   CAP-RRS Regulation Record:
+
+   {
+     "record_id":
+       "appi-17-1-20240401",
+     "tier": "1",
+     "jurisdiction": "JP",
+     "label":
+       "APPI Article 17(1) — Prohibition on Improper
+        Acquisition",
+     "agent_check": {
+       "condition":
+         "action.type == PersonalInformationAcquisition",
+       "prohibition":
+         "action.acquisition_method == ImproperMeans",
+       "disposition": "DENY"
+     },
+     "authority_source": {
+       "lri_version": "1.0",
+       "profile": "https://laws.e-gov.go.jp/lri/v1",
+       "law_id": "325AC0000000089",
+       "article_ref":
+         "/Law/LawBody/MainProvision/Chapter[@Num='4']
+           /Article[@Num='17']/Paragraph[@Num='1']",
+       "version_identifier": "2022-04-01",
+       "retrieved_at": "2026-06-01T09:00:00Z",
+       "amendment_detection_endpoint":
+         "https://laws.e-gov.go.jp/api/2/updatelawlists/
+           {date}",
+       "interpretation_endpoint":
+         "https://clawed.soosproject.com/jp/
+           interpretations/325AC0000000089/
+           Article_17_Paragraph_1",
+       "endorsement": {
+         "authority_id":
+           "https://www.clb.go.jp/authority",
+         "endorsed_at": "2026-06-10T00:00:00Z",
+         "endorsement_scope": "prohibition_predicate_only",
+         "resolution_basis": "statute_clear",
+         "resolution_instrument_id": "",
+         "co_endorsement_required": false,
+         "co_endorsement_quorum": "primary_only",
+         "co_endorsers": [],
+         "endorsement_claim": "<signed JWT>"
+       }
+     }
+   }
+
+6.3.  Worked Example 2: APPI Article 24 (名簿)
+
+   APPI Article 24 governs third-party provision of personal
+   information.  In a disaster response context, a 市区町村
+   may share a welfare recipient register (要支援者名簿) with
+   disaster relief agencies under an exception to the ordinary
+   consent requirement.
+
+   This use case involves APPI Article 24 (third-party provision)
+   and the 災害対策基本法 §49の11 (名簿 sharing provisions).
+   The Regulation Record encodes the permission — not the
+   general prohibition on third-party provision, but the
+   statutory exception operative in disaster declaration.
+
+   e-LAWS XPaths:
+
+   Primary (APPI):
+      "/Law/LawBody/MainProvision/Chapter[@Num='4']
+        /Article[@Num='24']"
+   Secondary (disaster context trigger):
+      "/Law/LawBody/MainProvision/Chapter[@Num='5']
+        /Article[@Num='49']/Paragraph[@Num='11']"
+      (災害対策基本法, 法令ID: 323AC0000000186)
+
+   CAP-RRS Regulation Record:
+
+   {
+     "record_id":
+       "appi-24-disaster-exception-20240401",
+     "tier": "1",
+     "jurisdiction": "JP",
+     "label":
+       "APPI Article 24 — Third-Party Provision Exception
+        (Disaster Declaration)",
+     "agent_check": {
+       "condition":
+         "action.type == PersonalInformationThirdParty AND
+          context.disaster_declaration == true AND
+          action.recipient.type == DisasterReliefAgency",
+       "permission": "PERMIT",
+       "disposition": "PERMIT"
+     },
+     "conflict_declarations": [
+       {
+         "conflict_type": "cross_statute",
+         "primary_law_id": "325AC0000000089",
+         "secondary_law_id": "323AC0000000186",
+         "resolution":
+           "Disaster declaration triggers exception under
+            基本法 §49の11; ordinary APPI §24 prohibition
+            is suspended during declared disaster"
+       }
+     ],
+     "authority_source": {
+       "lri_version": "1.0",
+       "profile": "https://laws.e-gov.go.jp/lri/v1",
+       "law_id": "325AC0000000089",
+       "article_ref": [
+         "/Law/LawBody/MainProvision/Chapter[@Num='4']
+           /Article[@Num='24']",
+         "/Law/LawBody/MainProvision/Chapter[@Num='5']
+           /Article[@Num='49']/Paragraph[@Num='11']"
+       ],
+       "version_identifier": "2022-04-01",
+       "retrieved_at": "2026-06-01T09:00:00Z",
+       "amendment_detection_endpoint":
+         "https://laws.e-gov.go.jp/api/2/updatelawlists/
+           {date}",
+       "interpretation_endpoint":
+         "https://clawed.soosproject.com/jp/
+           interpretations/325AC0000000089/Article_24",
+       "endorsement": {
+         "authority_id":
+           "https://www.clb.go.jp/authority",
+         "endorsed_at": "2026-06-10T00:00:00Z",
+         "endorsement_scope": "full_article",
+         "resolution_basis":
+           "cross_statute_coordination",
+         "resolution_instrument_id": "",
+         "co_endorsement_required": true,
+         "co_endorsement_quorum": "all",
+         "co_endorsers": [
+           {
+             "authority_id":
+               "https://cao.go.jp/bosaicho/authority",
+             "authority_role":
+               "防災庁 — 名簿共有 authority basis",
+             "endorsed_at": "2026-06-10T00:00:00Z",
+             "endorsement_claim": "<signed JWT>"
+           }
+         ],
+         "endorsement_claim": "<signed JWT>"
+       }
+     }
+   }
+
+6.4.  Worked Example 3: APPI Article 24 (個別避難計画)
+
+   The 個別避難計画 (individual evacuation plan) involves a more
+   complex consent structure than the 名簿.  Plans are created
+   with individual consent; however, in a declared disaster the
+   operative question is whether sharing the plan requires fresh
+   consent from an individual who may be incapacitated or
+   unreachable.
+
+   This creates a consent asymmetry: the ordinary rule requires
+   consent; the disaster exception under 基本法 §49の13 allows
+   sharing without consent in specified conditions.  The Cedar
+   policy encoding must be accurate about which rule governs
+   at what moment.
+
+   The critical structural difference from Example 2: the
+   consent asymmetry is an internal conflict within a
+   provision-family (不同意条件 within the plan-sharing rules),
+   not just a cross-statute coordination question.
+   `resolution_basis` is therefore `internal_conflict_resolution`
+   (not `cross_statute_coordination`) until a Cabinet Order
+   or 解釈指針 formally settles the asymmetry.
+
+   "endorsement": {
+     "authority_id": "https://www.clb.go.jp/authority",
+     "endorsed_at": "<ISO8601 timestamp>",
+     "endorsement_scope": "full_article",
+     "resolution_basis":
+       "internal_conflict_resolution",
+     "resolution_instrument_id": "",
+     "co_endorsement_required": false,
+     "co_endorsement_quorum": "primary_only",
+     "co_endorsers": [],
+     "endorsement_claim": "<signed JWT>"
+   }
+
+   Because `resolution_basis` is
+   `internal_conflict_resolution`, 内閣法制局 endorsement
+   is required regardless of the underlying LawType
+   (per Section 5.2).  On issuance of a Cabinet Order
+   settling the consent asymmetry, `resolution_basis`
+   transitions to `interpretive_ruling` and
+   `resolution_instrument_id` is populated with the Cabinet
+   Order number.
+
+6.5.  Consent Asymmetry Resolution
+
+   [JP:] The 名簿 / 個別避難計画 contrast illustrates the
+   general pattern for handling consent asymmetry in
+   disaster response contexts:
+
+   Before formal resolution (Cabinet Order or 解釈指針):
+   o  `resolution_basis`: `internal_conflict_resolution`
+   o  `resolution_instrument_id`: empty string
+   o  Required authority: 内閣法制局 (elevated)
+   o  Cedar policy: CONDITIONAL_PERMIT with explicit
+      disaster_declaration context gate
+
+   After formal resolution:
+   o  `resolution_basis`: `interpretive_ruling`
+   o  `resolution_instrument_id`: Cabinet Order number
+   o  Required authority: designated endorser per Table 1
+   o  Cedar policy: encoding of the formally settled rule
+
+   This transition does not require a new Regulation Record.
+   It is handled as a `resolution_basis` update with
+   re-endorsement by the designated authority, triggering
+   the versioning workflow in CAP-RRS §8.
+
+
+7.  e-Gov Catalog Publication Workflow
+
+7.1.  Catalog Authority Designation
+
+   [JP:] The catalog authority for the Japan e-LAWS LRI profile
+   is the Digital Agency (デジタル庁).
+
+   The Digital Agency's catalog authority role:
+
+   o  Operates the Constitutional Mandate Registry (CMR)
+      instance for Japan-jurisdiction Regulation Records
+   o  Maintains the endorsement authority table (Section 5)
+      as a machine-readable registry published at:
+      https://www.digital.go.jp/soos/authority-registry
+   o  Publishes update notifications to subscribers per
+      CAP-RRS §8.3 when new Regulation Records are added
+      or existing records are versioned
+
+   The Digital Agency operates this function in its role as
+   the coordinating body for legal digitization under the
+   デジタル行政推進法 and the broader AX (Administrative
+   Transformation) program.
+
+7.2.  Publication Workflow Steps
+
+   [JP:] A Regulation Record encoding a Japan-law provision
+   follows this workflow before becoming active in the
+   Constitutional Mandate Registry:
+
+   Step 1 — Draft preparation:
+      A legal compliance specialist drafts the Regulation
+      Record JSON, completing all LRI fields per Section 4.
+      The C-Law-ed Code system may assist with XPath
+      generation and field population from e-LAWS API
+      responses.
+
+   Step 2 — Internal review:
+      The draft is reviewed by the publisher's legal team
+      against the cited statutory text retrieved live from
+      e-LAWS.  The review confirms: (a) the XPath addresses
+      the correct provision, (b) the Cedar compilation
+      would produce the intended enforcement behavior,
+      (c) the `resolution_basis` is correctly classified.
+
+   Step 3 — Endorsement:
+      The completed Regulation Record is submitted to the
+      designated endorsing authority per Table 1.  For Acts
+      and Cabinet Orders, submission goes to 内閣法制局.
+      For Ministerial Ordinances, to the responsible
+      ministry's legal unit.  The endorsing authority
+      reviews, signs the `endorsement_claim` JWT, and
+      returns the signed record.
+
+   Step 4 — IPA co-endorsement (technology-layer records):
+      For Regulation Records that encode obligations
+      requiring technical implementation (e.g., data
+      encryption requirements, access control obligations),
+      IPA provides a co-endorser certification that the
+      Cedar policy correctly implements the legal obligation
+      at the technical layer.  IPA co-endorsement is not
+      required for all Regulation Records -- only those
+      where technical implementation correctness is a
+      separate question from legal text accuracy.
+
+   Step 5 — Catalog publication:
+      The endorsed Regulation Record is submitted to the
+      Digital Agency CMR instance.  The CMR publishes an
+      update notification to subscribers per CAP-RRS §8.3.
+      The record becomes active in GEC policy sets on the
+      next scheduled update cycle.
+
+   Step 6 — Amendment monitoring:
+      The Digital Agency CMR polls the
+      `amendment_detection_endpoint` at 24-hour cadence
+      for each active Regulation Record.  On detection of
+      a new amendment, the workflow in Section 4.4 initiates.
+
+7.3.  IPA Co-Endorsement Model
+
+   [JP:] IPA (独立行政法人情報処理推進機構, Information-
+   technology Promotion Agency) acts as co-endorser for
+   technology-layer compliance records.  IPA's endorsement
+   role is parallel to the role of a compliance certification
+   body in a standards-based compliance framework:
+
+      Legal authority (内閣法制局) certifies:
+        "This Cedar policy correctly encodes
+         this statutory obligation."
+
+      IPA certifies:
+        "This Cedar policy's technical implementation
+         correctly enforces that obligation at the
+         AI agent runtime layer."
+
+   IPA co-endorsement is expressed as an entry in the
+   `co_endorsers` array with:
+
+      "authority_id":
+        "https://www.ipa.go.jp/authority/soos",
+      "authority_role":
+        "IPA — technology-layer compliance certification",
+      "endorsement_claim": "<IPA-signed JWT>"
+
+   `co_endorsement_quorum` is "all" when IPA co-endorsement
+   is present -- the Cedar policy is inactive until both
+   the legal authority's endorsement and IPA's co-endorsement
+   are present in the `endorsement` block.
+
+
+8.  INTERPRETATION_SUPERSEDED in Japan Context
+
+8.1.  Interpretive Instruments in Japan's Legal System
+
+   [JP:] Japan's legal system produces four categories of
+   interpretive instrument that may supersede the
+   interpretive basis of a CAP-RRS Regulation Record without
+   amending the underlying statute:
+
+   Cabinet Order (政令):
+      An Order in Council issued by the Cabinet under
+      Article 73 of the Constitution.  May clarify the
+      application scope of a statutory provision or
+      establish implementing rules.  `instrument_type`:
+      `cabinet_order`.
+
+   Ministerial Guidance (解釈指針):
+      Binding guidance issued by a ministry responsible
+      for administering a statute.  Clarifies interpretation
+      for the administrative context.  `instrument_type`:
+      `ministerial_guidance`.
+
+   Cabinet Legislation Bureau Opinion (内閣法制局意見):
+      A formal legal opinion from 内閣法制局 on the
+      interpretation of a constitutional or statutory
+      provision.  Treated as authoritative by the executive
+      branch.  `instrument_type`: `ministerial_guidance`
+      (pending definition of a dedicated `instrument_type`
+      value for 内閣法制局意見 -- see JP-OQ-04).
+
+   Court Judgment (判決):
+      A judgment by a court of competent jurisdiction
+      establishing binding interpretation of a statutory
+      provision.  `instrument_type`: `court_judgment`.
+
+   In each case, the `law_id` and XPath `article_ref` in the
+   Regulation Record do not change.  The `PromulgationDate`
+   of the underlying statute does not change.  Yet the Cedar
+   policy is wrong -- it encodes a reading of the statute
+   that has been superseded.  This is the gap that the
+   `INTERPRETATION_SUPERSEDED` event and the
+   `interpretation_endpoint` polling (Section 4.5) address.
+
+8.2.  解釈変更 (Interpretation Change) Workflow
+
+   [JP:] When the `interpretation_endpoint` returns a new
+   interpretive instrument with `effective_date` posterior
+   to the Regulation Record's `endorsed_at` timestamp:
+
+   1. The implementation raises `INTERPRETATION_SUPERSEDED`
+      per CAP-RRS §10.3.
+   2. The affected Cedar policy is provisionally suspended.
+   3. HEM escalation is triggered per CAP-RRS §12.
+   4. The Regulation Record is queued for re-endorsement.
+
+   The re-endorsement workflow:
+
+   a. The publisher reviews the new interpretive instrument
+      and, if necessary, updates the Cedar policy to reflect
+      the new interpretation.
+   b. The updated record is submitted for endorsement per
+      Section 7.2 (Steps 3-5).
+   c. On endorsement, `resolution_basis` is updated to
+      `interpretive_ruling` and `resolution_instrument_id`
+      is populated with the instrument identifier.
+   d. The `INTERPRETATION_SUPERSEDED` GAR event's
+      `resolution` block is populated:
+
+      "resolution": {
+        "type": "re_endorsement",
+        "resolved_at": "<ISO8601 timestamp>",
+        "resolved_by":
+          "<endorsing authority_id>",
+        "new_endorsed_at": "<ISO8601 timestamp>",
+        "rationale":
+          "Re-endorsed following [instrument_type]
+           [instrument_id] effective [effective_date]"
+      }
+
+8.3.  信頼保護 Safe Harbor in Japan Context
+
+   [JP:] Agent actions taken under a non-superseded
+   Regulation Record at the time of action are protected
+   from retroactive liability under 信頼保護 (trust
+   protection), a principle recognized in Japan's
+   administrative law tradition and reflected in the
+   CAP-RRS §10.4 safe harbor clause.
+
+   The GAR audit record for an action taken under a
+   subsequently superseded interpretation carries:
+
+   o  The `endorsed_at` timestamp of the then-current
+      endorsement
+   o  The `resolution_basis` and `resolution_instrument_id`
+      of the then-authoritative interpretation
+   o  The `INTERPRETATION_SUPERSEDED.effective_date` of
+      the later ruling (when supersession is detected)
+
+   These three fields, present in an immutable GAR record,
+   constitute the machine-native 信頼保護 instrument for
+   this action.  The GAR record demonstrates that the action
+   was taken under a valid endorsement and that the endorsing
+   authority had not yet been superseded at the time of
+   action.
+
+   In formal terms:
+
+      解釈が変更された場合、変更前の解釈に基づいて
+      エージェントが行った行為は、GAR監査記録によって
+      保護される。コードは自動的に失効するが、過去の
+      行為の正当性は監査チェーンによって確保される。
+
+      (When an interpretation changes, agent actions taken
+      under the prior interpretation are protected by the
+      GAR audit record.  The code automatically lapses,
+      but the legitimacy of past actions is secured by
+      the audit chain.)
+
+   This safe harbor is not a Japan-specific rule -- it is
+   the CAP-RRS §10.4 safe harbor applied to the Japan
+   interpretive instrument taxonomy.
+
+8.4.  Diet Amendment Cycle Alignment
+
+   [JP:] Japan's National Diet (国会) follows a regular
+   amendment cycle: ordinary sessions open January 20
+   (through mid-June), with extraordinary sessions as
+   called.  Major omnibus amendments (一括改正法) are
+   common at the close of ordinary sessions.
+
+   A SOOS-compliant Japan deployment SHOULD increase the
+   `amendment_detection_endpoint` polling frequency to
+   every 6 hours during the 30-day window following the
+   close of each Diet ordinary session (mid-June).  This
+   is a RECOMMENDED operational practice, not a normative
+   requirement -- the 24-hour cadence from CAP-RRS §11.1
+   remains the minimum floor.
+
+   The 防災 domain is particularly affected: amendments to
+   災害対策基本法 and related statutes are frequent
+   following major disaster events.  Deployments targeting
+   disaster response use cases SHOULD apply heightened
+   polling cadence following declared major disasters
+   regardless of the Diet session calendar.
+
+
+9.  Open Issues
+
+   The following open questions are Japan-profile-specific
+   and are expected to be resolved in a subsequent version
+   of this document following engagement with the Digital
+   Agency, 内閣法制局, and 全国知事会.
+
+   JP-OQ-01: 都道府県知事代表 for co-endorsement.
+      For Regulation Records requiring 都道府県知事代表
+      co-endorsement under `cross_statute_coordination`,
+      the open question is whether individual prefectural
+      governors must endorse separately or whether a
+      全国知事会 (National Governors' Association) standing
+      endorsement is accepted as representative.  Individual
+      governor endorsement provides stronger per-prefecture
+      authority but is operationally impractical for
+      national-scale deployments.  全国知事会 standing
+      endorsement is operationally practical but raises
+      questions about delegation authority.  Resolution
+      requires engagement with 内閣法制局 and 全国知事会.
+
+   JP-OQ-02: 解釈指針 instrument_id format.
+      The `resolution_instrument_id` for a 解釈指針 requires
+      a stable, machine-readable identifier.  Two candidate
+      formats exist: (a) 府政防号 citation format (the
+      official gazette reference number), (b) the official
+      gazette page reference.  The Digital Agency may be
+      able to assign stable e-LAWS-integrated identifiers
+      for interpretive instruments as part of the e-LAWS
+      API v3 roadmap.  Resolution requires engagement with
+      the Digital Agency.
+
+   JP-OQ-03: Provisional interpretation registry scope.
+      The SOOS provisional interpretation registry at
+      https://clawed.soosproject.com/jp/interpretations/
+      currently ingests 官報 (Official Gazette) instruments
+      only.  The question is whether administrative circulars
+      (通達) and ministry-level guidance that are not
+      published in 官報 should be included.  通達 may be
+      legally significant for operational interpretation
+      without being formally published in the gazette.
+      Resolution requires legal analysis and engagement
+      with relevant ministries.
+
+   JP-OQ-04: 内閣法制局意見 machine-queryability.
+      内閣法制局意見 (Cabinet Legislation Bureau opinions)
+      are the most authoritative interpretive instrument for
+      constitutional and statutory questions.  It is not
+      currently established whether these opinions are
+      published in a machine-queryable form accessible to
+      the `interpretation_endpoint`.  Resolution requires
+      direct engagement with 内閣法制局.
+
+
+10. Security Considerations
+
+10.1. endorsement_claim JWT Compromise
+
+   The `endorsement_claim` in the LRI `endorsement` block
+   is a signed JWT from the designated endorsing authority.
+   If the signing key for a designated authority (e.g.,
+   内閣法制局) is compromised, an adversary could produce
+   fraudulent endorsement claims for Cedar policies encoding
+   any statutory provision.
+
+   Mitigation: the Constitutional Mandate Registry MUST
+   implement certificate pinning for endorsing authority
+   keys and MUST support key rotation with a minimum notice
+   period of 30 days.  GEC implementations MUST maintain
+   a local endorsement key cache and MUST reject
+   `endorsement_claim` values signed with keys not in the
+   cache.
+
+10.2. amendment_detection_endpoint Tampering
+
+   An adversary who can modify responses from the
+   `amendment_detection_endpoint` could suppress detection
+   of a statutory amendment, keeping a superseded Cedar
+   policy active.
+
+   Mitigation: implementations MUST verify the integrity
+   of the e-LAWS API response against a known public key
+   or HTTPS certificate pinning for the e-LAWS domain.
+   The Digital Agency's e-LAWS API v2 provides HTTPS
+   transport; certificate pinning is RECOMMENDED.
+
+10.3. interpretation_endpoint Injection
+
+   An adversary who can modify responses from the
+   provisional `interpretation_endpoint` at
+   https://clawed.soosproject.com could inject false
+   `INTERPRETATION_SUPERSEDED` events, triggering
+   policy suspension for Cedar policies that are in
+   fact valid.
+
+   Mitigation: the provisional interpretation registry
+   MUST authenticate its API responses with a signed
+   JSON structure.  Implementors MUST verify the
+   registry's response signature before acting on a
+   reported interpretation change.  Long-term mitigation:
+   transition to the Digital Agency-operated endpoint
+   removes the SOOS-operated registry from the trust chain.
+
+10.4. Endorsement Authority Impersonation
+
+   An adversary could register a URI that visually resembles
+   a legitimate endorsing authority URI (e.g.,
+   https://www.clb-go.jp/authority instead of
+   https://www.clb.go.jp/authority) and submit Regulation
+   Records bearing fraudulent endorsement claims.
+
+   Mitigation: the Constitutional Mandate Registry MUST
+   maintain an allow-list of permitted endorsing authority
+   URI domains, validated against the Japan profile
+   authority table (Section 5.1).  Regulation Records
+   bearing `authority_id` URIs not in the allow-list MUST
+   be rejected.
+
+
+11. Privacy Considerations
+
+   This document profiles a protocol for encoding legal
+   compliance obligations as machine-evaluable Cedar policies.
+   The Regulation Records defined in the worked examples
+   (Section 6) encode obligations about personal information
+   handling; they do not themselves contain personal
+   information.
+
+   However, `article_ref` XPath expressions combined with
+   `law_id` and `endorsed_at` timestamps may identify the
+   specific version of a provision that governed a specific
+   agent action in a specific time window.  This combination,
+   when associated with GAR audit records, may constitute
+   metadata about an AI agent's compliance posture that is
+   itself subject to data protection considerations.
+
+   Operators MUST NOT publish GAR records containing
+   Regulation Record references to third parties without
+   prior legal review under APPI Chapter IV and the
+   applicable data protection regime for the jurisdiction
+   of operation.
+
+
+12. IANA Considerations
+
+   This document requests the following registration in the
+   CAP-RRS LRI Profile URI Registry (established by
+   draft-sato-soos-cap-rrs-02 Section 9.7):
+
+   Profile URI:  https://laws.e-gov.go.jp/lri/v1
+   Profile name: Japan e-LAWS LRI Profile v1
+   Document:     draft-sato-soos-cap-rrs-jp-00
+   Contact:      tomsato@myauberge.jp
+   Notes:        Informational profile for Japan's e-LAWS
+                 statutory database.  Endorsement authority
+                 table in Section 5.1.  XPath addressing
+                 per XMLSchemaForJapaneseLaw v3.
+
+
+13. References
+
+13.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to
+              Indicate Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase
+              in RFC 2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017.
+
+   [CAP-RRS]  Sato, T., "Constitutional AI Protocol --
+              Regulation Record Specification",
+              draft-sato-soos-cap-rrs-02, Work in
+              Progress, June 2026.
+
+   [ELAWS]    Japan Ministry of Internal Affairs and
+              Communications / Digital Agency, "e-LAWS Law
+              Database", <https://laws.e-gov.go.jp/>.
+
+   [ELAWS-API] Digital Agency / Ministry of Internal Affairs
+              and Communications, "e-LAWS API v2",
+              <https://laws.e-gov.go.jp/api/2/>, March 2025.
+
+   [ELAWS-XSD] Ministry of Internal Affairs and
+              Communications, "XMLSchemaForJapaneseLaw v3",
+              XMLSchemaForJapaneseLaw_v3.xsd.
+
+13.2.  Informative References
+
+   [CAP]      Sato, T., "Constitutional AI Prohibitions",
+              draft-sato-soos-cap-04, Work in Progress,
+              June 2026.
+
+   [GAR]      Sato, T., "Governed Audit Record",
+              draft-sato-soos-gar-03, Work in Progress,
+              June 2026.
+
+   [HEM]      Sato, T., "Human Escalation Mandate",
+              draft-sato-soos-hem-05, Work in Progress,
+              June 2026.
+
+   [APPI]     Japan, "Act on the Protection of Personal
+              Information", 法令ID: 325AC0000000089,
+              <https://laws.e-gov.go.jp/law/
+              325AC0000000089>.
+
+   [KIHON-HO] Japan, "Basic Act for Disaster
+              Countermeasures", 法令ID: 323AC0000000186,
+              <https://laws.e-gov.go.jp/law/
+              323AC0000000186>.
+
+   [KYUUJO-HO] Japan, "Disaster Relief Act",
+              法令ID: 326AC0000000118,
+              <https://laws.e-gov.go.jp/law/
+              326AC0000000118>.
+
+   [OSCAL]    National Institute of Standards and Technology,
+              "Open Security Controls Assessment Language",
+              <https://pages.nist.gov/OSCAL/>.
+
+   [ELI]      Publications Office of the EU, "European
+              Legislation Identifier",
+              <http://data.europa.eu/eli>.
+
+   [AI-RINCHO] Cabinet Office, Japan, "AI臨調 ディスカッション
+              ペーパー (Themes 21 and 22 — 法令のAX)",
+              2026.
+
+
+Appendix A.  Complete Japan LRI Profile Schema
+
+   The following is the complete Japan LRI profile schema
+   with all Japan-specific fields populated.  Fields marked
+   [JP:] are Japan-profile-specific.  All other fields are
+   as defined in draft-sato-soos-cap-rrs-02 Section 9.2.
+
+   {
+     "authority_source": {
+       "lri_version": "1.0",
+       "profile":
+         "https://laws.e-gov.go.jp/lri/v1",        [JP:]
+       "law_id":
+         "<e-LAWS 法令ID, 15 chars>",               [JP:]
+       "article_ref":
+         "<XPath 1.0 against JP-law v3 schema>",   [JP:]
+       "version_identifier":
+         "<ISO8601 date of most recent amendment>", [JP:]
+       "retrieved_at":
+         "<ISO8601 timestamp of e-LAWS retrieval>",
+       "amendment_detection_endpoint":
+         "https://laws.e-gov.go.jp/api/2/
+           updatelawlists/{date}",                  [JP:]
+       "interpretation_endpoint":
+         "https://clawed.soosproject.com/jp/
+           interpretations/{law_id}/{article_ref}", [JP:]
+       "endorsement": {
+         "authority_id":
+           "<URI per Section 5.1 endorser table>", [JP:]
+         "endorsed_at":
+           "<ISO8601 timestamp>",
+         "endorsement_scope":
+           "prohibition_predicate_only |
+            full_article | paragraph_scope",
+         "resolution_basis":
+           "statute_clear | interpretive_ruling |
+            internal_conflict_resolution |
+            cross_statute_coordination",
+         "resolution_instrument_id":
+           "<instrument id | empty string>",       [JP:]
+         "co_endorsement_required":
+           false,
+         "co_endorsement_quorum":
+           "primary_only | all",
+         "co_endorsers": [],
+         "endorsement_claim":
+           "<signed JWT>"
+       }
+     }
+   }
+
+
+Appendix B.  防災 Statutory Conflict Examples
+
+   This appendix documents two 防災 statutory conflict
+   scenarios that informed the design of the `resolution_basis`
+   field (Section 5.2) and the `INTERPRETATION_SUPERSEDED`
+   workflow (Section 8).
+
+B.1.  §49の11 Internal Contradiction (OQ-BOSAI-001)
+
+   災害対策基本法 §49の11 contains two paragraphs (②③)
+   that, under certain disaster scenarios, impose contradictory
+   obligations:
+
+   o  §49の11② requires the 市区町村長 to share 名簿
+      data with designated relief agencies immediately upon
+      disaster declaration.
+   o  §49の11③ requires confirmation of consent from the
+      data subjects before sharing, subject to conditions.
+
+   In a scenario where the disaster declaration is issued
+   while data subjects are unreachable (e.g., in an
+   evacuation center without communication), ② and ③
+   conflict.
+
+   The Cedar policy encoding the resolution of this conflict
+   has `resolution_basis`: `internal_conflict_resolution`
+   and requires 内閣法制局 endorsement per Section 5.2.
+   The relevant `INTERPRETATION_SUPERSEDED` trigger would
+   be a Cabinet Order or 解釈指針 settling which paragraph
+   governs.
+
+B.2.  Dual Command Authority (OQ-BOSAI-002)
+
+   The 2025 amended 防災庁設置法 §12 grants 防災庁 a
+   勧告権 (recommendation authority) in relation to
+   disaster response.  The pre-existing 災害対策基本法 §60
+   grants evacuation-order authority to 市町村長.
+
+   A Cedar policy coordinating between these two authority
+   chains -- specifying which authority's instruction governs
+   when both have issued instructions affecting the same
+   geographic area -- requires `cross_statute_coordination`
+   `resolution_basis` and co-endorsement from both 防災庁
+   and a 都道府県知事代表, as shown in Section 5.3.
+
+   This case motivated Decision 3 of DR-CAPRRS-INTERP-02:
+   the multi-authority endorsement model.
+
+   Note: 防災庁 is anticipated to begin operations in
+   autumn 2026.  References to 防災庁設置法 in this
+   appendix are based on draft legislation; they will be
+   updated once the final text is enacted.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano
+   Japan
+
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/cap-rrs-jp

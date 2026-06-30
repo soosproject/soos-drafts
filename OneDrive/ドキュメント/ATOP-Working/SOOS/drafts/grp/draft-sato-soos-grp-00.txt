@@ -1,0 +1,1986 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                         14 July 2026
+Expires: 14 January 2027
+
+
+      The Governed Remediation Protocol (GRP) for Agentic AI Systems
+                       draft-sato-soos-grp-00
+
+Abstract
+
+   This document specifies the Governed Remediation Protocol (GRP)
+   for agentic AI systems operating under the Sovereign Object OS
+   (SOOS) framework.  GRP defines the normative remediation action
+   set available to a SOOS governance kernel when agent execution
+   encounters a governed failure condition: FALLBACK (autonomous
+   resource substitution), RETRY (bounded autonomous retry),
+   ESCALATE (human escalation boundary), and ROLLBACK (reversible
+   action undo).  GRP specifies the conditions under which each
+   action class may be taken autonomously and the boundaries at
+   which Human Escalation Messaging (HEM) is required.  GRP
+   operates at the intersection of the Resource Governance Protocol
+   (RGP), the Agent Execution Protocol (AEP), and the Human
+   Escalation Mechanism (HEM), and normatively references the
+   Governance Audit Record (GAR) for logging all remediation events.
+   GRP adopts DEC-RGP-08 (the three-condition autonomous fallback
+   test) verbatim from [I-D.sato-soos-rgp] as the normative FALLBACK
+   action class boundary rule.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 14 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Use Case: Activity Travel Supplier Failure (Ponyhouse Farm)
+     1.2.  Use Case: Disaster Response Route Rerouting
+     1.3.  Use Case: Enterprise Procurement Supplier API Failure
+     1.4.  Relationship to SOOS
+   2.  What GRP Is and Is Not
+     2.1.  What GRP Does
+     2.2.  What GRP Does Not Do
+     2.3.  The Division of Labor
+     2.4.  The Governed Remediation Analogy
+   3.  How GRP Works
+     3.1.  Use Case: Operator Deploying a SOOS-Governed Agent System
+     3.2.  Use Case: Regulator Auditing a Remediation Chain
+     3.3.  Use Case: Developer Integrating GRP Into an Agent
+     3.4.  Use Case: Multi-Condition Failure with Cross-Cluster Impact
+   4.  Conventions and Definitions
+   5.  Architecture Overview
+     5.1.  GRP Position in the SOOS Stack
+     5.2.  Trigger Sources and Action Classes
+     5.3.  Relationship to HEM and GAR
+   6.  Remediation Trigger Types
+     6.1.  GRP-T1: PROHIBITION_BLOCK
+     6.2.  GRP-T2: RESOURCE_FAILURE
+     6.3.  GRP-T3: EXECUTION_FAILURE
+     6.4.  GRP-T4: MANDATE_BOUNDARY
+     6.5.  GRP-T5: CONSENT_ABSENT
+   7.  Change Event Schema
+   8.  Publisher Identity Requirements
+     8.1.  Publisher Types
+     8.2.  P-TYPE-1: SOOS Principal Publisher
+     8.3.  P-TYPE-2: Registered External Publisher
+     8.4.  P-TYPE-3: Well-Known URI Publisher
+     8.5.  External Publisher Registry (EPR)
+     8.6.  Publisher Verification Procedure
+   9.  Receiver Impact Assessment
+     9.1.  Resource Map SO as Dependency Registry
+     9.2.  Impact Assessment Procedure
+     9.3.  Cedar Classification of Remediation Tier
+   10. HEM Remediation Classification
+     10.1. Four-Tier Taxonomy
+     10.2. HEM Class Map by Action Class
+   11. Remediation Action Protocol
+     11.1. FALLBACK Action Class
+     11.2. RETRY Action Class
+     11.3. ESCALATE Action Class
+     11.4. ROLLBACK Action Class
+     11.5. Action Class Ordering Principle
+     11.6. DEC-RGP-08: Three-Condition Autonomous Fallback Test
+   12. Cross-Cluster Coordination
+     12.1. Authority Model (DEC-GRP-04)
+     12.2. Cross-Cluster Signal Verification
+     12.3. GAR Recording for Cross-Cluster Events
+   13. Change Applicability Statement
+   14. PT Audit Record Requirements
+   15. Open Issues
+   16. Security Considerations
+     16.1. Spoofed Change Event Injection
+     16.2. Remediation Loop Exploitation
+     16.3. ROLLBACK Replay
+     16.4. GRP Authority Bypass
+     16.5. Cross-Cluster Propagation Spoofing
+   17. Privacy Considerations
+   18. IANA Considerations
+     18.1. GRP Action Class Registry
+     18.2. GRP ALE Type Registry
+     18.3. GRP Trigger Type Registry
+   19. References
+     19.1. Normative References
+     19.2. Informative References
+   Appendix A.  Worked Example -- Ponyhouse Farm Activity Fallback
+   Appendix B.  Related Work
+     B.1.  Existing Automated Remediation Systems
+     B.2.  Regulatory Instruments
+     B.3.  SOOS Companion Drafts
+
+Author's Address
+
+
+1.  Introduction
+
+   When an AI agent operating under a governed mandate encounters a
+   failure -- a resource goes offline, a Cedar prohibition fires, a
+   session reaches a terminal state it cannot exit -- the question
+   of what happens next is not an implementation detail.  It is a
+   governance question.  An agent that retries indefinitely exhausts
+   its mandate budget without principal authorization.  An agent that
+   silently falls back to a lower-trust resource takes an action its
+   principal never approved.  An agent that abandons a sub-goal
+   without notification leaves a commitment chain broken with no
+   audit record.
+
+   In each case, the failure mode is not that something went wrong.
+   Failures are expected in complex systems.  The failure mode is
+   that the agent's response to failure was not governed -- not
+   bounded by policy, not subject to human escalation where required,
+   not recorded in the audit trail that makes the agent's behavior
+   inspectable.
+
+   This document specifies the Governed Remediation Protocol (GRP):
+   a normative specification of the remediation action set available
+   to a SOOS governance kernel when agent execution encounters a
+   governed failure condition.  GRP defines four action classes --
+   FALLBACK, RETRY, ESCALATE, and ROLLBACK -- with explicit
+   authority boundaries that determine when each action class may
+   proceed autonomously and when it must escalate to a human
+   principal through the Human Escalation Mechanism (HEM).
+
+   GRP closes the gap between prohibition detection and agent
+   response.  The SOOS draft suite specifies what agents can do
+   (CAP), how they declare intent (IDP), how sessions execute (AEP),
+   how resources are discovered (RGP), and how failures are escalated
+   to humans (HEM).  What was missing was a normative specification
+   of what an agent kernel does in the moment of failure -- the
+   governed response that connects failure detection to human
+   oversight.  GRP specifies that response.
+
+   This document is published on the SOOS Project web site at
+   https://soosproject.ai/drafts/grp.
+
+1.1.  Use Case: Activity Travel Supplier Failure (Ponyhouse Farm)
+
+   An ATP-governed booking agent is mid-session assigning a horse
+   trek activity at Ponyhouse Farm (capability class: CAP-EXP,
+   trust level: TRUST-1) to fulfill a guest's itinerary request at
+   MyAuberge K.K.  During the PLAN step, the agent receives an RGP
+   availability update: the horse trek is AT_CAPACITY for the
+   requested date.
+
+   Without GRP, the agent faces an unspecified decision: should it
+   autonomously substitute the farm walk activity (a different
+   product but same supplier), or should it escalate to the operator?
+   The agent has no normative rule to follow.
+
+   With GRP, the kernel evaluates the FALLBACK action class against
+   DEC-RGP-08.  In a deployment with strict sub-type matching, the
+   farm walk covers a different CAP-EXP sub-type from the horse trek
+   (condition 2: capability class coverage at sub-type level fails).
+   GRP routes HEM-PRE-2 to the operator.  The operator approves
+   the substitution.  The fallback is authorized.  ALE-064 through
+   ALE-066 record the complete remediation chain in the GAR.
+
+1.2.  Use Case: Disaster Response Route Rerouting
+
+   A disaster response coordination agent operating under an
+   emergency mandate is executing a route-to-shelter assignment
+   for a district in a governed emergency response deployment.
+   The primary evacuation route (a road network API resource)
+   returns UNAVAILABLE due to an obstruction reported by the local
+   emergency management system.
+
+   GRP receives a GRP-T2 (RESOURCE_FAILURE) trigger.  The kernel
+   evaluates FALLBACK against DEC-RGP-08 for the pre-declared
+   alternate route.  The alternate route API is TRUST-1 (same as
+   primary), covers the same routing capability class (CAP-NET),
+   and the Resource Envelope budget is within mandate bounds.  All
+   three conditions pass.  GRP autonomously activates the alternate
+   route.  The evacuation assignment continues without human delay.
+   ALE-066 (GRP_FALLBACK_ACTIVATED) records the three-condition
+   pass result for post-incident audit.
+
+1.3.  Use Case: Enterprise Procurement Supplier API Failure
+
+   A procurement agent is mid-transaction when its primary supplier's
+   API returns a 503 error.  The mandate allows three autonomous
+   retries.  The GEC executes GRP RETRY twice (ALE-065 recorded for
+   each attempt).  On the third attempt the API remains unavailable.
+   The retry ceiling is reached.
+
+   GRP does not allow a fourth autonomous retry.  The GEC triggers
+   HEM-PRE-2: "Primary supplier API has failed after 3 retry
+   attempts.  Mandate retry limit reached.  Options: (1) wait and
+   retry with principal authorization, (2) activate fallback
+   supplier, (3) terminate session."  The principal chooses option 2.
+   GRP evaluates FALLBACK for the secondary supplier.  All three
+   DEC-RGP-08 conditions pass.  Fallback proceeds under HEM
+   authorization.
+
+1.4.  Relationship to SOOS
+
+   GRP is a coordination layer.  It introduces no new cryptographic
+   or identity primitives.  It specifies the governed coordination
+   of mechanisms already defined in the SOOS draft suite: the
+   fallback boundary rule from RGP (DEC-RGP-08), the escalation
+   protocol from HEM, the audit obligations from GAR, and the
+   session state machine from AEP.
+
+   GRP sits above RGP and AEP in the SOOS stack -- it is the
+   governed response to the failure signals those protocols produce.
+   GRP sits below HEM -- it is the source of escalation requests
+   that HEM processes.  GRP is the normative specification of what
+   happens between a failure condition and a human decision.
+
+
+2.  What GRP Is and Is Not
+
+2.1.  What GRP Does
+
+   GRP specifies what a SOOS governance kernel does when an agent
+   session encounters a governed failure condition.  It defines four
+   action classes, the authority boundary for each (autonomous vs.
+   HEM-required), the GAR obligations for all remediation activity,
+   and the publisher identity requirements that make change event
+   ingestion safe.
+
+   GRP governs: resource substitution (FALLBACK), bounded retry
+   (RETRY), human escalation routing (ESCALATE), and state reversal
+   (ROLLBACK).  For each, GRP specifies the trigger conditions, the
+   autonomous authority scope, the HEM class triggered when
+   autonomous authority is exceeded, and the mandatory GAR record.
+
+2.2.  What GRP Does Not Do
+
+   GRP does not govern kernel software upgrades, GEC configuration
+   changes, or changes to the Cedar policy corpus.  These operations
+   are governed by the Kernel Software Upgrade Protocol [OPS-B] and
+   the CAP-RRS companion specification [I-D.sato-soos-cap-rrs],
+   respectively.
+
+   GRP does not replace HEM.  GRP determines when HEM is triggered
+   and with which HEM interaction class.  The HEM protocol itself --
+   the escalation request structure, the designation chain, the
+   human decision types -- is governed by [I-D.sato-soos-hem].
+
+   GRP does not govern the content of Cedar policies.  CAP
+   [I-D.sato-soos-cap] governs constitutional enforcement.  GRP
+   specifies what happens after a Cedar DENY fires -- the normative
+   agent response -- not the policy that produced the DENY.
+
+   GRP does not specify what AI agents should do in general.  It
+   specifies what the GEC kernel enforces on agent behavior in
+   specific, categorized failure conditions.  An agent cannot opt
+   out of GRP enforcement.  An application cannot suppress it.
+
+2.3.  The Division of Labor
+
+   Three parties operate in the GRP governance model:
+
+   The failure detection layer (RGP, AEP, CAP):  Detects and
+   signals the conditions that trigger GRP -- resource
+   unavailability, session terminal states, Cedar DENY events.
+   These protocols signal to GRP; they do not specify the agent's
+   response.
+
+   The GEC kernel (GRP):  Evaluates the failure condition against
+   the active mandate, classifies the required remediation tier,
+   selects the appropriate action class, evaluates autonomous
+   authority conditions (including DEC-RGP-08), executes autonomous
+   actions where authorized, and triggers HEM where human judgment
+   is required.
+
+   The human principal layer (HEM):  Receives escalation requests
+   routed by GRP, issues one of six defined decision types, and
+   provides the authorization that GRP requires for non-autonomous
+   action class execution.
+
+2.4.  The Governed Remediation Analogy
+
+   Circuit breakers in electrical systems are a useful analogy.
+   A circuit breaker does not interpret the cause of an overload.
+   It applies a pre-configured rule: if current exceeds threshold
+   for a specified duration, interrupt the circuit.  The rule is
+   set by engineers; the breaker executes it deterministically.
+   No one argues that a circuit breaker "makes decisions" about
+   electricity -- it enforces a pre-declared policy.
+
+   GRP applies the same framing to agent failure response.  GRP
+   does not interpret why a resource failed or determine what the
+   best response is.  It applies pre-declared rules: if the RETRY
+   ceiling is reached, interrupt autonomous retry and escalate.
+   If the three-condition test (DEC-RGP-08) fails, do not activate
+   the fallback autonomously; route to the human principal.  The
+   rules are set by mandate issuers and deployment operators; GRP
+   enforces them deterministically.
+
+
+3.  How GRP Works
+
+3.1.  Use Case: Operator Deploying a SOOS-Governed Agent System
+
+   An operator deploying a SOOS-governed procurement agent asks:
+   "What happens when my primary supplier goes offline mid-session?
+   Can my agent continue autonomously, and if so, under what
+   conditions?"
+
+   In a GRP-governed deployment, the answer is: the agent's GEC
+   evaluates DEC-RGP-08 against the available fallback resource.
+   If the fallback is at equal or higher trust level, covers the
+   same capability class, and fits within the mandate budget, the
+   GEC autonomously activates the fallback and logs ALE-066.  If
+   any condition fails, the GEC triggers HEM and routes a
+   structured escalation request to the designated human principal
+   with the option set and the failing condition identified.  The
+   operator can inspect the complete decision chain in the GAR
+   audit record at any time.
+
+3.2.  Use Case: Regulator Auditing a Remediation Chain
+
+   A regulator conducting a post-incident review of an AI agent
+   deployment asks: "How do I reconstruct what the agent did when
+   its primary resource failed, and verify that it had authorization
+   for every non-autonomous action it took?"
+
+   In a GRP-governed deployment, the GAR audit record contains a
+   complete remediation chain: the trigger ALE (resource failure
+   or Cedar DENY), all RETRY attempts (ALE-065), the DEC-RGP-08
+   condition evaluation results (ALE-064 or ALE-066), any HEM
+   escalation event (ALE-067), the human decision record (DRR),
+   and the final resolution or abandonment.  The resolution ALE
+   carries a reference to the initiating trigger ALE, enabling
+   single-query chain reconstruction.
+
+   EU AI Act Article 14 requires that high-risk AI systems include
+   human oversight measures.  GRP's HEM escalation requirements --
+   enforced by the GEC, not declared by the agent -- provide the
+   machine-readable audit trail that supports Article 14 inspection.
+
+3.3.  Use Case: Developer Integrating GRP Into an Agent
+
+   A developer building a SOOS-governed agent system asks: "What
+   do I implement to make my agent GRP-conformant?"
+
+   GRP conformance requires four implementation items:
+
+   (1)  Register all change event publishers in the EPR before
+        session start, or configure well-known URI trust anchors
+        for P-TYPE-3 publishers.  The GEC rejects events from
+        unregistered publishers.
+
+   (2)  Configure the RETRY policy in the MJWT mandate: maximum
+        retry count, retry interval model, and the HEM class to
+        trigger when the ceiling is reached.
+
+   (3)  Pre-declare fallback resources in the IDP Expected Outcome
+        Declaration (EOD) before session start.  The GEC will not
+        autonomously activate a fallback that was not pre-declared
+        in the EOD.
+
+   (4)  Implement the ROLLBACK handler for reversible actions.
+        Every action that can be rolled back MUST expose a rollback
+        endpoint callable by the GEC, with rollback nonce binding
+        to prevent replay.
+
+3.4.  Use Case: Multi-Condition Failure with Cross-Cluster Impact
+
+   A multi-agent system under MAD delegation detects a change event
+   affecting a shared dependency used by three sub-agents in two
+   clusters.  The change event is a GRP-T2 (RESOURCE_FAILURE) with
+   severity "HIGH" affecting a CAP-COMP resource.
+
+   The originating GEC verifies the publisher identity (P-TYPE-2,
+   EPR-registered).  The impact assessment (Section 9) identifies
+   three Resource Map SO entries across two clusters.  Cedar
+   returns remediation tier "approve" for all three (severity HIGH,
+   CAP-COMP, mandate policy requires pre-approval).
+
+   Cross-cluster propagation of the change signal requires SACR
+   authority.  The originating GEC verifies its SACR includes
+   propagation authority.  It signals the receiving-cluster GECs
+   over the MAD authority chain.  Each receiving GEC independently
+   verifies the signal, evaluates its own Resource Map SO, triggers
+   HEM-PRE-2 for its sub-agent, and logs ALE-064 through ALE-065.
+   No cluster acts on the signal until its own verification passes.
+
+
+4.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+   "MAY", and "OPTIONAL" in this document are to be interpreted as
+   described in BCP 14 [RFC2119] [RFC8174] when, and only when,
+   they appear in all capitals, as shown here.
+
+   This document uses the following terms:
+
+   GRP:
+      The Governed Remediation Protocol.  The protocol defined by
+      this document.
+
+   GRP Action Class:
+      One of four normative categories of governed remediation
+      behavior: FALLBACK, RETRY, ESCALATE, ROLLBACK.
+
+   GRP Trigger Type:
+      A categorized failure condition that initiates GRP processing.
+      Five trigger types are defined: GRP-T1 through GRP-T5.
+
+   Change Event:
+      A structured, signed, machine-readable message from a
+      registered publisher indicating that a dependency, resource,
+      or mandate condition relevant to an active agent session has
+      changed.
+
+   External Publisher Registry (EPR):
+      A kernel-managed Sovereign Object containing the set of
+      non-SOOS publishers authorized to emit change events to the
+      GEC.  EPR entries include the publisher's signing key and
+      validity window.
+
+   DEC-RGP-08:
+      The three-condition autonomous fallback test adopted verbatim
+      from [I-D.sato-soos-rgp] Section 13.1 as the normative
+      FALLBACK action class boundary rule in this document.
+
+   Remediation Tier:
+      The Cedar-classified level of authority required to execute
+      a GRP action class: autonomous, notify, approve, or escalate.
+
+   RETRY ceiling:
+      The maximum number of autonomous retry attempts permitted by
+      the active MJWT mandate for a given resource and session.
+
+   GEC (Governance Execution Controller):
+      The runtime kernel component that enforces GRP.  A GEC
+      manages session state, evaluates DEC-RGP-08, triggers HEM,
+      and records GAR ALEs.
+
+   Resource Map SO:
+      The session-scoped Sovereign Object constructed by RGP
+      discovery [I-D.sato-soos-rgp] Section 10.  Serves as the
+      runtime dependency graph for GRP impact assessment.
+
+   SACR:
+      Sub-Agent Composition Record.  Defined in
+      [I-D.sato-soos-mad].  Provides the authority scope for
+      sub-agent operations including cross-cluster propagation.
+
+   rollback_nonce:
+      A session-scoped nonce generated by the GEC at ROLLBACK
+      initiation.  Binds the ROLLBACK event to the current session
+      to prevent replay.
+
+   ALE:
+      Audit Log Entry.  A structured record emitted to the
+      Governance Audit Record (GAR) [I-D.sato-soos-gar].
+
+   HEM:
+      Human Escalation Mechanism [I-D.sato-soos-hem].
+
+   HEM_PENDING:
+      The GEC session state in which HEM is active and no governed
+      object state transitions may execute.
+
+   EOD:
+      Expected Outcome Declaration [I-D.sato-soos-aep].  The
+      pre-declared fallback structure for each critical sub-goal.
+
+   EPR:
+      External Publisher Registry.  See definition above.
+
+   DRR:
+      Decision Rationale Record [I-D.sato-soos-hem].  Captures
+      human principal reasoning for audit purposes.
+
+   propagation_scope:
+      A field in the SACR specifying the cluster identifiers
+      to which the GEC is authorized to propagate change signals.
+
+
+5.  Architecture Overview
+
+5.1.  GRP Position in the SOOS Stack
+
+   GRP sits between the failure detection layer (RGP, AEP, CAP)
+   and the human escalation layer (HEM).  It receives failure
+   signals from the detection layer, evaluates the appropriate
+   action class and authority boundary, executes autonomous actions
+   where authorized, and routes escalation requests to HEM where
+   human judgment is required.
+
+   +-----------------------------------+
+   |   CAP (Cedar DENY)                |  Trigger source: GRP-T1
+   |   AEP (STALLED / ERROR)           |  Trigger source: GRP-T3
+   |   RGP (resource failure)          |  Trigger source: GRP-T2
+   |   MAD (mandate boundary)          |  Trigger source: GRP-T4
+   |   CAP (consent absent)            |  Trigger source: GRP-T5
+   +-----------------------------------+
+                     |
+                     v  Trigger event
+   +-----------------------------------+
+   |      GRP  (this document)         |
+   |                                   |
+   |  1. Publisher identity verify     |
+   |  2. Impact assessment (RGP SO)    |
+   |  3. Cedar remediation tier class  |
+   |  4. Action class selection        |
+   |  5. DEC-RGP-08 eval (FALLBACK)    |
+   |  6. Autonomous execute  OR        |
+   |     HEM trigger                   |
+   |  7. GAR record (ALE-064..069)     |
+   +-----------------------------------+
+          |                  |
+          v autonomous       v HEM required
+   Action executes    HEM_PENDING state
+   ALE-065..069       ALE-067 + HEM class
+                      Human decision -> resume
+
+5.2.  Trigger Sources and Action Classes
+
+   Each GRP trigger type maps to one or more action classes.
+   The mapping is not exclusive: a single trigger may warrant
+   different action classes depending on session context and
+   the Cedar remediation tier classification.
+
+   +---------+-----------------------+------------------------------+
+   | Trigger | Name                  | Eligible Action Classes      |
+   +---------+-----------------------+------------------------------+
+   | GRP-T1  | PROHIBITION_BLOCK     | FALLBACK, ESCALATE           |
+   | GRP-T2  | RESOURCE_FAILURE      | FALLBACK, RETRY, ESCALATE    |
+   | GRP-T3  | EXECUTION_FAILURE     | RETRY, ROLLBACK, ESCALATE    |
+   | GRP-T4  | MANDATE_BOUNDARY      | ESCALATE                     |
+   | GRP-T5  | CONSENT_ABSENT        | ESCALATE                     |
+   +---------+-----------------------+------------------------------+
+
+5.3.  Relationship to HEM and GAR
+
+   HEM [I-D.sato-soos-hem] is the receiving system for all GRP
+   ESCALATE actions.  GRP determines which HEM interaction class
+   is triggered (HEM-PRE-2, HEM-LIM-1, HEM-HIGH-1, HEM-DS-1,
+   HEM-CONSENT) based on the failing condition.  HEM specifies
+   the escalation request structure, the designation chain, and
+   the human decision processing.
+
+   GAR [I-D.sato-soos-gar] records every GRP event in the append-
+   only audit log.  GRP defines ALE-064 through ALE-069 as new
+   entries in the GAR ALE registry.  The complete remediation
+   chain from trigger to resolution or abandonment MUST be
+   reconstructable from GAR ALEs alone.
+
+
+6.  Remediation Trigger Types
+
+   This section normatively specifies the five GRP trigger types.
+
+6.1.  GRP-T1: PROHIBITION_BLOCK
+
+   Trigger condition:  A Cedar policy evaluation by the GEC
+   returns DENY for an action the agent has requested or is
+   executing.
+
+   Source:  CAP constitutional enforcement layer.
+
+   Eligible action classes:  FALLBACK (to a different resource
+   or action type), ESCALATE.  RETRY is NOT eligible for GRP-T1:
+   a Cedar DENY on the same action against the same resource will
+   produce the same result.
+
+   Normative requirement:  The GEC MUST NOT re-evaluate a Cedar
+   DENY action without either (a) activating a FALLBACK to a
+   different action type or resource, or (b) triggering ESCALATE
+   to HEM.
+
+6.2.  GRP-T2: RESOURCE_FAILURE
+
+   Trigger condition:  RGP signals that a resource assigned to
+   an active sub-goal has returned UNAVAILABLE, AT_CAPACITY, or
+   DEGRADED in its Stage 1 fingerprint update.
+
+   Source:  RGP resource availability monitoring.  RGP ALE-025
+   (RGP_RESOURCE_UNAVAILABLE) is the primary GRP-T2 trigger ALE.
+
+   Eligible action classes:  FALLBACK, RETRY, ESCALATE.
+
+   Normative requirement:  The GEC MUST evaluate whether the
+   failure is transient (RETRY eligible) or persistent (FALLBACK
+   or ESCALATE).  A resource that has returned UNAVAILABLE for
+   more than one consecutive availability update SHOULD be treated
+   as persistent.
+
+6.3.  GRP-T3: EXECUTION_FAILURE
+
+   Trigger condition:  The AEP session state machine enters
+   STALLED or ERROR state.
+
+   Source:  AEP session state machine [I-D.sato-soos-aep].
+
+   Eligible action classes:  RETRY (from STALLED if the blocking
+   dependency is transient), ROLLBACK (if the session state can
+   be reversed to a valid prior state), ESCALATE.
+
+   Normative requirement:  The GEC MUST evaluate whether the
+   STALLED or ERROR state is associated with a completed,
+   reversible action before triggering ROLLBACK.  ROLLBACK MUST
+   NOT be triggered for actions that have no defined rollback
+   endpoint.
+
+6.4.  GRP-T4: MANDATE_BOUNDARY
+
+   Trigger condition:  The agent requests an action that MAD
+   mandate validation determines is outside the scope of the
+   active MJWT.
+
+   Source:  MAD mandate validation [I-D.sato-soos-mad].
+
+   Eligible action classes:  ESCALATE only.
+
+   Normative requirement:  The GEC MUST NOT autonomously expand
+   the agent's mandate scope.  Mandate scope extension requires
+   principal authorization through HEM.
+
+6.5.  GRP-T5: CONSENT_ABSENT
+
+   Trigger condition:  A Cedar consent exception check cannot
+   be satisfied for an action involving personal data.
+
+   Source:  CAP consent evaluation layer.
+
+   Eligible action classes:  ESCALATE only.
+
+   Normative requirement:  The GEC MUST NOT proceed with an
+   action requiring consent until consent is obtained and
+   verified.  The HEM-CONSENT class governs the consent
+   acquisition workflow.
+
+
+7.  Change Event Schema
+
+   A change event is a structured, signed, machine-readable
+   message from a registered publisher indicating that a
+   dependency, resource, or mandate condition relevant to an
+   active agent session has changed.
+
+   Change events are the primary external input to GRP.  Full
+   schema formalization (JSON Schema and CDDL binding) is deferred
+   to a second GRP session post-Vienna (OQ-GRP-06).
+
+   Required fields:
+
+   event_id:  REQUIRED.  String.  A unique identifier for this
+      change event instance.  MUST be globally unique within
+      the publisher's event stream.
+
+   publisher_id:  REQUIRED.  String.  The identifier of the
+      registered publisher.  For P-TYPE-1 publishers, this is
+      the GEC's XPID [I-D.sato-soos-kee].  For P-TYPE-2
+      publishers, this is the EPR registry entry identifier.
+      For P-TYPE-3 publishers, this is the well-known URI base.
+
+   publisher_type:  REQUIRED.  Enum.  One of: "P-TYPE-1",
+      "P-TYPE-2", "P-TYPE-3".
+
+   publisher_signature:  REQUIRED.  String.  The publisher's
+      cryptographic signature over the event payload.
+      Signature algorithm and key reference are publisher-type-
+      dependent (Section 8).
+
+   session_nonce:  REQUIRED.  String.  The session-scoped nonce
+      provided by the receiving GEC at session start.  The GEC
+      MUST reject events whose session_nonce does not match the
+      current session.
+
+   event_timestamp:  REQUIRED.  String (ISO 8601).  The time
+      at which the change event was generated.
+
+   change_class:  REQUIRED.  Enum.  Category of change.  Initial
+      values: "RESOURCE_STATE", "DEPENDENCY_UPDATE",
+      "POLICY_UPDATE", "MANDATE_CONDITION".
+
+   affected_component:  REQUIRED.  String.  The identifier of
+      the resource, dependency, or mandate component affected.
+      For RGP resources, this is the resource_id in the Resource
+      Map SO.
+
+   change_severity:  REQUIRED.  Enum.  One of: "LOW", "MEDIUM",
+      "HIGH", "CRITICAL".  Used by Cedar remediation tier
+      classification (Section 9.3).
+
+   remediation_hint:  OPTIONAL.  String.  Publisher-provided
+      suggestion for the preferred GRP action class.  The GEC
+      is NOT required to follow this hint; it MUST perform its
+      own Cedar classification.
+
+   Example change event (JSON):
+
+   {
+     "event_id": "grp-evt-20260714-001",
+     "publisher_id": "ponyhouse.myauberge.jp",
+     "publisher_type": "P-TYPE-3",
+     "publisher_signature": "<JWS compact serialization>",
+     "session_nonce": "ses-nonce-aep-session-001",
+     "event_timestamp": "2026-07-14T10:23:00Z",
+     "change_class": "RESOURCE_STATE",
+     "affected_component": "rgp-resource-horse-trek-001",
+     "change_severity": "MEDIUM",
+     "remediation_hint": "FALLBACK"
+   }
+
+
+8.  Publisher Identity Requirements
+
+8.1.  Publisher Types
+
+   A GRP change event publisher MUST be one of three recognized
+   publisher types.  The GEC MUST reject events from publishers
+   that do not belong to a recognized type with a valid
+   registration.
+
+   +----------+---------------------------+------------------------+
+   | Type     | Identity Requirement      | Trust Model            |
+   +----------+---------------------------+------------------------+
+   | P-TYPE-1 | Registered IDP principal  | Full SOOS trust;       |
+   |          | with active KIA credential| KIA signature chain    |
+   |          |                           | verified by receiving  |
+   |          |                           | GEC                    |
+   | P-TYPE-2 | Non-SOOS publisher        | Trust-on-first-        |
+   |          | registered in EPR with    | registration; EPR      |
+   |          | asymmetric signing key    | entry validates        |
+   | P-TYPE-3 | Publisher exposing        | Discovery-based trust; |
+   |          | /.well-known/soos-grp-    | TLS cert verified      |
+   |          | publisher document        | against pre-configured |
+   |          |                           | trust anchor           |
+   +----------+---------------------------+------------------------+
+
+8.2.  P-TYPE-1: SOOS Principal Publisher
+
+   A P-TYPE-1 publisher is a SOOS principal registered in the
+   IDP registry [I-D.sato-soos-idp] with an active KIA
+   credential [I-D.sato-soos-kia].
+
+   (1)  The publisher MUST sign the change event payload using
+        its GEC KIA signing key.
+
+   (2)  The receiving GEC MUST verify the KIA signature before
+        processing the event.
+
+   (3)  The receiving GEC MUST verify that the publisher's KIA
+        credential has not been revoked [I-D.sato-soos-kia].
+
+   P-TYPE-1 is the highest-trust publisher type and the
+   appropriate type for SOOS kernel components signaling
+   internal change conditions to a peer GEC.
+
+8.3.  P-TYPE-2: Registered External Publisher
+
+   A P-TYPE-2 publisher is a non-SOOS entity registered in the
+   deployment's External Publisher Registry (EPR).
+
+   (1)  The publisher MUST sign change events using an asymmetric
+        key pair registered in the EPR at deployment time.
+
+   (2)  The receiving GEC MUST verify the signature against the
+        EPR entry for the publisher_id in the event.
+
+   (3)  The receiving GEC MUST check the EPR entry's validity
+        window (not_before, not_after) before accepting the
+        publisher's signature as valid.
+
+   (4)  An expired EPR entry MUST cause the event to be rejected
+        as ALE-064 (GRP_EVENT_REJECTED) with rejection_reason:
+        "publisher_registration_expired".
+
+   P-TYPE-2 is the appropriate type for automated systems that
+   generate change signals relevant to SOOS deployments, such as
+   vulnerability feed operators, package registries, and
+   compliance status services.
+
+8.4.  P-TYPE-3: Well-Known URI Publisher
+
+   A P-TYPE-3 publisher exposes a well-known URI at
+   /.well-known/soos-grp-publisher declaring its signing keys
+   and publisher metadata.
+
+   (1)  The GEC MUST fetch and cache the well-known document at
+        session start for each P-TYPE-3 publisher referenced in
+        the active session's expected change event sources.
+
+   (2)  The GEC MUST verify the TLS certificate for the well-
+        known URI against a pre-configured trust anchor before
+        relying on the document.
+
+   (3)  The well-known document MUST include:
+
+        keys:  REQUIRED.  Array of JSON Web Keys [RFC7517]
+           used to sign change events from this publisher.
+
+        publisher_name:  REQUIRED.  String.  Human-readable
+           publisher identifier.
+
+        event_types:  REQUIRED.  Array.  The change_class
+           values this publisher emits.
+
+        not_after:  REQUIRED.  String (ISO 8601).  Document
+           validity expiry.
+
+   (4)  The GEC MUST NOT accept change events from a P-TYPE-3
+        publisher whose well-known URI is not pre-configured
+        in the deployment's trust anchor list.  An agent MUST
+        NOT dynamically extend the publisher trust set during
+        a session.
+
+   P-TYPE-3 is the appropriate type for upstream open source
+   publishers (package registries, vulnerability databases,
+   CVE feeds, GitHub Security Advisories) that cannot be
+   registered as SOOS principals but whose change signals are
+   operationally relevant to SOOS-governed deployments.
+
+8.5.  External Publisher Registry (EPR)
+
+   The External Publisher Registry (EPR) is a kernel-managed
+   Sovereign Object [I-D.sato-soos-sov] that stores the
+   registration records of P-TYPE-2 publishers.
+
+   EPR entries MUST include:
+
+   publisher_id:  REQUIRED.  String.  The unique identifier
+      for this publisher within the deployment.
+
+   signing_key:  REQUIRED.  JSON Web Key [RFC7517].
+
+   not_before:  REQUIRED.  String (ISO 8601).
+
+   not_after:  REQUIRED.  String (ISO 8601).
+
+   event_types_permitted:  REQUIRED.  Array of change_class
+      values this publisher is permitted to emit.
+
+   The EPR MUST be a kernel-managed SO under KIA signing
+   integrity.  Modifications to the EPR MUST be logged to GAR
+   and MUST require deployment operator authorization.
+
+8.6.  Publisher Verification Procedure
+
+   For every received change event, the GEC MUST:
+
+   (1)  Determine publisher_type from the event's publisher_type
+        field.
+
+   (2)  For P-TYPE-1: verify the KIA signature and credential
+        validity.  If verification fails, record ALE-064 with
+        rejection_reason: "kia_signature_invalid" and discard.
+
+   (3)  For P-TYPE-2: look up publisher_id in EPR, verify
+        validity window, verify signature against registered key.
+        If any check fails, record ALE-064 with appropriate
+        rejection_reason and discard.
+
+   (4)  For P-TYPE-3: retrieve cached well-known document,
+        verify signature against well-known keys.  If
+        verification fails, record ALE-064 with rejection_reason:
+        "well_known_signature_invalid" and discard.
+
+   (5)  Verify that the event's session_nonce matches the
+        current session's active nonce.  If not, record ALE-064
+        with rejection_reason: "session_nonce_mismatch" and
+        discard.
+
+   (6)  If all checks pass, the event is admitted for GRP
+        processing.
+
+
+9.  Receiver Impact Assessment
+
+9.1.  Resource Map SO as Dependency Registry
+
+   The normative source for GRP impact assessment scoping is the
+   Resource Map Sovereign Object (RGP Section 10) [I-D.sato-soos-rgp],
+   which serves as the runtime dependency graph for the session.
+   No separate dependency registry primitive is required
+   (DEC-GRP-02).
+
+   The Resource Map SO contains an entry for every resource queried
+   during RGP discovery for the current session, including resources
+   retained with mandate_compatible: false.  The full Resource Map
+   SO is the impact assessment scope.
+
+9.2.  Impact Assessment Procedure
+
+   When a change event is admitted (Section 8.6), the GEC MUST:
+
+   (1)  Query the active session's Resource Map SO for all entries
+        whose resource_id or capability_class matches the
+        affected_component field in the change event.
+
+   (2)  Produce an impact set: the list of matching Resource Map
+        SO entries with their mandate_compatible status,
+        trust_level, and capability_class.
+
+   (3)  If the impact set is empty, record ALE-064 with
+        rejection_reason: "no_impact_match" and take no
+        remediation action.
+
+   (4)  If the impact set is non-empty, proceed to Cedar
+        remediation tier classification (Section 9.3).
+
+9.3.  Cedar Classification of Remediation Tier
+
+   For each entry in the impact set, the GEC MUST evaluate Cedar
+   policy to classify the required remediation tier.  Cedar policy
+   inputs:
+
+   -  change_severity from the change event
+   -  capability_class from the Resource Map SO entry
+   -  mandate_compatible status from the Resource Map SO entry
+   -  remediation_policy from the active MJWT mandate
+
+   The Cedar evaluation MUST produce one of four remediation tiers:
+
+   autonomous:  The GEC may act without HEM escalation, subject
+      to action-class-specific conditions (DEC-RGP-08 for
+      FALLBACK; RETRY ceiling for RETRY).
+
+   notify:  The GEC executes autonomously and MUST emit a
+      notification to designated principals.  No HEM approval
+      is required before action.
+
+   approve:  The GEC MUST trigger the appropriate HEM class
+      (Section 10.2) and MUST NOT execute the action class until
+      a human APPROVE or APPROVE_WITH_CONSTRAINTS decision is
+      received.
+
+   escalate:  The GEC MUST trigger HEM-HIGH-1 and MUST NOT
+      execute any autonomous remediation action.  Only ESCALATE
+      action class is eligible.
+
+   Cedar policy example (informative):
+
+   permit(
+     principal is SOOS::GEC,
+     action == SOOS::Action::"EvaluateRemediation",
+     resource is SOOS::ChangeEvent
+   ) when {
+     resource.change_severity == "LOW" &&
+     resource.mandate_policy.remediation_scope == "autonomous"
+   };
+
+
+10.  HEM Remediation Classification
+
+10.1.  Four-Tier Taxonomy
+
+   GRP classifies every remediation action into one of four tiers
+   based on the Cedar evaluation result (Section 9.3):
+
+   Tier A -- Autonomous:  The GEC executes the action class
+      without HEM escalation.  RETRY within ceiling and FALLBACK
+      when all DEC-RGP-08 conditions pass are Tier A.
+
+   Tier B -- Notify:  The GEC executes autonomously and emits a
+      structured notification to designated principals.  No
+      blocking HEM approval required.
+
+   Tier C -- Approve:  The GEC enters HEM_PENDING.  No action
+      class executes until a human APPROVE decision is received.
+      The specific HEM interaction class depends on the failing
+      condition (Section 10.2).
+
+   Tier D -- Escalate:  The GEC triggers HEM-HIGH-1 and halts
+      autonomous processing.  Human review is required before
+      any further action.
+
+10.2.  HEM Class Map by Action Class
+
+   When GRP requires HEM escalation (Tier C or D), the HEM
+   interaction class is determined by the action class and the
+   failing condition:
+
+   +----------------------------+------------+------------------+
+   | Failing Condition          | Action     | HEM Class        |
+   +----------------------------+------------+------------------+
+   | DEC-RGP-08 Cond. 1         | FALLBACK   | HEM-HIGH-1       |
+   | (trust level decrease)     |            |                  |
+   | DEC-RGP-08 Cond. 2         | FALLBACK   | HEM-PRE-2        |
+   | (capability class mismatch)|            |                  |
+   | DEC-RGP-08 Cond. 3         | FALLBACK   | HEM-DS-1         |
+   | (budget exceeded)          |            |                  |
+   | RETRY ceiling reached      | RETRY      | HEM-PRE-2        |
+   | Mandate scope violation    | ESCALATE   | HEM-HIGH-1       |
+   | (GRP-T4)                   |            |                  |
+   | Consent absent (GRP-T5)    | ESCALATE   | HEM-CONSENT      |
+   | Cedar tier D (any class)   | ESCALATE   | HEM-HIGH-1       |
+   | Post-ROLLBACK review       | (review)   | HEM-HIGH-1       |
+   +----------------------------+------------+------------------+
+
+   If more than one condition fails simultaneously, the GEC MUST
+   escalate with the highest-priority HEM class:
+   HEM-HIGH-1 > HEM-CONSENT > HEM-PRE-2 > HEM-DS-1.
+
+
+11.  Remediation Action Protocol
+
+11.1.  FALLBACK Action Class
+
+   The FALLBACK action class allows the GEC to autonomously
+   substitute an alternative resource for a failed primary
+   resource, subject to DEC-RGP-08 (Section 11.6).
+
+   (1)  FALLBACK MUST only be triggered by GRP-T1 or GRP-T2
+        trigger types.
+
+   (2)  The FALLBACK candidate MUST have been pre-declared in
+        the IDP Expected Outcome Declaration (EOD) as an
+        authorized fallback resource before session start.
+
+   (3)  The GEC MUST NOT autonomously activate a fallback
+        resource that was not pre-declared in the EOD.
+
+   (4)  The GEC MUST evaluate DEC-RGP-08 (Section 11.6) before
+        activating any fallback.
+
+   (5)  If all three DEC-RGP-08 conditions pass, the GEC MUST
+        record ALE-066 (GRP_FALLBACK_ACTIVATED) with autonomous:
+        true and MUST activate the fallback resource.
+
+   (6)  If any DEC-RGP-08 condition fails, the GEC MUST trigger
+        the HEM class specified in Section 10.2, MUST record
+        ALE-064, and MUST NOT activate the fallback resource
+        until a human APPROVE decision is received.
+
+   (7)  A FALLBACK activated under HEM authorization MUST be
+        recorded as ALE-066 with autonomous: false and the
+        human decision DRR reference included.
+
+11.2.  RETRY Action Class
+
+   The RETRY action class allows the GEC to autonomously re-
+   attempt a failed action on the same resource, bounded by the
+   mandate's retry policy.
+
+   (1)  RETRY MUST only be triggered by GRP-T2 or GRP-T3.
+        RETRY is NOT eligible for GRP-T1, GRP-T4, or GRP-T5.
+
+   (2)  The GEC MUST enforce the RETRY ceiling from the active
+        MJWT mandate's retry_policy field.  If no retry_policy
+        field is present, the GEC MUST default to a maximum of
+        3 retry attempts per resource per session.
+
+   (3)  RETRY intervals MUST follow exponential backoff.  The
+        minimum interval MUST be 1 second.  The maximum interval
+        MUST be configurable per deployment.
+
+   (4)  Every RETRY attempt MUST be recorded as ALE-065
+        (GRP_RETRY_ATTEMPTED) including attempt count, elapsed
+        time since trigger, and current mandate budget
+        consumption.
+
+   (5)  When the RETRY ceiling is reached, the GEC MUST NOT
+        attempt further autonomous RETRY.  The GEC MUST trigger
+        HEM-PRE-2 and present the principal with the retry
+        failure context and available options.
+
+11.3.  ESCALATE Action Class
+
+   The ESCALATE action class routes the remediation decision to
+   a human principal via HEM.  ESCALATE is the universal fallback
+   when autonomous remediation options are exhausted or when any
+   autonomous condition fails.
+
+   (1)  ESCALATE is eligible for all five GRP trigger types.
+
+   (2)  The GEC MUST use the HEM class specified in Section 10.2
+        based on the failing condition.
+
+   (3)  The GEC MUST construct a GRP Escalation Package including:
+        the trigger ALE reference, the Cedar remediation tier
+        result, action classes evaluated and their outcomes, the
+        impact set from Section 9.2, and available options for
+        human decision.
+
+   (4)  The GEC MUST enter HEM_PENDING state.  No GRP action
+        class MUST execute during HEM_PENDING.
+
+   (5)  The GEC MUST record ALE-067 (GRP_ESCALATE_TRIGGERED)
+        at HEM entry.
+
+11.4.  ROLLBACK Action Class
+
+   The ROLLBACK action class instructs the GEC to undo a
+   previously executed, reversible action upon detection of a
+   governance violation or terminal session state.
+
+   (1)  ROLLBACK is triggered by GRP-T3 when the session state
+        is STALLED or ERROR, or by detection of a CAP SUSPENDED
+        governance violation.
+
+   (2)  The GEC MUST evaluate whether the action to be rolled
+        back has a defined rollback endpoint before triggering
+        ROLLBACK.  ROLLBACK MUST NOT be triggered for actions
+        with no defined rollback endpoint.
+
+   (3)  The GEC MUST generate a rollback_nonce at ROLLBACK
+        initiation.  The rollback_nonce MUST be session-scoped
+        and MUST be included in the ROLLBACK event.
+
+   (4)  The ROLLBACK event MUST reference the specific ALE
+        sequence number of the action being undone.  The GEC
+        MUST verify that the referenced ALE is within the current
+        session's WAL before executing the rollback.
+
+   (5)  The GEC MUST record ALE-068 (GRP_ROLLBACK_INITIATED)
+        before executing the rollback operation.
+
+   (6)  Upon successful rollback completion, the GEC MUST record
+        ALE-069 (GRP_ROLLBACK_COMPLETED) and MUST trigger
+        HEM-HIGH-1 for human review of the state that required
+        rollback.
+
+   (7)  The GEC MUST reject any subsequent ROLLBACK event for
+        the same action in the same session after ALE-069 is
+        emitted.
+
+11.5.  Action Class Ordering Principle
+
+   An agent SHOULD attempt action classes in order from least
+   to most disruptive.  The recommended ordering is:
+
+   RETRY (if eligible) -> FALLBACK (if eligible) -> ESCALATE
+
+   Exceptions:
+
+   -  GRP-T1 (PROHIBITION_BLOCK) skips RETRY directly to
+      FALLBACK or ESCALATE.
+
+   -  GRP-T4 and GRP-T5 permit only ESCALATE.
+
+   -  ROLLBACK is not part of the progressive ordering.  It is
+      triggered independently by terminal states.
+
+   The GEC MUST record the action classes attempted (and their
+   outcomes) in GAR before triggering ESCALATE.  A human
+   principal receiving a GRP ESCALATE request MUST be informed
+   of all action classes already attempted.
+
+11.6.  DEC-RGP-08: Three-Condition Autonomous Fallback Test
+
+   GRP adopts DEC-RGP-08 verbatim from [I-D.sato-soos-rgp]
+   Section 13.1 as the normative FALLBACK action class boundary
+   rule.  GRP implementors MUST treat [I-D.sato-soos-rgp]
+   Section 13.1 as the authoritative source.
+
+   The following is reproduced for implementor convenience.
+
+   An agent MAY autonomously activate a fallback resource without
+   HEM escalation if and only if ALL THREE of the following
+   conditions are satisfied:
+
+   Condition 1 -- Trust level parity or improvement:  The
+      fallback resource's trust_level MUST be equal to or higher
+      than the unavailable resource's trust_level.  A GEC MUST
+      NOT autonomously fall back to a lower-trust resource.
+
+   Condition 2 -- Capability class coverage:  The fallback
+      resource's capability_class MUST cover the sub-goal
+      assigned to the unavailable resource.  A GEC MUST NOT
+      autonomously substitute a resource of a different
+      capability class.
+
+   Condition 3 -- Resource Envelope compliance:  The fallback
+      resource's cost_model, combined with prior resource
+      commitments in this session, MUST remain within the MJWT
+      Resource Envelope budget.  A GEC MUST NOT autonomously
+      activate a fallback that would cause the session to exceed
+      its mandate budget.
+
+   All three conditions MUST be evaluated against current Stage 1
+   fingerprint data (not cached data older than valid_until) at
+   the moment of fallback activation.
+
+   If any condition fails, the GEC MUST trigger the HEM class
+   specified in Section 10.2.  If more than one condition fails,
+   the GEC MUST trigger the highest-priority HEM class.
+
+   Every DEC-RGP-08 evaluation MUST be recorded in GAR as
+   ALE-064 (if conditions fail) or ALE-066 (if all conditions
+   pass), including the boolean pass/fail for each condition.
+
+
+12.  Cross-Cluster Coordination
+
+12.1.  Authority Model (DEC-GRP-04)
+
+   Cross-cluster change propagation MUST be pre-authorized in
+   the mandate chain; it MUST NOT be negotiated at event time.
+
+   A GEC MAY propagate a change signal to GECs in other clusters
+   governed by the same MAD mandate authority chain only if the
+   originating GEC's active SACR [I-D.sato-soos-mad] includes
+   explicit propagation authority in the propagation_scope field.
+
+   (1)  Propagation authority MUST be declared in the SACR at
+        SACR issuance time in the propagation_scope field: an
+        array of cluster identifiers to which the GEC is
+        authorized to propagate change signals.
+
+   (2)  At propagation time, the originating GEC MUST verify
+        that the target cluster identifier appears in its active
+        SACR's propagation_scope before transmitting the signal.
+
+   (3)  If the target cluster is not in propagation_scope, the
+        originating GEC MUST NOT transmit the signal.
+        Cross-cluster action outside propagation_scope is a
+        mandate boundary violation (GRP-T4).
+
+12.2.  Cross-Cluster Signal Verification
+
+   Every receiving GEC MUST independently verify a received
+   cross-cluster change signal before acting on it.
+
+   (1)  The receiving GEC MUST verify the originating GEC's
+        SACR propagation authority.
+
+   (2)  The receiving GEC MUST verify the originating GEC's
+        KIA signature on the propagated signal.
+
+   (3)  The receiving GEC MUST perform its own independent
+        impact assessment (Section 9.2).  A cross-cluster signal
+        does not inherit the originating cluster's impact
+        assessment.
+
+   (4)  If any verification step fails, the receiving GEC MUST
+        record ALE-064 with rejection_reason:
+        "cross_cluster_authority_failure" and MUST NOT trigger
+        any GRP action class.
+
+12.3.  GAR Recording for Cross-Cluster Events
+
+   The originating GEC MUST record ALE-064 or ALE-066 for the
+   propagation decision.  Each receiving GEC MUST record its own
+   independent ALE-064 or ALE-066.  The complete cross-cluster
+   remediation chain MUST be reconstructable from the GAR records
+   of all participating GECs.
+
+
+13.  Change Applicability Statement
+
+   The Change Applicability Statement (CAS) is a downstream
+   implementor's confirmation that a change signal has been
+   received, verified, assessed, and either acted upon or
+   deferred.  The CAS provides closed-loop audit evidence that
+   change signals were not silently dropped.
+
+   Full CAS schema specification is deferred to a second GRP
+   session post-Vienna (OQ-GRP-02).  The following fields are
+   confirmed as required:
+
+   event_id:  REQUIRED.  Reference to the change event.
+
+   consumer_gec_id:  REQUIRED.  The XPID of the receiving GEC.
+
+   assessment_timestamp:  REQUIRED.  String (ISO 8601).
+
+   impact_set_count:  REQUIRED.  Integer.  Resource Map SO
+      entries matched in impact assessment.
+
+   remediation_tier:  REQUIRED.  Enum.  Cedar-classified tier.
+
+   action_class_selected:  REQUIRED.  The GRP action class
+      selected for execution or escalation.
+
+   resolution_status:  REQUIRED.  Enum.  One of: RESOLVED,
+      ESCALATED, ABANDONED, DEFERRED.
+
+   resolution_ale_ref:  REQUIRED.  Reference to the GAR ALE
+      for the final resolution event.
+
+
+14.  PT Audit Record Requirements
+
+   GRP imposes full GAR [I-D.sato-soos-gar] logging on all
+   remediation activity.  The complete remediation chain from
+   trigger to resolution or abandonment MUST be reconstructable
+   from GAR ALEs alone.
+
+   GRP defines the following ALE types (see Section 18.2):
+
+   ALE-064 (GRP_EVENT_REJECTED):
+      Trigger: publisher verification failure, session nonce
+      mismatch, no impact match, DEC-RGP-08 condition failure,
+      cross-cluster authority failure.
+      Required fields: event_id, publisher_id, rejection_reason,
+      session_id, timestamp, prev_span_hash.
+
+   ALE-065 (GRP_RETRY_ATTEMPTED):
+      Trigger: GRP RETRY action class execution.
+      Required fields: event_id, resource_id, attempt_count,
+      elapsed_ms, mandate_budget_remaining, session_id,
+      timestamp, prev_span_hash.
+
+   ALE-066 (GRP_FALLBACK_ACTIVATED):
+      Trigger: GRP FALLBACK action class execution.
+      Required fields: event_id, primary_resource_id,
+      fallback_resource_id, autonomous (boolean),
+      dec_rgp08_cond1_pass (boolean),
+      dec_rgp08_cond2_pass (boolean),
+      dec_rgp08_cond3_pass (boolean),
+      hem_decision_ref (if autonomous: false),
+      session_id, timestamp, prev_span_hash.
+
+   ALE-067 (GRP_ESCALATE_TRIGGERED):
+      Trigger: GRP ESCALATE action class; HEM entry.
+      Required fields: event_id, hem_class, trigger_type,
+      action_classes_attempted (array), session_id, timestamp,
+      prev_span_hash.
+
+   ALE-068 (GRP_ROLLBACK_INITIATED):
+      Trigger: GRP ROLLBACK action class initiation.
+      Required fields: event_id, target_ale_ref, rollback_nonce,
+      session_id, timestamp, prev_span_hash.
+
+   ALE-069 (GRP_ROLLBACK_COMPLETED):
+      Trigger: GRP ROLLBACK action class completion.
+      Required fields: event_id, target_ale_ref, rollback_nonce,
+      rollback_status (SUCCESS / PARTIAL / FAILED),
+      session_id, timestamp, prev_span_hash.
+
+   Chain traceability requirement:  ALE-069 and the final
+   resolution ALE MUST carry a reference to the initiating
+   trigger ALE.  This enables single-query chain reconstruction:
+   trigger -> attempts -> outcome.
+
+
+15.  Open Issues
+
+   The following open questions are explicitly deferred to a
+   second GRP session post-Vienna.  Implementors SHOULD NOT
+   make normative design choices that depend on resolution of
+   these OQs without consulting the SOOS Project.
+
+   OQ-GRP-02:  Change Applicability Statement schema.  Section 13
+      specifies the minimum confirmed fields.  The complete schema
+      including publication target (PT audit log only, or external
+      registry), media type registration, and whether CAS is
+      REQUIRED or RECOMMENDED is deferred.
+
+   OQ-GRP-03:  Cross-cluster coordination detail.  Section 12
+      specifies the authority model (DEC-GRP-04: pre-authorized
+      via SACR propagation_scope).  The normative query interface
+      for cross-cluster SACR verification, and handling of
+      multi-hop propagation (cluster A -> B -> C), is deferred.
+
+   OQ-GRP-06:  Change event format standardization.  Whether the
+      GRP change event schema (Section 7) should be published as
+      a standalone IETF draft applicable to any protocol
+      maintainer, or remains as a GRP-internal schema, is deferred
+      pending Vienna working group engagement.
+
+
+16.  Security Considerations
+
+   This section identifies attack vectors against the GRP
+   protocol, specifies normative defenses, and characterizes
+   residual risk.  Security Considerations is authored before
+   normative sections in accordance with [SOOS-MANUAL-v1.1].
+
+16.1.  Spoofed Change Event Injection
+
+   Attack name:  Spoofed Change Event Injection
+
+   Mechanism:  An adversary injects a syntactically valid but
+   semantically false change event to cause the GEC to initiate
+   autonomous remediation against a non-existent condition.  The
+   remediation action itself becomes the attack vector: the agent
+   takes a real governance action in response to a false trigger.
+
+   Normative defense:
+
+   (1)  A change event publisher MUST be a recognized publisher
+        type (Section 8.1).  The GEC MUST reject events from
+        unregistered publishers.
+
+   (2)  Every change event MUST carry a publisher signature.
+        The GEC MUST verify the signature before admitting the
+        event (Section 8.6).
+
+   (3)  Change events MUST carry a session_nonce (Section 7).
+        The GEC MUST reject events with non-matching nonces.
+
+   (4)  A change event that fails any verification step MUST be
+        recorded as ALE-064 and MUST NOT trigger any GRP action
+        class.
+
+   Residual risk:  A compromised KIA credential (P-TYPE-1) or
+   EPR signing key (P-TYPE-2) enables false event injection.
+   KIA revocation [I-D.sato-soos-kia] bounds exposure.
+
+16.2.  Remediation Loop Exploitation
+
+   Attack name:  Remediation Loop Exploitation
+
+   Mechanism:  An adversary causes repeated transient failures
+   on a resource to trigger unbounded RETRY cycles, exhausting
+   the mandate budget or saturating the GAR audit log.
+
+   Normative defense:
+
+   (1)  The GEC MUST enforce the RETRY ceiling (Section 11.2).
+
+   (2)  When the ceiling is reached, the GEC MUST NOT attempt
+        further autonomous RETRY and MUST trigger HEM-PRE-2.
+
+   (3)  RETRY intervals MUST follow exponential backoff with
+        a minimum interval of 1 second (Section 11.2).
+
+   (4)  Every RETRY attempt MUST be recorded as ALE-065
+        (Section 14).
+
+   Residual risk:  An adversary with mandate issuance control
+   can set an artificially high RETRY ceiling.  MJWT mandate
+   issuer integrity is governed by KIA.
+
+16.3.  ROLLBACK Replay
+
+   Attack name:  ROLLBACK Replay
+
+   Mechanism:  An adversary replays a previously valid ROLLBACK
+   event to cause the GEC to undo an action that was validly
+   completed after the original rollback, producing inconsistent
+   governance state.
+
+   Normative defense:
+
+   (1)  Every ROLLBACK event MUST carry a session-scoped
+        rollback_nonce (Section 11.4).  The GEC MUST reject
+        ROLLBACK events with non-matching nonces.
+
+   (2)  Once ALE-069 (GRP_ROLLBACK_COMPLETED) is emitted, the
+        GEC MUST reject any further ROLLBACK event for the same
+        action in the same session (Section 11.4).
+
+   (3)  ROLLBACK events MUST reference the specific ALE sequence
+        number of the action being undone.  The GEC MUST verify
+        the referenced ALE is in the current session's WAL
+        before executing (Section 11.4).
+
+   Residual risk:  If the GAR append-only log is compromised,
+   replay detection fails.  GAR tamper-evidence (KEE-1 P7:
+   WAL prev_span_hash + Merkle root) bounds this risk.
+
+16.4.  GRP Authority Bypass
+
+   Attack name:  GRP Authority Bypass
+
+   Mechanism:  An agent or adversary claims autonomous authority
+   for a GRP action class that requires HEM approval -- asserting
+   DEC-RGP-08 conditions are satisfied when they are not.
+
+   Normative defense:
+
+   (1)  All DEC-RGP-08 condition evaluations MUST be performed
+        by the GEC against current Stage 1 fingerprint data.
+        The agent MUST NOT self-certify condition satisfaction
+        (Section 11.6).
+
+   (2)  Cedar policy MUST enforce the HEM escalation requirement
+        for each failed condition.  Cedar, not the agent, is
+        authoritative.
+
+   (3)  Every DEC-RGP-08 evaluation MUST be recorded as ALE-064
+        or ALE-066.  A missing ALE for a FALLBACK activation is
+        a conformance violation (Section 14).
+
+   (4)  A GRP action class execution without a preceding
+        condition-evaluation ALE MUST be treated as a governance
+        violation and MUST trigger ROLLBACK.
+
+   Residual risk:  A compromised GEC can falsify evaluation
+   results.  GEC integrity is governed by KEE-1 P5 (GEC Manifest
+   hash-lock) and KEE-1 P2 (FROST threshold signing at L2/L3).
+
+16.5.  Cross-Cluster Propagation Spoofing
+
+   Attack name:  Cross-Cluster Propagation Spoofing
+
+   Mechanism:  An adversary injects a false change signal that
+   triggers coordinated remediation across a MAD-governed cluster,
+   amplifying a single spoofed event into cluster-wide governed
+   behavior.
+
+   Normative defense:
+
+   (1)  Cross-cluster propagation MUST be pre-authorized in the
+        SACR propagation_scope (Section 12.1).  A signal outside
+        propagation_scope MUST NOT be transmitted.
+
+   (2)  Every receiving GEC MUST independently verify the
+        originating GEC's SACR authority and KIA signature
+        (Section 12.2).
+
+   (3)  A signal that fails cross-cluster verification at any
+        receiving GEC MUST be recorded as ALE-064 with
+        rejection_reason: "cross_cluster_authority_failure"
+        (Section 12.2).
+
+   Residual risk:  If the MAD mandate chain is compromised,
+   cross-cluster authorization is undermined.  MAD mandate
+   integrity is governed by KIA signing [I-D.sato-soos-mad].
+
+
+17.  Privacy Considerations
+
+   Resource identifiers in change events:  The affected_component
+   field (Section 7) MUST NOT contain personal data.  If the
+   affected resource is a CAP-HUMAN resource, the resource_id
+   MUST use a pseudonymous identifier consistent with
+   [I-D.sato-soos-rgp] Privacy Considerations.
+
+   ALE data minimization:  GRP ALEs (ALE-064 through ALE-069)
+   MUST NOT include personal data in any field.  Resource
+   identifiers in ALEs MUST follow the data minimization policy
+   specified in [I-D.sato-soos-gar].
+
+   RETRY history:  ALE-065 records elapsed time and mandate
+   budget consumption.  These fields reveal session timing
+   patterns.  GRP ALE data is subject to the deployment's GAR
+   retention policy.
+
+   Cross-cluster propagation:  Change signals propagated across
+   clusters MUST NOT include personal data in any field.
+
+
+18.  IANA Considerations
+
+18.1.  GRP Action Class Registry
+
+   This document requests IANA to establish a new registry
+   "GRP Action Classes" under the SOOS Protocol Parameters
+   registry group.
+
+   Registration procedure:  IETF consensus.
+
+   Initial entries:
+
+   +----------+--------------------------------------------------+
+   | Class    | Description                                      |
+   +----------+--------------------------------------------------+
+   | FALLBACK | Autonomous resource substitution, subject to     |
+   |          | DEC-RGP-08 three-condition test                  |
+   | RETRY    | Bounded autonomous retry, subject to MJWT retry  |
+   |          | ceiling                                          |
+   | ESCALATE | Route to human principal via HEM                 |
+   | ROLLBACK | Undo a reversible action on governance violation |
+   +----------+--------------------------------------------------+
+
+18.2.  GRP ALE Type Registry
+
+   This document defines the following GAR ALE types for
+   registration in the GAR ALE Type Registry [I-D.sato-soos-gar]:
+
+   ALE-064:  GRP_EVENT_REJECTED
+   ALE-065:  GRP_RETRY_ATTEMPTED
+   ALE-066:  GRP_FALLBACK_ACTIVATED
+   ALE-067:  GRP_ESCALATE_TRIGGERED
+   ALE-068:  GRP_ROLLBACK_INITIATED
+   ALE-069:  GRP_ROLLBACK_COMPLETED
+
+   Full ALE schemas are defined in Section 14 of this document.
+
+18.3.  GRP Trigger Type Registry
+
+   This document requests IANA to establish a new registry
+   "GRP Trigger Types" under the SOOS Protocol Parameters
+   registry group.
+
+   Registration procedure:  IETF consensus.
+
+   Initial entries:
+
+   +--------+----------------------------------------------------+
+   | ID     | Description                                        |
+   +--------+----------------------------------------------------+
+   | GRP-T1 | PROHIBITION_BLOCK -- Cedar DENY event              |
+   | GRP-T2 | RESOURCE_FAILURE -- RGP resource unavailability    |
+   | GRP-T3 | EXECUTION_FAILURE -- AEP STALLED or ERROR state    |
+   | GRP-T4 | MANDATE_BOUNDARY -- MAD mandate scope violation    |
+   | GRP-T5 | CONSENT_ABSENT -- Cedar consent check failure      |
+   +--------+----------------------------------------------------+
+
+
+19.  References
+
+19.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [RFC8446]  Rescorla, E., "The Transport Layer Security (TLS)
+              Protocol Version 1.3", RFC 8446, August 2018.
+
+   [RFC7517]  Jones, M., "JSON Web Key (JWK)", RFC 7517,
+              May 2015.
+
+   [I-D.sato-soos-sov]
+              Sato, T., "The Sovereign Object (SOV) for Agentic
+              AI Systems", draft-sato-soos-sov-02, work in
+              progress, July 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Architecture (KIA) for
+              Agentic AI Systems", draft-sato-soos-kia-03, work
+              in progress, July 2026.
+
+   [I-D.sato-soos-mjwt]
+              Sato, T., "The Mandate JWT (MJWT) for Agentic AI
+              Systems", draft-sato-soos-mjwt-02, work in
+              progress, July 2026.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "The Constitutional Assertion Protocol
+              (CAP) for Agentic AI Systems",
+              draft-sato-soos-cap-04, work in progress, July 2026.
+
+   [I-D.sato-soos-cap-rrs]
+              Sato, T., "The CAP Runtime Ruleset (CAP-RRS) for
+              Agentic AI Systems", draft-sato-soos-cap-rrs-02,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-aep]
+              Sato, T., "The Agent Execution Protocol (AEP) for
+              Agentic AI Systems", draft-sato-soos-aep-02, work
+              in progress, July 2026.
+
+   [I-D.sato-soos-idp]
+              Sato, T., "The Intent Declaration Primitive (IDP)
+              for Agentic AI Systems", draft-sato-soos-idp-05,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM)
+              for Agentic AI Systems", draft-sato-soos-hem-05,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "Governance Audit Record (GAR) for
+              Agentic AI Systems", draft-sato-soos-gar-03, work
+              in progress, July 2026.
+
+   [I-D.sato-soos-mad]
+              Sato, T., "Multi-Agent Delegation (MAD) for
+              Agentic AI Systems", draft-sato-soos-mad-03, work
+              in progress, July 2026.
+
+   [I-D.sato-soos-rgp]
+              Sato, T., "The Resource Governance Protocol (RGP)
+              for Agentic AI Systems", draft-sato-soos-rgp-00,
+              work in progress, July 2026.
+
+   [I-D.sato-soos-kee]
+              Sato, T., "Kernel Execution Environment (KEE-1)
+              for Agentic AI Systems", draft-sato-soos-kee-00,
+              work in progress, July 2026.
+
+19.2.  Informative References
+
+   [EUAIA]    European Parliament and Council of the European
+              Union, "Regulation (EU) 2024/1689 laying down
+              harmonised rules on artificial intelligence
+              (Artificial Intelligence Act)", Official Journal
+              of the European Union, OJ L, 2024/1689, July 2024.
+
+   [SOOS-MANUAL-v1.1]
+              Sato, T., "SOOS Draft Authoring and Web Page
+              Design Manual v1.1", MyAuberge K.K. internal
+              document, June 2026.
+
+   [ATP-ARCH] Sato, T., "Activity Travel Protocol Architecture",
+              https://activitytravel.pro, work in progress, 2026.
+
+   [OPS-B]    Sato, T., "Kernel Software Upgrade Protocol
+              (OPS-B) for SOOS Deployments", work in progress,
+              post-Vienna.
+
+   [CSAF]     OASIS, "Common Security Advisory Format (CSAF)
+              Version 2.0", OASIS Standard, November 2022.
+
+
+Appendix A.  Worked Example -- Ponyhouse Farm Activity Fallback
+
+A.1.  Scenario Setup
+
+   Deployment:  MyAuberge K.K. ATP-governed booking agent.
+   Session:  AEP session "aep-session-booking-20260714-001".
+   Mandate:  MJWT jti "mjwt-booking-20260714".
+      resource_bound: [CAP-EXP, TRUST-1 minimum].
+      retry_policy: {max_retries: 2, backoff_model:
+        "exponential", hem_on_ceiling: "HEM-PRE-2"}.
+      remediation_policy: {severity_LOW: "autonomous",
+        severity_MEDIUM: "autonomous", severity_HIGH: "approve"}.
+   Active Resource Map SO entries:
+      - resource_id: "ponyhouse-horse-trek-001"
+        capability_class: "CAP-EXP", trust_level: "TRUST-1",
+        availability_status: "AVAILABLE",
+        mandate_compatible: true
+      - resource_id: "ponyhouse-farm-walk-001"
+        capability_class: "CAP-EXP", trust_level: "TRUST-1",
+        availability_status: "AVAILABLE",
+        mandate_compatible: true
+   EOD pre-declared fallback:
+      sub-goal "activity_booking_primary":
+        fallback_resource: "ponyhouse-farm-walk-001"
+   Publisher:  P-TYPE-3.
+      well-known URI: https://ponyhouse.myauberge.jp/
+        .well-known/soos-grp-publisher
+      Trust anchor pre-configured in deployment.
+
+A.2.  Change Event Arrival
+
+   GEC receives change event at 2026-07-14T10:23:00Z:
+
+   {
+     "event_id": "ponyhouse-evt-20260714-004",
+     "publisher_id": "ponyhouse.myauberge.jp",
+     "publisher_type": "P-TYPE-3",
+     "publisher_signature": "<valid JWS>",
+     "session_nonce": "ses-nonce-booking-001",
+     "event_timestamp": "2026-07-14T10:23:00Z",
+     "change_class": "RESOURCE_STATE",
+     "affected_component": "ponyhouse-horse-trek-001",
+     "change_severity": "MEDIUM",
+     "remediation_hint": "FALLBACK"
+   }
+
+A.3.  Publisher Verification (Section 8.6)
+
+   GEC retrieves cached well-known document.  TLS certificate
+   verified against pre-configured trust anchor.  Publisher
+   signature verified against well-known keys.  Session nonce
+   matches.  Event admitted for GRP processing.
+
+A.4.  Impact Assessment (Section 9)
+
+   GEC queries Resource Map SO for affected_component
+   "ponyhouse-horse-trek-001".  Match found: capability_class
+   "CAP-EXP", trust_level "TRUST-1", mandate_compatible: true.
+   Impact set: 1 entry.
+
+   Cedar evaluates remediation tier: change_severity "MEDIUM",
+   mandate_policy.remediation_policy.severity_MEDIUM
+   "autonomous".  Cedar returns: Tier A (autonomous).
+
+A.5.  Action Class Selection (Section 11.5)
+
+   Trigger: GRP-T2 (RESOURCE_FAILURE).  Resource has returned
+   AT_CAPACITY.  RETRY on AT_CAPACITY: GEC determines this is
+   a persistent, not transient, failure for the session's
+   booking window.  RETRY not selected.  FALLBACK selected.
+
+A.6.  DEC-RGP-08 Evaluation (Section 11.6)
+
+   Fallback candidate: "ponyhouse-farm-walk-001".
+   Stage 1 fingerprint retrieved at 2026-07-14T10:23:01Z:
+
+   Condition 1 (trust level): farm-walk TRUST-1, horse-trek
+      TRUST-1.  Equal.  PASS.
+
+   Condition 2 (capability class): farm-walk capability_class
+      "CAP-EXP".  Mandate defines CAP-EXP sub-type "ANY_
+      EXPERIENTIAL" as covered for this sub-goal.  Farm walk
+      is a valid CAP-EXP experiential activity.  PASS.
+
+   Condition 3 (budget): farm-walk cost_model 5000 JPY.  Prior
+      commitments: 0 JPY.  Mandate budget: 50000 JPY.  PASS.
+
+   All three conditions PASS.  Autonomous FALLBACK authorized.
+
+A.7.  PERMIT Path -- GAR Recording and Execution
+
+   ALE-066 emitted:
+   {
+     "ale_type": "GRP_FALLBACK_ACTIVATED",
+     "ale_seq": 47,
+     "event_id": "ponyhouse-evt-20260714-004",
+     "primary_resource_id": "ponyhouse-horse-trek-001",
+     "fallback_resource_id": "ponyhouse-farm-walk-001",
+     "autonomous": true,
+     "dec_rgp08_cond1_pass": true,
+     "dec_rgp08_cond2_pass": true,
+     "dec_rgp08_cond3_pass": true,
+     "session_id": "aep-session-booking-20260714-001",
+     "timestamp": "2026-07-14T10:23:02Z",
+     "prev_span_hash": "<hash of ALE-046>"
+   }
+
+   GEC assigns ponyhouse-farm-walk-001 as the active resource
+   for sub-goal "activity_booking_primary".  Session continues.
+
+A.8.  DENY Path -- Condition 1 Failure Scenario
+
+   In a deployment where the fallback resource is a different
+   supplier at TRUST-2 (lower than the TRUST-1 primary):
+
+   Condition 1 (trust level): fallback TRUST-2 < primary
+      TRUST-1.  FAIL.
+
+   GEC MUST NOT activate the fallback autonomously.  GEC
+   triggers HEM-HIGH-1 (trust level decrease -- a compliance
+   risk the principal must accept consciously).
+
+   ALE-064 emitted:
+   {
+     "ale_type": "GRP_EVENT_REJECTED",
+     "rejection_reason": "dec_rgp08_cond1_fail",
+     "dec_rgp08_cond1_pass": false,
+     "dec_rgp08_cond2_pass": true,
+     "dec_rgp08_cond3_pass": true,
+     "session_id": "aep-session-booking-20260714-001",
+     ...
+   }
+
+   ALE-067 emitted (GRP_ESCALATE_TRIGGERED, hem_class:
+   "HEM-HIGH-1").
+
+   Session enters HEM_PENDING.  Principal is notified.
+   Principal may APPROVE the lower-trust fallback, REDIRECT
+   to a different option, or TERMINATE the session.
+
+A.9.  Audit Chain Reconstruction
+
+   A regulator conducting post-session audit queries GAR for
+   session "aep-session-booking-20260714-001".  The ALE-066
+   record (PERMIT path) or ALE-064 + ALE-067 sequence (DENY
+   path) provides the complete fallback decision with DEC-RGP-08
+   condition results and human decision reference.  The complete
+   remediation chain is reconstructable from GAR alone.
+
+
+Appendix B.  Related Work
+
+B.1.  Existing Automated Remediation Systems
+
+   Dependabot and Renovate provide automated dependency update
+   systems for software repositories.  Both detect dependency
+   changes and propose or apply updates.  Neither provides a
+   governance layer, identity verification for change event
+   publishers, principal sovereignty model, or human escalation
+   boundary for changes that exceed autonomous authority scope.
+   GRP is the governance infrastructure that makes automated
+   remediation systems safe for use in agentic AI deployments
+   where the agent's actions have real-world consequences.
+
+   CSAF (Common Security Advisory Format) [CSAF] provides a
+   machine-readable format for security advisories.  CSAF
+   defines the change event content format; it does not specify
+   the governed response to a change event.  A CSAF advisory
+   feed can serve as a P-TYPE-3 publisher in a GRP deployment.
+
+   No existing automated remediation system combines: (1) a
+   governance layer binding remediation actions to principal
+   mandate authority, (2) identity verification for change event
+   publishers, (3) a normative human escalation boundary for
+   changes that exceed autonomous authority scope, and (4) a
+   complete audit trail enabling post-incident chain
+   reconstruction.  GRP is the first specification to address
+   all four together.
+
+B.2.  Regulatory Instruments
+
+   EU AI Act Article 14 (Human oversight) requires that
+   providers of high-risk AI systems ensure those systems can
+   be effectively overseen by natural persons.  GRP's ESCALATE
+   action class and HEM integration provide the protocol-level
+   mechanism for human oversight in the specific context of
+   agent failure response -- the moment when oversight is most
+   needed.
+
+   EU AI Act Article 17 (Quality management system) requires
+   that providers of high-risk AI systems establish a quality
+   management system covering incident examination.  GRP's
+   mandatory GAR logging of the complete remediation chain
+   (ALE-064 through ALE-069) provides the machine-readable
+   incident record supporting Article 17 requirements.
+
+   Japan AI Rincho Item 23 identifies human oversight of
+   autonomous AI decision-making as a priority governance
+   requirement.  GRP's HEM integration implements a protocol-
+   level oversight boundary consistent with Item 23.
+
+B.3.  SOOS Companion Drafts
+
+   RGP [I-D.sato-soos-rgp]:  DEC-RGP-08 (RGP Section 13.1)
+   is adopted verbatim as the normative FALLBACK boundary rule
+   in GRP Section 11.6.  RGP ALE-025 is the primary GRP-T2
+   trigger.  GRP depends on RGP for the three-condition test
+   and the Resource Map SO dependency graph.
+
+   AEP [I-D.sato-soos-aep]:  AEP STALLED and ERROR states are
+   GRP-T3 trigger sources.  The EOD pre-declares fallback
+   resources that GRP may activate.  GRP depends on AEP for
+   session state and fallback pre-declaration.
+
+   HEM [I-D.sato-soos-hem]:  All GRP ESCALATE actions route
+   through HEM.  GRP specifies which HEM interaction class is
+   triggered for each failing condition (Section 10.2).  GRP
+   is the primary source of remediation-context escalation
+   requests to HEM.
+
+   CAP [I-D.sato-soos-cap]:  Cedar DENY events (GRP-T1) are
+   produced by CAP.  GRP specifies the governed response to
+   Cedar DENY.  CAP SUSPENDED state triggers ROLLBACK.
+
+   MAD [I-D.sato-soos-mad]:  SACR propagation_scope governs
+   cross-cluster change propagation (Section 12).  GRP-T4
+   originates from MAD mandate scope validation.
+
+   GAR [I-D.sato-soos-gar]:  GRP defines ALE-064 through
+   ALE-069.  GAR provides the tamper-evident audit log.
+
+   IDP [I-D.sato-soos-idp]:  Fallback resources MUST be pre-
+   declared in the IDP EOD.  P-TYPE-1 publisher verification
+   uses IDP principal registration.
+
+   KIA [I-D.sato-soos-kia]:  P-TYPE-1 publisher verification
+   uses KIA signature verification.  GEC integrity (Section
+   16.4) is governed by KEE-1 P5 and P2.
+
+   SOV [I-D.sato-soos-sov]:  The EPR is a kernel-managed SO
+   instance.  GRP depends on SOV for the SO type framework.
+
+   MJWT [I-D.sato-soos-mjwt]:  The RETRY ceiling and
+   remediation_policy are specified in the active MJWT mandate.
+   GRP depends on MJWT for mandate authority constraints.
+
+   KEE-1 [I-D.sato-soos-kee]:  GEC integrity guarantees for
+   DEC-RGP-08 evaluation (Section 16.4) are governed by KEE-1
+   P5 (GEC Manifest hash-lock) and P2 (FROST threshold signing).
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/grp

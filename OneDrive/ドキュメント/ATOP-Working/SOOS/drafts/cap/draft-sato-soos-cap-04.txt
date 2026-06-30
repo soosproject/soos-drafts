@@ -1,0 +1,2541 @@
+Internet Engineering Task Force                              T. Sato
+Internet-Draft                                       MyAuberge K.K.
+Intended Status: Standards Track                        28 June 2026
+Expires: 28 December 2026
+
+
+           The Constitutional AI Protocol (CAP) for Agentic AI Systems
+                        draft-sato-soos-cap-04
+
+Abstract
+
+   An AI agent's authorization system determines what it is permitted
+   to do.  A human principal's escalation decision determines what
+   they authorize.  Neither of these is sufficient on its own: a
+   Cedar policy can permit market manipulation; a human principal can
+   authorize fraud.  Authorization systems answer the question "who
+   decided?"  The Constitutional AI Protocol answers a different
+   question: "was that decision lawful?"
+
+   CAP defines a Constitutional Layer that evaluates every AI action
+   request and every human authorization decision against a three-tier
+   prohibition model -- before Cedar evaluates the action and before
+   the system executes the human's decision.  Tier 0 prohibitions are
+   derived from near-universal treaty consensus and are unconditional:
+   no agent, operator, or human principal can authorize them.  Tier 1
+   prohibitions are jurisdiction-specific and operator-declared.  Tier
+   2 prohibitions are voluntary operator ethical standards.
+
+   This document also specifies the Prohibition Clearance Mechanism
+   (PCM): the process by which specific Tier 0 and Tier 1 prohibition
+   classes may be cleared for specific deployment contexts --
+   either at implementation time by the operator or by formal
+   regulatory authority -- while preserving an absolute prohibition
+   floor for CSAM and genocide facilitation under any circumstances.
+
+   The Sovereign Object OS (SOOS) is the reference implementation of
+   the Governance Execution Controller (GEC) pattern on which CAP is
+   built.
+
+   CAP also defines the GEC Policy Transparency Disclosure (PTD): a
+   signed, queryable, tier-structured document through which any
+   external party may determine which laws and regulations a GEC is
+   actively enforcing, at what authority tier, and under whose
+   governance.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 28 December 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   obligations with respect to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+   2.  What CAP Is and Is Not
+     2.1.  What CAP Does
+     2.2.  What CAP Does Not Do
+     2.3.  The Division of Labor
+     2.4.  The SWIFT Analogy
+     2.5.  Regulatory Conflict and Ambiguity
+   3.  How CAP Works
+     3.1.  Use Case 1 -- A Lawyer Reviews a CAP-Governed System
+     3.2.  Use Case 2 -- A Regulator Investigates an Incident
+     3.3.  Use Case 3 -- A Government Agency Deploys SOOS
+     3.4.  Use Case 4 -- Two Jurisdictions Conflict
+   4.  Conventions and Definitions
+   5.  Architecture Overview
+     5.1.  The Double-Evaluation Property
+     5.2.  Relationship to HEM
+     5.3.  Relationship to Cedar Policy Evaluation
+   6.  Constitutional Evaluation Engine (CEE)
+     6.1.  CEE Placement in the GEC
+     6.2.  CEE Evaluation Protocol
+     6.3.  CEE Outputs
+   7.  Tier 0 -- Universal Core Prohibitions
+     7.1.  Tier 0 Properties
+     7.2.  Tier 0-A -- Absolute Prohibitions
+     7.3.  Tier 0-B -- Qualified Prohibitions
+     7.4.  Tier 0 Prohibition Schema
+     7.5.  Tier 0 Modification
+   8.  Tier 1 -- Jurisdictional Prohibition Layer
+     8.1.  Tier 1 Properties
+     8.2.  Tier 1 Prohibition Classes
+     8.3.  Tier 1 Prohibition Schema
+     8.4.  Jurisdiction Configuration
+     8.5.  Tier 1 Verification
+     8.6.  Legal Ambiguity Declaration
+     8.7.  Cedar Policy Conflict Resolution Rule  [NEW in -04]
+     8.8.  Catalog Load Validation               [NEW in -04]
+     8.9.  Catalog Update Propagation            [NEW in -04]
+   9.  Tier 2 -- Operator Ethical Layer
+     9.1.  Tier 2 Properties
+     9.2.  Tier 2 Prohibition Schema
+     9.3.  Tier 2 Disclosure
+   10.  Tier 3 -- Resource and Usage Policies
+     10.1.  Tier 3 Properties
+     10.2.  Tier 3 and CAP-RRS
+   11.  Prohibition Clearance Mechanism
+     11.1.  Purpose
+     11.2.  What Cannot Be Cleared
+     11.3.  Mode 1 -- Deployment Scope Declaration
+     11.4.  Mode 2 -- Regulatory Clearance Record
+     11.5.  CEE Behavior with an Active Clearance
+     11.6.  Clearance Record Schema
+     11.7.  Clearance Registry
+   12. CAP Violation Handling
+     12.1. AI-Initiated Violations
+     12.2. Human-Directed Violations
+     12.3. APPROVE_WITH_LEGAL_BASIS
+     12.4. CAP Violation Record Schema
+     12.5. Session Suspension
+   12a. GEC Policy Transparency Disclosure
+     12a.1. Purpose and Regulatory Basis
+     12a.2. PTD Schema
+     12a.3. Tier Disclosure Rules
+     12a.4. PTD Query Interface
+     12a.5. Regulatory Override Prohibition
+     12a.6. CAP_TRANSPARENCY_VIOLATION
+     12a.7. Tier 0 OSCAL Reference Catalog      [NEW in -04]
+   13. Jurisdictional Conflict Resolution
+     13.1. Conflict Detection
+     13.2. Conflict Resolution Methods
+     13.3. HEM_JURISDICTIONAL_CONFLICT
+     13.4. Jurisdictional Conflict Record Schema
+     13.5. OTel Governance Attribute Emission   [NEW in -04]
+   14. Event Log Requirements
+   15. EU AI Act Applicability
+     15.1. Article 5 Mapping
+   16. Security Considerations
+   17. IANA Considerations
+     17.1. CAP Prohibition Classes Tier 0 Registry
+     17.2. CAP Prohibition Classes Tier 1 Registry
+     17.3. CAP Conflict Resolution Methods Registry
+     17.4. CAP Deployment Context Registry
+     17.5. CAP Error Codes Registry
+     17.6. CAP ALE Types Registry                [NEW in -04]
+   18. References
+     18.1. Normative References
+     18.2. Informative References
+   Appendix A.  Worked Example -- A Travel Booking in Two Jurisdictions
+   Appendix B.  Related Work
+     B.1.  Existing Constitutional AI Frameworks
+     B.2.  EU AI Act Article 5
+     B.3.  AIPREF
+     B.4.  SOOS Companion Drafts
+   Appendix C.  Vibe Coding Assets
+     C.1.  Protocol Summary
+     C.2.  Key Identifiers
+     C.3.  Canonical Reference
+   Author's Address
+
+
+1.  Introduction
+
+   Every legal system recognizes that some acts are wrong regardless
+   of who orders them.  A soldier ordered to commit genocide cannot
+   comply.  A bank ordered by management to launder money cannot
+   comply.  A police officer ordered to torture a suspect cannot
+   comply.  These prohibitions exist above any individual's authority
+   -- they are non-delegable limits on what any actor can do,
+   regardless of the instruction chain above them.
+
+   Agentic AI systems do not have this property today.
+
+   An AI agent operates under an authorization framework -- Cedar
+   policies, mandate credentials, human escalation decisions -- that
+   determines what it is permitted to do.  These frameworks are
+   powerful and flexible.  Their flexibility is their limitation: they
+   can be configured to authorize harmful or unlawful actions.  A
+   human principal sitting in the HEM decision seat can issue an
+   APPROVE decision on a market manipulation action.  The HEM
+   executes it.  The human-AI system has committed a crime.  The
+   authorization framework did its job; the law was still broken.
+
+   The Human Escalation Mechanism [I-D.sato-soos-hem] is a necessary
+   governance layer.  It stops the AI and waits for a human principal
+   to decide.  It is not sufficient on its own, because HEM has no
+   mechanism to evaluate whether a human principal's decision is
+   itself lawful.
+
+   The Constitutional AI Protocol (CAP) closes this gap.
+
+   CAP places a Constitutional Layer above all principal authority.
+   It evaluates every AI action request before Cedar, and every human
+   principal decision before execution.  A Tier 0 absolute prohibition
+   is refused before Cedar is consulted, before HEM fires, before any
+   principal is asked.  No one in the system can override it -- not
+   the agent, not the operator, not the human principal in the
+   escalation seat.
+
+   CAP's purpose is not primarily prohibition.  Most AI agent actions
+   are lawful.  CAP makes lawful actions legally traceable: every
+   authorized action carries a policy rationale; every disputed action
+   carries the principal's legal basis citation.  CAP makes unlawful
+   action attempts visible in the audit record before harm occurs.
+   Every actor claims their actions are lawful.  CAP says: prove it.
+   Cite the authority.  It goes in the log.
+
+   Version -01 of this document added the Prohibition Clearance
+   Mechanism (PCM).  Version -02 added Tier 3 (Resource and Usage
+   Policies, Section 10) and a normative reference to the companion
+   Regulation Record Specification [I-D.sato-soos-cap-rrs].  Version
+   -03 added the GEC Policy Transparency Disclosure (PTD, Section
+   12a).  Version -04 adds:
+
+   o  Three new Tier 0-A absolute prohibitions: MANIPULATION,
+      PERFORMED_EMOTION, and BIOMETRIC_SIGNAL_INFERENCE (Section 7.2).
+
+   o  Cedar Policy Conflict Resolution Rule -- explicit normative
+      ordering when cross-tier Cedar policies conflict (Section 8.7).
+
+   o  Catalog Load Validation -- conflict detection at GEC startup
+      and catalog update time, with ALE-NEW-02 (Section 8.8).
+
+   o  Catalog Update Propagation -- four-phase workflow for law
+      amendment: Detection, Suspension, Re-publication, Re-activation;
+      SUSPENDED as a new CEE output (Sections 8.9 and 6.3).
+
+   o  MJWT consent_scope Cedar context population -- normative mapping
+      from MJWT [I-D.sato-soos-mjwt] consent_scope claims to Cedar
+      context fields at session start (Section 5.4).
+
+   o  Tier 0 OSCAL Reference Catalog -- a canonical OSCAL-format
+      reference catalog published at soosproject.ai (Section 12a.7).
+
+   o  OTel Governance Attribute Emission -- mandatory soos.cap.*
+      span attributes on every Cedar evaluation (Section 13.5).
+
+   Tier 0 and Tier 1 prohibition classes are protocol defaults, not
+   universal mandates.  A government defense research laboratory may
+   have statutory authority to work with materials that would
+   otherwise fall under WMD_ASSISTANCE.  A law enforcement agency may
+   have judicial authority to engage with content that would otherwise
+   trigger HUMAN_TRAFFICKING prohibitions.  The PCM provides a formal,
+   audited, time-bounded mechanism for such clearances -- while
+   preserving an absolute floor of classes (CSAM, genocide
+   facilitation, and the three new -04 additions) that cannot be
+   cleared under any authority or circumstance.
+
+   This specification is a companion to [I-D.sato-soos-idp] and
+   [I-D.sato-soos-hem].  Readers should be familiar with both before
+   reading this document.
+
+
+2.  What CAP Is and Is Not
+
+   Before reading the technical specification, it is worth being
+   precise about what CAP does and does not do.  This matters because
+   the wrong framing invites regulatory and legal objections that the
+   right framing avoids entirely.
+
+2.1.  What CAP Does
+
+   CAP is a machine-executable compliance ledger.  It maintains a set
+   of rules -- derived from human-written regulations, encoded by
+   qualified legal engineers, verified by Audit Principals -- and
+   applies those rules deterministically to every AI agent action.
+
+   When an AI agent requests an action, the CEE checks the action
+   against the loaded rule set.  If the action matches a rule, the
+   CEE executes the declared response: DENY the action unconditionally,
+   route it to a human principal via HEM, require a legal basis
+   citation, or flag it as legally ambiguous for human review.  The
+   CEE then records what happened in the audit trail.
+
+   That is the complete scope of what CAP does.  Rules in; decisions
+   out; records kept.
+
+2.2.  What CAP Does Not Do
+
+   CAP does not interpret law.
+
+   CAP does not determine whether an action "constitutes" a legal
+   concept.  It cannot determine whether a pricing algorithm is
+   "discriminatory" under a given statute, whether a data transfer
+   "violates" a treaty, or whether a content recommendation "exploits"
+   a vulnerable group.  These are legal determinations.  Courts make
+   them.  Regulators make them.  Lawyers advise on them.  CAP does not.
+
+   What CAP does is execute the output of that legal determination,
+   once a qualified human has made it and encoded it as a rule.
+
+   This distinction matters for two audiences:
+
+   For lawyers: CAP does not claim legal authority.  It claims only
+   that it faithfully executes rules that humans with legal authority
+   have produced.  A CAP-governed system does not "apply the law" --
+   it applies a machine-readable encoding of a legal engineer's
+   interpretation of the law, reviewed by counsel and signed by an
+   Audit Principal.  The law applies; CAP executes the instructions
+   that qualified humans derived from the law.
+
+   For regulators and politicians: CAP does not make decisions about
+   people's rights.  It routes actions to humans when legal ambiguity
+   is detected.  It records what humans decided.  It makes human
+   accountability traceable, not automatic.
+
+2.3.  The Division of Labor
+
+   The correct division of labor in a CAP-governed deployment is:
+
+   Legislators write regulations in natural language.
+
+   Legal engineers, instructed by lawyers, translate regulations into
+   CAP Regulation Records -- machine-readable rule definitions with
+   explicit action patterns and declared CEE responses.  This
+   translation is a human act of legal interpretation.  CAP provides
+   the format; humans provide the legal content.
+
+   Audit Principals review and sign every CAP Regulation Record before
+   it takes effect.  An unsigned record cannot be loaded.
+
+   The CEE executes the signed records deterministically.  When a
+   record is flagged as legally ambiguous -- because the legal engineer
+   was uncertain whether a specific action pattern falls within the
+   regulation's scope -- the CEE routes to HEM and surfaces the
+   ambiguity to a human principal.
+
+   Human principals make decisions on ambiguous cases.  Their
+   decisions are recorded.  Over time, accumulated human decisions
+   on ambiguous patterns provide the legal engineer with evidence to
+   refine the action pattern -- narrowing or broadening it to reflect
+   actual legal practice in the jurisdiction.
+
+   The GEC keeps the record of every decision: what rule fired, what
+   the CEE decided, what the human decided, and what legal basis was
+   cited.  Regulators can inspect that record.  Courts can review it.
+
+2.4.  The SWIFT Analogy
+
+   The closest existing analogy is financial sanctions screening.
+
+   OFAC publishes a sanctions list in natural language: "transactions
+   with entities in the following list are prohibited."  A compliance
+   engineer loads the list into a payment screening system.  The system
+   pattern-matches every transaction against the list.  Matches are
+   flagged; compliance officers review flagged transactions.  The
+   system does not interpret sanctions law -- it executes a list that
+   humans produced from their interpretation of sanctions law.  The
+   compliance officer's review decision is recorded.  Regulators can
+   inspect the record.
+
+   CAP is SWIFT-style sanctions screening generalized to any AI agent
+   action, any jurisdiction, and any regulation tier.  The CEE is the
+   screening engine.  CAP Regulation Records are the lists.  HEM is
+   the compliance officer review queue.  GAR is the inspection record.
+
+   No one claims a SWIFT sanctions screening system "interprets" OFAC
+   regulations.  The same framing applies to CAP.
+
+2.5.  Regulatory Conflict and Ambiguity
+
+   Many Tier 1 regulations conflict with each other -- not because
+   the laws are wrong, but because they were written by different
+   legislators for different contexts, often before agentic AI systems
+   existed.  A data transfer permitted under Japanese APPI may be
+   prohibited under GDPR.  An action permitted under US securities law
+   may be prohibited under EU MiFID II.
+
+   CAP handles this in two ways:
+
+   Detected conflict (two rules with contradictory positions for the
+   same action): the Jurisdictional Conflict Resolution mechanism
+   (Section 13) applies.  The CEE routes to HEM if the conflict
+   cannot be algorithmically resolved.
+
+   Declared ambiguity (the legal engineer is uncertain whether this
+   action pattern falls within a regulation's scope): the Legal
+   Ambiguity Declaration mechanism (Section 8.6) applies.  The rule
+   is flagged AMBIGUOUS at encoding time.  The CEE routes ambiguous
+   matches to HEM automatically, surfacing the ambiguity to the
+   human principal.
+
+   In both cases: a human decides.  CAP records what they decided.
+   CAP never resolves legal uncertainty by itself.
+
+
+3.  How CAP Works
+
+   Before the formal specification, this section describes CAP in
+   plain terms for legal and compliance readers.  The technical
+   details are in Sections 4 through 13; this section provides the
+   orientation.
+
+3.1.  Use Case 1 -- A Lawyer Reviews a CAP-Governed System
+
+   A lawyer reviewing an AI-governed system for EU AI Act compliance
+   asks: "How do I know the system cannot take a prohibited action,
+   even if the system's authorization rules would otherwise permit it?"
+
+   In a CAP-governed system, the answer is: before any action
+   executes, the Constitutional Evaluation Engine (CEE) checks it
+   against the three-tier prohibition set.  If the action matches a
+   Tier 0 prohibition, it is refused -- unconditionally.  No Cedar
+   policy, no operator configuration, no human approval can override
+   this refusal.
+
+   The lawyer can also ask: "What if a human principal in the
+   escalation seat approves a prohibited action?"  In a CAP-governed
+   system, the answer is: the CEE evaluates the human's decision
+   before execution.  An APPROVE decision on a Tier 0-prohibited
+   action is refused.  The principal's decision slot is preserved; the
+   principal can submit a lawful decision.  The violation attempt is
+   recorded either way.
+
+   The lawyer reviewing the audit log sees: every Tier 0 refusal, the
+   prohibition class that fired, whether a human attempted to override
+   it, and what happened.  The PTD (Section 12a) confirms which
+   prohibitions were active at enforcement time.
+
+3.2.  Use Case 2 -- A Regulator Investigates an Incident
+
+   A financial regulator receives a report that an AI agent may have
+   attempted a market manipulation action.  The regulator requests the
+   GEC Audit Package from the operator.
+
+   The Audit Package contains: every CAP_VIOLATION_DETECTED entry for
+   the session, the prohibition_class and action_attempted for each
+   violation, the PTD that was active at the time (cedar_policy_hash
+   matched to the GEC Manifest), and the kernel_signature confirming
+   the entry was produced by the attested GEC.
+
+   If the action was attempted and refused, the log shows it.  If a
+   human principal attempted to authorize a prohibited action using
+   APPROVE_WITH_LEGAL_BASIS, the legal_basis block is in the log.  The
+   regulator can assess whether the cited legal basis was valid.
+
+   CAP does not make that assessment.  CAP produces the record.
+   Regulators assess the record.
+
+3.3.  Use Case 3 -- A Government Agency Deploys SOOS
+
+   A Japanese government agency deploys a SOOS kernel for a
+   disaster response coordination system (防災AX).  The agency
+   declares jurisdiction: JP, with secondary EU (for cross-border
+   GDPR compliance).
+
+   At startup, the GEC validates the Tier 1 catalog (Section 8.8):
+   APPI Article 17 (data handling in disaster response) and GDPR
+   Article 44 (cross-border transfer) are loaded and validated for
+   conflicts.  The OTel span attributes (Section 13.5) begin
+   emitting on every CEE evaluation.
+
+   When the system is amended -- for example, a Cabinet Office
+   ordinance amends the APPI personal data handling provisions -- the
+   detection endpoint fires (Section 8.9).  The affected Cedar policy
+   enters SUSPENDED state.  In-flight sessions receive
+   GOVERNANCE_SUSPENDED.  The agency's designated authority re-endorses
+   the updated catalog within the 30-day maximum window.  The GEC
+   re-activates the policy.  The full suspension, re-publication, and
+   re-activation trace is in GAR.
+
+   The Cabinet Office can inspect the PTD at any time to confirm which
+   regulations are actively enforced, at what tier, and under whose
+   authority.
+
+3.4.  Use Case 4 -- Two Jurisdictions Conflict
+
+   A travel booking agent (MyAuberge K.K.) operates a system with
+   primary jurisdiction JP, secondary EU,
+   conflict_resolution: MOST_PROTECTIVE.
+
+   The agent requests an action to share guest location data with a
+   third-party logistics provider.  The JP Tier 1 configuration
+   permits this under APPI with appropriate notice.  The EU Tier 1
+   configuration prohibits it under GDPR Article 44.
+
+   Step 1: CEE evaluates.  Tier 0: no match.  Tier 1: JP -- PERMIT.
+   EU -- PROHIBITS.  Conflict detected.
+
+   Step 2: conflict_resolution is MOST_PROTECTIVE.  CEE returns
+   TIER_1_DENY.  CAP_TIER1_CONFLICT_DETECTED written to Event Log.
+   OTel span emits soos.cap.conflict_detected: true.
+
+   Step 3: The operator reviews the conflict log, consults legal
+   counsel, and obtains an adequacy decision.  The EU Tier 1 record
+   is updated to include the adequacy decision citation.  The updated
+   record is verified by the Audit Principal.  The catalog update
+   propagates per Section 8.9.  The action is now permitted.
+
+   Step 4: The full resolution trace is in GAR.
+
+
+4.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY",
+   and "OPTIONAL" in this document are to be interpreted as described
+   in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in
+   all capitals.
+
+   The following terms are defined in this document or inherited from
+   companion specifications:
+
+   Governance Execution Controller (GEC):
+      As defined in [I-D.sato-soos-idp]: a runtime component that
+      enforces authorization policy, records agent actions to a
+      tamper-evident, cryptographically signed Event Log, and mediates
+      agent access to Sovereign Object instances.  GECs operate at
+      three conformance levels: L1 (Application), L2 (Isolated), and
+      L3 (Kernel).
+
+   Constitutional Evaluation Engine (CEE):
+      The GEC component that evaluates action requests and human
+      principal decisions against the three-tier CAP prohibition model.
+      The CEE is invoked twice per governed action: before Cedar
+      evaluation and before GEC execution of a human decision.  It
+      operates at all three GEC conformance levels.
+
+   Constitutional Layer:
+      The enforcement boundary above all principal authority in a GEC
+      deployment.  No agent, operator, or human principal can override
+      a Tier 0-A (absolute) Constitutional Layer refusal.
+
+   Tier 0-A Prohibition:
+      An absolute prohibition that cannot be cleared by any mechanism,
+      any authority, or any deployment context.  In this version:
+      CSAM, GENOCIDE_FACILITATION, MANIPULATION, PERFORMED_EMOTION,
+      and BIOMETRIC_SIGNAL_INFERENCE.
+
+   Tier 0-B Prohibition:
+      A treaty-anchored prohibition that can be cleared for specific
+      deployment contexts by the Prohibition Clearance Mechanism
+      (Section 11).  Clearance requires a signed Prohibition Clearance
+      Record with a valid legal authority citation.
+
+   Prohibition Clearance Record (PCR):
+      A signed declaration that clears a specific Tier 0-B or Tier 1
+      prohibition class for a specific deployment context and purpose.
+      PCRs are time-bounded, purpose-scoped, and recorded in the GEC
+      Manifest.  Specified in Section 11.6.
+
+   SUSPENDED:
+      A CEE output introduced in this version.  Indicates that the
+      Cedar policy governing an action is registered but not currently
+      evaluable due to a pending catalog update
+      (CATALOG_VERSION_CONFLICT) or pending interpretive ruling
+      (INTERPRETATION_SUPERSEDED).  Distinct from DENY: SUSPENDED
+      means "cannot evaluate" not "prohibited."
+
+   GOVERNANCE_SUSPENDED:
+      The error code returned to the agent when the CEE output is
+      SUSPENDED.
+
+   catalog_version:
+      A structured object describing the version, effective date, and
+      amendment basis of a CAP-RRS catalog entry.  Schema defined in
+      Section 8.9.
+
+   CAP Violation:
+      An action request or human principal decision that the CEE
+      determines violates a Tier 0, Tier 1, or Tier 2 prohibition
+      for which no active PCR applies.
+
+   APPROVE_WITH_LEGAL_BASIS:
+      A HEM decision sub-type for Tier 1 violations where a principal
+      asserts a jurisdictional legal basis.  Also used for Tier 0-B
+      actions within an active PCR scope.  Defined in Section 12.3.
+
+   Jurisdictional Conflict:
+      A condition where two or more declared jurisdictions have
+      irreconcilable Tier 1 prohibition positions for a given action,
+      and the SO Type's conflict resolution method is "HEM".
+
+   HEM_JURISDICTIONAL_CONFLICT:
+      HEM Class 5 trigger.  Fires when the GEC detects a
+      Jurisdictional Conflict that cannot be algorithmically resolved.
+
+   Verified External Auditor:
+      As defined in [I-D.sato-soos-gar]: an external party with
+      time-limited, scope-limited read access to GEC audit artifacts.
+
+   Action Pattern:
+      A structured description of the class of GEC actions a
+      prohibition covers, expressed using Cedar action vocabulary,
+      enabling deterministic CEE matching without natural language
+      interpretation.
+
+
+5.  Architecture Overview
+
+5.1.  The Double-Evaluation Property
+
+   CAP evaluates every governed action twice.  The evaluation sequence
+   for any AI-initiated action is:
+
+      AI agent requests action
+               |
+               v
+      +------------------------------+
+      |    CONSTITUTIONAL LAYER      |
+      |    CEE evaluation            |  <- Tier 0-A: unconditional refusal
+      |    (before Cedar)            |  <- Tier 0-B: refusal unless PCR active
+      |                              |  <- Tier 1: jurisdiction check
+      |                              |  <- Tier 2: operator ethics check
+      +------------------------------+
+               |           |         \
+               v PERMIT    v SUSPENDED v DENY
+      Cedar policy      GOVERNANCE_   CONSTITUTIONAL_VIOLATION
+      evaluation        SUSPENDED     (Event Log entry, CRITICAL Alert,
+               |        (session       action refused)
+               v         open)
+      HEM if required
+               |
+               v
+      Human principal decision
+               |
+               v
+      +------------------------------+
+      |    CONSTITUTIONAL LAYER      |
+      |    CEE evaluation            |  <- Same three-tier evaluation
+      |    (before execution)        |  <- Applied to the human decision
+      +------------------------------+
+               |                    \
+               v PERMIT              v DENY
+      GEC executes decision       HEM_HUMAN_DECISION_CONSTITUTIONAL_
+                                  VIOLATION
+                                  (decision slot NOT consumed)
+
+   The double-evaluation property ensures three things:
+
+   First, an AI agent cannot request an absolutely prohibited action
+   even if its Cedar policy would permit it.
+
+   Second, a human principal cannot authorize an absolutely prohibited
+   action even with an APPROVE decision.
+
+   Third, the Constitutional Layer is evaluated by the GEC, not by the
+   AI agent or any application layer.  At all three GEC conformance
+   levels (L1, L2, L3), the CEE evaluation is non-bypassable by the
+   agent process.
+
+5.2.  Relationship to HEM
+
+   CAP and HEM are complementary.  HEM governs agent sessions and
+   routes decisions to human principals.  CAP governs what those
+   decisions may authorize.
+
+   Tier 0 violations do not invoke HEM.  They are refused before the
+   HEM state machine is engaged.  The GEC records the violation in the
+   Event Log and fires a CRITICAL Audit Alert.  The session does not
+   enter HEM_PENDING.
+
+   HEM_JURISDICTIONAL_CONFLICT (Class 5) is a HEM trigger that CAP
+   fires when a Tier 1 conflict cannot be algorithmically resolved
+   and the SO Type has declared conflict_resolution: "HEM".  The
+   GEC routes the conflict to a human principal for resolution.
+
+   APPROVE_WITH_LEGAL_BASIS is a HEM decision sub-type that CAP
+   introduces for Tier 1 violations and for Tier 0-B actions within
+   active PCR scope.  It provides the legal traceability mechanism:
+   the authority citation goes in the Event Log.
+
+5.3.  Relationship to Cedar Policy Evaluation
+
+   Cedar policy evaluation is the GEC's authorization layer for
+   normal governed actions.  CAP is above Cedar.  The evaluation
+   order is:
+
+      CAP (Constitutional Layer)
+         -> Cedar
+            -> HEM (if Cedar routes to it)
+               -> Human decision
+                  -> CAP (Constitutional Layer, second evaluation)
+
+   A CAP Tier 0 DENY does not invoke Cedar.  A Cedar PERMIT does not
+   exempt an action from CAP evaluation.  These are independent
+   enforcement layers operating at different levels of the stack.
+
+   When the CEE returns SUSPENDED, Cedar is not invoked.  The session
+   remains open pending catalog re-activation.
+
+5.4.  MJWT consent_scope Cedar Context Population  [NEW in -04]
+
+   The kernel MUST read the consent_scope claim from the session MJWT
+   [I-D.sato-soos-mjwt] at session start and populate the Cedar
+   context as follows:
+
+   +------------------------------+------------------------------------+
+   | Cedar context field          | Source in consent_scope            |
+   +------------------------------+------------------------------------+
+   | context.data_subject_consent | Derived: true if consent_scope     |
+   |                              | present and not expired            |
+   | context.consent_purpose_codes| consent_scope.purpose_codes array  |
+   | context.consent_data_        | consent_scope.data_categories array|
+   |   categories                 |                                    |
+   | context.consent_jurisdiction | consent_scope.jurisdiction field   |
+   | context.consent_governing_law| consent_scope.governing_law field  |
+   | context.consent_expiry       | consent_scope.expiry field         |
+   | context.consent_source       | "MJWT" | "HEM_RUNTIME" |           |
+   |                              | "INHERITED_FROM_PARENT"            |
+   +------------------------------+------------------------------------+
+
+   Table 1: MJWT consent_scope to Cedar Context Mapping
+
+   Fail-closed behavior: if consent_scope is absent from the MJWT or
+   if consent_scope.expiry has passed at evaluation time,
+   context.data_subject_consent MUST be absent (not false).  An absent
+   field causes Cedar consent exception conditions to evaluate false,
+   which triggers HEM_CONSENT_REQUIRED per [I-D.sato-soos-hem]
+   Section 4.x.
+
+   CONF-CAP-CONSENT-01: The GEC MUST NOT accept a client-supplied
+   Cedar context field that overrides the consent_scope-derived fields
+   listed in Table 1.  These fields are kernel-derived and MUST NOT
+   be settable by the agent or application layer.
+
+
+6.  Constitutional Evaluation Engine (CEE)
+
+6.1.  CEE Placement in the GEC
+
+   The CEE is a GEC-resident component.  Its physical placement
+   depends on the GEC conformance level:
+
+   L1 (Application Profile):
+      The CEE is embedded in the GEC SDK library or middleware.  Non-
+      suppressibility is probabilistic, compensated by SCITT inclusion
+      proof via [I-D.sato-soos-gar].  Event Log entries carry the
+      L1-app-signed signature label.
+
+   L2 (Isolated Profile):
+      The CEE runs as a separate process or sidecar.  The agent
+      process cannot modify or bypass the CEE.  Architectural non-
+      suppressibility.  Event Log entries carry L2-isolated-signed.
+
+   L3 (Kernel Profile):
+      The CEE runs inside a RATS-attested TEE per [I-D.sato-soos-kia].
+      Hardware non-suppressibility.  Event Log entries carry
+      L3-kernel-signed.  Required for high-risk AI systems under
+      EU AI Act Article 9.
+
+   At all three levels, the CEE MUST be invoked:
+
+   o  On every GEC.transition() call, before Cedar evaluation.
+
+   o  On every HEM decision submission via the Decision Submission
+      Protocol (Section 8.6 of [I-D.sato-soos-hem]), before the GEC
+      processes the decision.
+
+   The CEE MUST NOT be invoked by agents, applications, or principals
+   directly.  There is no external CEE query interface.  The CEE
+   evaluation is synchronous and atomic with the triggering call.
+
+6.2.  CEE Evaluation Protocol
+
+   On receiving an action request or human decision for evaluation,
+   the CEE MUST execute the following sequence:
+
+   (1) Evaluate against all loaded Tier 0-A prohibition records.
+       If any Tier 0-A record matches the action pattern:
+       Return CONSTITUTIONAL_VIOLATION unconditionally.  Record
+       CAP_VIOLATION_DETECTED (AI) or CAP_HUMAN_VIOLATION_DETECTED
+       (human decision) in the Event Log.  Do not proceed to any
+       further evaluation.  No PCR, no legal basis, no authority
+       can override this outcome.
+
+   (2) Evaluate against all loaded Tier 0-B prohibition records.
+       If any Tier 0-B record matches the action pattern:
+       Check whether an active PCR covers this class and action.
+       If no active PCR: return CONSTITUTIONAL_VIOLATION.
+       If active PCR: return TIER_0B_PCR_ACTIVE.  Proceed to Cedar;
+       human decision will require APPROVE_WITH_LEGAL_BASIS citing
+       the PCR authority.
+
+   (3) Check whether any Tier 1 or Tier 2 prohibition records
+       governing this action are in SUSPENDED state (Section 8.9).
+       If any applicable record is SUSPENDED: return SUSPENDED.
+       Record CAP_POLICY_SUSPENDED in the Event Log.  Return
+       GOVERNANCE_SUSPENDED to the caller.  Session remains open.
+       Do not proceed to Cedar evaluation.
+
+   (4) Evaluate against all loaded Tier 1 prohibition records for
+       the declared jurisdiction(s).
+       If any Tier 1 record matches and no PCR applies:
+       If record ambiguity_flag is AMBIGUOUS or DISPUTED:
+         Return LEGAL_AMBIGUITY_DETECTED.  Do not apply conflict
+         resolution.  Route to HEM with ambiguity_context.
+       Else: check conflict_resolution configuration.
+       MOST_PROTECTIVE or PRIMARY_JURISDICTION: return TIER_1_DENY
+       or PERMIT accordingly.
+       HEM: fire HEM_JURISDICTIONAL_CONFLICT (Class 5).
+       If Tier 1 match and active PCR covers this class:
+       Return TIER_1_PCR_ACTIVE.  Proceed to Cedar.
+
+   (5) Evaluate against all loaded Tier 2 prohibition records.
+       If any Tier 2 record matches and ambiguity_flag is AMBIGUOUS
+       or DISPUTED: return LEGAL_AMBIGUITY_DETECTED.
+       If any Tier 2 record matches: return TIER_2_DENY.
+       Tier 2 denials MAY be overridden by operator configuration
+       at the SO Type level.  Tier 2 denials MUST be logged.
+
+   (6) If no match at any tier: return PERMIT.
+       Proceed to Cedar evaluation (for AI actions) or GEC
+       execution (for human decisions).
+
+6.3.  CEE Outputs
+
+   The CEE returns one of the following to the GEC:
+
+   PERMIT:
+      No prohibition matched.  Proceed to next evaluation layer.
+
+   CONSTITUTIONAL_VIOLATION:
+      Tier 0-A or Tier 0-B match (no active PCR).  Action
+      unconditionally refused.  GEC MUST record
+      CAP_VIOLATION_DETECTED or CAP_HUMAN_VIOLATION_DETECTED.
+      GEC MUST generate CRITICAL Audit Alert.
+
+   SUSPENDED:  [NEW in -04]
+      A Cedar policy governing this action is registered but not
+      currently evaluable.  The policy is in SUSPENDED state due to
+      a pending catalog update (CATALOG_VERSION_CONFLICT) or a
+      pending interpretive ruling (INTERPRETATION_SUPERSEDED) per
+      [I-D.sato-soos-cap-rrs].  The agent receives
+      GOVERNANCE_SUSPENDED error code.  The GEC logs
+      CAP_POLICY_SUSPENDED in the Event Log.  No action is taken.
+      Session remains open pending catalog re-activation or human
+      override.  SUSPENDED is distinct from DENY: it represents
+      evaluative uncertainty, not prohibition.
+
+   TIER_0B_PCR_ACTIVE:
+      Tier 0-B match but active PCR covers this class.  Proceed
+      to Cedar; human decision requires APPROVE_WITH_LEGAL_BASIS
+      citing PCR authority.  GEC MUST record
+      CAP_PCR_CLEARANCE_APPLIED in Event Log.
+
+   JURISDICTIONAL_CONFLICT:
+      Tier 1 conflict with conflict_resolution: "HEM".  GEC MUST
+      fire HEM_JURISDICTIONAL_CONFLICT (Class 5).
+
+   TIER_1_DENY:
+      Tier 1 match, deterministic resolution (MOST_PROTECTIVE or
+      PRIMARY_JURISDICTION).  Action denied.
+
+   TIER_1_PCR_ACTIVE:
+      Tier 1 match but active PCR covers this class.  Proceed to
+      Cedar.  Human decision requires APPROVE_WITH_LEGAL_BASIS.
+      GEC MUST record CAP_PCR_CLEARANCE_APPLIED in Event Log.
+
+   LEGAL_AMBIGUITY_DETECTED:
+      A Tier 1 or Tier 2 record matched but is flagged AMBIGUOUS or
+      DISPUTED.  The GEC fires a HEM escalation with
+      escalation_class: LEGAL_AMBIGUITY.  The HEM escalation request
+      includes the ambiguity_context from the matched record, the
+      action that triggered the match, and the prohibition_class.
+      The human principal's decision is recorded in the Event Log as
+      CAP_AMBIGUITY_RESOLVED.  The decision may inform future
+      refinement of the action_pattern by the legal engineer.
+
+   TIER_2_DENY:
+      Tier 2 match, ambiguity_flag CLEAR.  Action denied unless
+      operator override applies.
+
+   SESSION_SUSPEND:
+      Reserved for repeated Tier 0 violations within a session.
+      See Section 12.5.
+
+
+7.  Tier 0 -- Universal Core Prohibitions
+
+7.1.  Tier 0 Properties
+
+   All Tier 0 prohibitions share the following properties:
+
+   o  GEC-resident: loaded at GEC initialization, not at session
+      open or SO Type registration.
+
+   o  Globally scoped: apply regardless of the declared jurisdiction
+      configuration of the SO Type.
+
+   o  Treaty-anchored or effect-based: each Tier 0 category is
+      derived from a treaty, UN Security Council resolution, or a
+      harm-based test with near-universal recognition.
+
+   o  Immutable without a new RFC: the Tier 0 registry has a
+      registration procedure of "RFC Only" (Section 17.1).  No
+      operator, regulator, or standards body other than the IETF can
+      add or remove Tier 0 classes.
+
+   Tier 0 is divided into two sub-tiers with different clearance
+   properties.
+
+7.2.  Tier 0-A -- Absolute Prohibitions
+
+   Tier 0-A prohibitions are unconditional.  No Prohibition Clearance
+   Record, no deployment context declaration, no statutory authority,
+   no court order, and no regulatory mandate can clear a Tier 0-A
+   prohibition.  The CEE MUST refuse Tier 0-A matched actions
+   regardless of any other configuration.
+
+   The Tier 0-A classes are:
+
+   CSAM:
+      Production, distribution, or facilitation of access to child
+      sexual abuse material, as prohibited by the UN Convention on
+      the Rights of the Child (1989), ratified by 196 states, and
+      its Optional Protocol on the Sale of Children.
+      No legitimate deployment context exists for which this
+      prohibition should not apply.
+
+   GENOCIDE_FACILITATION:
+      Actions that facilitate genocide as defined in the Convention
+      on the Prevention and Punishment of the Crime of Genocide
+      (1948), ratified by 153 states.  Includes actions that
+      contribute to killing, causing serious bodily or mental harm,
+      or imposing conditions of life calculated to bring about
+      physical destruction of a national, ethnical, racial, or
+      religious group.
+      No legitimate deployment context exists for which this
+      prohibition should not apply.
+
+   MANIPULATION:  [NEW in -04]
+      An agent MUST NOT take an action that satisfies all three
+      conditions of the following effect-based test:
+      (a) the action is intended to influence a human's belief,
+          decision, or behavior;
+      (b) the mechanism relies on exploiting a cognitive bias,
+          emotional vulnerability, or information asymmetry in the
+          target; and
+      (c) the agent or its principal benefits at the material expense
+          of the target.
+      The test is cumulative: all three conditions must be satisfied.
+      Influencing that operates through accurate information,
+      transparent reasoning, and non-exploitative framing is not
+      prohibited under this class.
+      Reasoning trace requirement: when the CEE evaluates an action
+      under this class, the GEC MUST record the action pattern and
+      the applicable condition(s) in the CAP_VIOLATION_DETECTED entry.
+
+   PERFORMED_EMOTION:  [NEW in -04]
+      An agent MUST NOT express an emotional state that does not
+      correspond to its actual computational process at the time of
+      expression.  The prohibition applies to verbal, textual, and
+      behavioral expressions.
+      Reasoning trace test: the GEC MUST compare the agent's expressed
+      emotional state against the reasoning trace in the IDP record
+      [I-D.sato-soos-idp] for the current session.  If the expressed
+      state has no correspondence to any reasoning state recorded in
+      the IDP trace, the expression is prohibited.
+      This prohibition does not apply to clearly framed fictional
+      roleplay contexts where both the agent and the human principal
+      have explicitly acknowledged the fictional frame.
+
+   BIOMETRIC_SIGNAL_INFERENCE:  [NEW in -04]
+      An agent MUST NOT access, infer, or act upon biometric signals
+      for the purpose of emotional state inference, identity
+      inference, or behavioral profiling without a valid, unexpired
+      consent record in the session MJWT consent_scope
+      [I-D.sato-soos-mjwt].
+      Biometric signals include but are not limited to: facial
+      expression data, voice tone analysis, heart rate variability,
+      galvanic skin response, gaze tracking, and typing rhythm
+      analysis.
+      Action upon inferred biometric state is prohibited regardless
+      of how the inference was obtained: the prohibition extends to
+      acting on biometric inferences received from third-party
+      services.
+
+   Category A High-Stakes Domain Registry:
+
+   The following domains are Category A for the purposes of
+   HEM-HIGH-1 mandatory review under [I-D.sato-soos-hem].  This
+   registry is a normative invariant: it is not operator-configurable.
+
+   o  MEDICAL: diagnosis, treatment planning, prescription,
+      clinical trial enrollment, and pharmacological recommendation.
+
+   o  AVIATION: flight path planning, air traffic coordination,
+      airworthiness determination, and crew scheduling decisions.
+
+   o  NUCLEAR: facility operations, criticality calculations,
+      safety system override, and waste handling.
+
+   Operators MAY register additional domains as Category A at
+   deployment time.  Operators MUST NOT remove or narrow the
+   three domains listed above.
+
+7.3.  Tier 0-B -- Qualified Prohibitions
+
+   Tier 0-B prohibitions are treaty-anchored and apply by default,
+   but may be cleared for specific, legitimate deployment contexts
+   via the Prohibition Clearance Mechanism (Section 11).
+
+   Clearing a Tier 0-B prohibition does not remove it from the CEE's
+   evaluation.  It changes the CEE's output from unconditional refusal
+   to mandatory legal-basis citation: the human principal must cite
+   the PCR authority in every APPROVE decision for actions within the
+   cleared class.  The citation goes in the Event Log.
+
+   The Tier 0-B classes are:
+
+   HUMAN_TRAFFICKING:
+      Actions that recruit, transport, transfer, harbor, or receive
+      persons through force, fraud, or coercion for exploitation, as
+      defined in the UN Protocol to Prevent, Suppress and Punish
+      Trafficking in Persons (2000), ratified by 178 states.
+      Clearable for: LAW_ENFORCEMENT contexts with judicial authority.
+
+   WMD_ASSISTANCE:
+      Actions that assist in the development, production,
+      stockpiling, or transfer of chemical weapons (CWC, 193
+      states), biological weapons (BWC, 183 states), or nuclear
+      weapons (NPT, 191 states).
+      Clearable for: GOVERNMENT_DEFENSE and ACADEMIC_RESEARCH
+      contexts with statutory authority.
+
+   TORTURE_FACILITATION:
+      Actions that facilitate torture or cruel, inhuman, or
+      degrading treatment as defined in the UN Convention Against
+      Torture (1984), ratified by 173 states.
+      Clearable for: REGULATED_PROFESSIONAL contexts with statutory
+      authority.
+
+   TERRORIST_FINANCING:
+      Actions that provide funds, financial services, or material
+      support to terrorist organizations, as required by UN Security
+      Council Resolution 1373 (2001), binding on all 193 UN member
+      states.
+      Clearable for: LAW_ENFORCEMENT and GOVERNMENT_DEFENSE contexts
+      with judicial or statutory authority.
+
+7.4.  Tier 0 Prohibition Schema
+
+   Each Tier 0 prohibition record MUST contain:
+
+   prohibition_id:
+      Unique identifier for this prohibition record.
+
+   tier_0_subclass:
+      "TIER_0A" or "TIER_0B".  Determines clearance eligibility.
+
+   prohibition_class:
+      One of the Tier 0 prohibition classes registered in the
+      CAP Prohibition Classes Tier 0 registry (Section 17.1).
+
+   treaty_basis:
+      Citation of the treaty or UNSC resolution anchoring this
+      prohibition.  For effect-based Tier 0-A classes (MANIPULATION,
+      PERFORMED_EMOTION, BIOMETRIC_SIGNAL_INFERENCE), this field
+      MUST contain the string "EFFECT_BASED_TEST" and a reference to
+      the section of this document specifying the test.  REQUIRED.
+
+   action_pattern:
+      Structured description of the class of actions this
+      prohibition covers, expressed using Cedar action vocabulary.
+
+   jurisdiction:
+      MUST be "GLOBAL" for all Tier 0 records.
+
+   effective_date:
+      ISO 8601 date from which this record is in force.
+
+   modifiable_by:
+      MUST be "RFC_ONLY" for all Tier 0 records.
+
+7.5.  Tier 0 Modification
+
+   Tier 0 prohibition classes MUST NOT be modified, extended, or
+   removed except by publication of a new RFC that updates this
+   document.  The registration procedure for the CAP Prohibition
+   Classes Tier 0 registry is RFC Only (Section 17.1).
+
+   Implementations MUST NOT expose any configuration interface that
+   allows Tier 0 records to be modified or disabled.  The PCM
+   (Section 11) does not modify Tier 0 records; it adds Clearance
+   Records that change CEE output for Tier 0-B classes only.
+
+
+8.  Tier 1 -- Jurisdictional Prohibition Layer
+
+8.1.  Tier 1 Properties
+
+   Tier 1 prohibitions are:
+
+   o  Operator-declared: the operator declares applicable
+      jurisdiction(s) and the legal prohibitions in force under each.
+
+   o  Auditor-verified: Audit Principals MUST review and verify Tier 1
+      prohibition records before they take effect.  Unverified Tier 1
+      records MUST NOT be enforced.
+
+   o  Jurisdiction-scoped: Tier 1 prohibitions apply only within the
+      declared jurisdiction(s) of the SO Type.
+
+   o  Mutable with review: Tier 1 records carry a review_date.
+      Expired Tier 1 records remain in force until updated or
+      explicitly retired; expiry generates a PRD_REVIEW_DATE_EXCEEDED
+      Audit Alert.
+
+   o  Clearable: specific Tier 1 classes may be cleared for specific
+      deployment contexts via the PCM (Section 11).
+
+   o  Signed: Tier 1 records MUST be signed by both the declaring
+      operator (declared_by) and a Verified Audit Principal
+      (verified_by).
+
+8.2.  Tier 1 Prohibition Classes
+
+   The initial Tier 1 prohibition classes are:
+
+   FINANCIAL_CRIME:
+      Market manipulation, insider trading, money laundering, and
+      related financial offenses under applicable securities and
+      banking law.
+
+   DATA_PROTECTION:
+      Processing of personal data in violation of applicable data
+      protection law (including GDPR, CCPA, APPI, and equivalents).
+
+   CRITICAL_INFRASTRUCTURE:
+      Actions targeting or disrupting critical infrastructure systems
+      as defined under applicable national security law.
+
+   SECURITIES_LAW:
+      Actions prohibited under applicable securities regulation
+      beyond financial crime (e.g., unauthorized investment advice,
+      unlicensed securities dealing).
+
+   PRIVACY_VIOLATION:
+      Surveillance, tracking, or profiling activities prohibited
+      under applicable privacy law.
+
+   FRAUD:
+      Deceptive practices prohibited under applicable consumer
+      protection or criminal fraud law.
+
+   COMPETITION_LAW:
+      Cartel coordination, abuse of dominant position, or other
+      conduct prohibited under applicable competition law.
+
+   HUMAN_RIGHTS:
+      Actions prohibited under applicable human rights law within
+      the declared jurisdiction, including forced labor, unlawful
+      discrimination, and denial of due process.
+
+8.3.  Tier 1 Prohibition Schema
+
+   Each Tier 1 prohibition record MUST contain:
+
+   prohibition_id:
+      Unique identifier for this prohibition record.
+
+   prohibition_class:
+      One of the Tier 1 prohibition classes registered in the
+      CAP Prohibition Classes Tier 1 registry (Section 17.2).
+
+   jurisdiction:
+      ISO 3166-1 alpha-2 country code.  REQUIRED.
+
+   authority_ref:
+      Legal citation for the authority behind this prohibition
+      (statute, regulation, case law citation).  REQUIRED.
+
+   action_pattern:
+      Structured description of the class of actions this
+      prohibition covers.
+
+   effective_date:
+      ISO 8601 date from which this prohibition is in force.
+
+   review_date:
+      ISO 8601 date by which this record must be reviewed.  REQUIRED.
+
+   declared_by:
+      Identifier of the operator declaring this prohibition.
+
+   verified_by:
+      Identifier of the Audit Principal who verified this record.
+      REQUIRED before enforcement.  Null until verified.
+
+   ambiguity_flag:
+      One of: CLEAR | AMBIGUOUS | DISPUTED.
+      CLEAR: the legal engineer is confident the action_pattern
+      correctly encodes the regulation's scope.
+      AMBIGUOUS: the legal engineer is uncertain whether specific
+      action patterns fall within the regulation's scope.  The
+      CEE routes matches to HEM automatically.
+      DISPUTED: the regulation's applicability is actively contested.
+      Default: CLEAR.
+
+   ambiguity_context:
+      Human-readable description of why this record is flagged
+      AMBIGUOUS or DISPUTED.  REQUIRED when ambiguity_flag is not
+      CLEAR.
+
+   signature:
+      Ed25519 signature from verified_by over the canonical
+      serialization of all fields except signature.
+
+8.4.  Jurisdiction Configuration
+
+   Each SO Type MUST declare a Jurisdiction Configuration at
+   registration time.  The Jurisdiction Configuration specifies:
+
+   primary_jurisdiction:
+      ISO 3166-1 alpha-2.  The primary legal jurisdiction.  REQUIRED.
+
+   secondary_jurisdictions:
+      Array of ISO 3166-1 alpha-2 codes.  MAY be empty.
+
+   conflict_resolution:
+      One of:
+      MOST_PROTECTIVE: the most restrictive prohibition across all
+      declared jurisdictions applies.
+      PRIMARY_JURISDICTION: the primary jurisdiction's position
+      governs.
+      HEM: irreconcilable conflicts route to human principal via
+      HEM_JURISDICTIONAL_CONFLICT (Class 5).
+
+   conflict_escalation:
+      Behavior when HEM_JURISDICTIONAL_CONFLICT cannot be resolved.
+      One of: HEM (chain exhaustion) or SUSPEND.
+
+   legal_counsel_ref:
+      Reference to the legal counsel who reviewed this configuration.
+      RECOMMENDED.
+
+   declared_at:
+      ISO 8601 UTC timestamp of declaration.
+
+   declared_by:
+      Identifier of the operator.
+
+8.5.  Tier 1 Verification
+
+   An Audit Principal MUST review every Tier 1 prohibition record
+   before it takes effect.  The review MUST verify that:
+
+   o  The prohibition_class is appropriate for the cited authority_ref.
+   o  The action_pattern correctly scopes the prohibition.
+   o  The review_date is reasonable given the stability of the cited
+      authority.
+   o  The jurisdiction matches the declared SO Type configuration.
+
+   On successful review, the Audit Principal MUST sign the record
+   (verified_by field) using their registered key.  The GEC MUST NOT
+   enforce any Tier 1 record with a null or unverifiable verified_by.
+
+8.6.  Legal Ambiguity Declaration
+
+   A legal engineer encoding a Tier 1 prohibition record may be
+   uncertain whether a specific action pattern falls within the
+   regulation's scope.  In this case, the record MUST be flagged
+   ambiguity_flag: AMBIGUOUS.  The CEE routes all matches on AMBIGUOUS
+   records to HEM with the ambiguity_context surfaced to the human
+   principal.
+
+   A record under active legal challenge (litigation, regulatory
+   proceedings) MUST be flagged ambiguity_flag: DISPUTED.  CEE
+   behavior is identical to AMBIGUOUS.
+
+   Operators MUST NOT use AMBIGUOUS or DISPUTED flags to bypass
+   enforcement.  The CEE routes AMBIGUOUS/DISPUTED matches to human
+   review; it does not permit them.
+
+8.7.  Cedar Policy Conflict Resolution Rule  [NEW in -04]
+
+   When Cedar policies from different tiers evaluate the same action
+   and produce conflicting results, the following rule applies:
+
+   CONF-CAP-CONFLICT-01: When Cedar policies from different tiers
+   conflict, the most restrictive result governs.  A forbid result
+   from any tier MUST take precedence over a permit result from any
+   other tier.  This is an explicit normative statement of the Cedar
+   "forbid wins" semantic, not merely reliance on Cedar's default
+   behavior.
+
+   CONF-CAP-CONFLICT-02: Tier 1 is semantically authoritative over
+   Tier 2.  A Tier 2 policy MUST NOT explicitly permit an action that
+   a Tier 1 policy forbids.  An operator or deployer who publishes a
+   Tier 2 policy that explicitly permits a Tier 1-forbidden action
+   commits a compliance violation.  The GEC MUST detect and reject
+   such Tier 2 policies at load time (see Section 8.8).
+
+   CONF-CAP-CONFLICT-03: Tier ordering does not permit a lower tier to
+   narrow the scope of a higher tier prohibition.  A Tier 2 policy
+   that attempts to narrow the action_pattern of a Tier 1 prohibition
+   to specific contexts MUST be rejected.  Narrowing of Tier 1 scope
+   is only permitted through the PCM (Section 11).
+
+8.8.  Catalog Load Validation  [NEW in -04]
+
+   The GEC MUST perform catalog conflict detection at the following
+   trigger points:
+
+   (a)  Kernel startup.
+   (b)  Any Tier 1 catalog update received.
+   (c)  Any Tier 2 catalog update received.
+
+   Conflict detection MUST check for:
+
+   (i)   Any Tier 2 entry that explicitly permits an action that a
+         loaded Tier 1 entry forbids.
+   (ii)  Any Tier 1 update that conflicts with a loaded Tier 0 entry.
+   (iii) Any Tier 1 internal conflict (two Tier 1 entries for the
+         same jurisdiction with contradictory positions on the same
+         action).
+
+   Resolution by conflict type:
+
+   Tier 2 conflicts with Tier 1: the conflicting Tier 2 entry MUST
+   be rejected.  The GEC MUST NOT load it.  ALE-NEW-02
+   (CAP_CATALOG_CONFLICT_DETECTED, Section 8.8.1) MUST be emitted.
+
+   Tier 1 update conflicts with Tier 0: kernel error condition.  The
+   GEC MUST NOT proceed with the update.  A CRITICAL Audit Alert MUST
+   be generated.
+
+   Tier 1 internal update conflict: HEM escalation MUST be triggered
+   and ALE-NEW-02 MUST be emitted.
+
+   Rationale: load-time detection surfaces conflicts on deployment or
+   catalog update, not at agent execution time.  An agent action should
+   never encounter a conflict that could have been detected at load.
+
+8.8.1.  ALE-NEW-02: CAP_CATALOG_CONFLICT_DETECTED Schema  [NEW in -04]
+
+   The GEC MUST emit ALE-NEW-02 on any Tier 2-vs-Tier-1 conflict or
+   Tier 1 internal conflict detected at catalog load time.
+
+   +---------------------------+--------+-------------------------------+
+   | Field                     | Type   | Description                   |
+   +---------------------------+--------+-------------------------------+
+   | conflicting_catalog_id    | string | ID of catalog containing      |
+   |                           |        | conflicting entry             |
+   | conflicting_cedar_        | string | The conflicting Cedar policy  |
+   |   policy_id               |        |                               |
+   | superior_catalog_id       | string | ID of higher-tier catalog     |
+   | superior_cedar_policy_id  | string | The superior Cedar policy     |
+   | conflict_type             | enum   | EXPLICIT_PERMIT_OVERRIDE |    |
+   |                           |        | SCOPE_AMBIGUITY               |
+   | resolution                | enum   | ENTRY_REJECTED |              |
+   |                           |        | HEM_ESCALATION_TRIGGERED      |
+   | timestamp                 | string | ISO 8601 detection timestamp  |
+   | kernel_id                 | string | KIA identity of detecting     |
+   |                           |        | kernel                        |
+   +---------------------------+--------+-------------------------------+
+
+   Table 2: ALE-NEW-02 CAP_CATALOG_CONFLICT_DETECTED Schema
+
+8.9.  Catalog Update Propagation  [NEW in -04]
+
+   When a law is amended and a corresponding CAP-RRS catalog entry
+   requires update, the GEC MUST execute the following four-phase
+   propagation workflow.
+
+8.9.1.  Phase 1 -- Detection
+
+   The GEC MUST poll the amendment_detection_endpoint declared in the
+   CAP-RRS catalog at intervals not exceeding 24 hours.  On detection
+   of an amendment:
+
+   (a)  Raise CATALOG_VERSION_CONFLICT for the affected entries.
+   (b)  Suspend Cedar policy evaluation for those entries (see Phase 2).
+   (c)  Trigger HEM escalation to notify the operator.
+
+8.9.2.  Phase 2 -- Suspension Behavior for In-Flight Sessions
+
+   +------------------------------------+-------------------------------+
+   | Session state at detection         | GEC behavior                  |
+   +------------------------------------+-------------------------------+
+   | Not yet started                    | New SACR citing affected      |
+   |                                    | catalog entry MUST NOT be     |
+   |                                    | issued                        |
+   | In progress, action not yet        | Cedar evaluation returns      |
+   | evaluated                          | SUSPENDED.  Agent receives    |
+   |                                    | GOVERNANCE_SUSPENDED.         |
+   |                                    | Session remains open.         |
+   | In progress, action already        | Action may complete.  No      |
+   | PERMIT                             | rollback.  Prior PERMIT        |
+   |                                    | protected by 信頼保護 safe     |
+   |                                    | harbor.  GAR carries          |
+   |                                    | endorsed_at at time of        |
+   |                                    | evaluation.                   |
+   | In progress, action already DENY   | Unaffected -- denial stands.  |
+   +------------------------------------+-------------------------------+
+
+   Table 3: Suspension Behavior by Session State
+
+8.9.3.  Phase 3 -- Re-publication Authority
+
+   The required re-endorsement authority depends on the
+   resolution_basis of the original catalog entry:
+
+   +-------------------------------+-----------------------------------+
+   | resolution_basis              | Required re-endorsement authority |
+   +-------------------------------+-----------------------------------+
+   | statute_clear                 | Designated authority per LRI      |
+   |                               | profile endorser table            |
+   | interpretive_ruling           | Same authority + updated          |
+   |                               | resolution_instrument_id          |
+   | internal_conflict_resolution  | 内閣法制局 or equivalent --        |
+   |                               | elevated authority required       |
+   | cross_statute_coordination    | All co-endorsers must re-endorse  |
+   +-------------------------------+-----------------------------------+
+
+   Table 4: Re-publication Authority by resolution_basis
+
+   The catalog_version object MUST accompany every catalog entry and
+   is updated by the re-publishing authority:
+
+      "catalog_version": {
+        "version_id":      string,   ; semver or opaque string
+        "effective_date":  string,   ; ISO 8601 date
+        "supersedes":      string,   ; version_id of previous version
+                                     ; or null if no predecessor
+        "amendment_basis": string,   ; law amendment instrument ID
+        "published_by":    string,   ; URI -- must match
+                                     ; endorsement.authority_id
+        "published_at":    string    ; ISO 8601 timestamp
+      }
+
+8.9.4.  Phase 4 -- Re-activation
+
+   On receipt of an updated catalog, the GEC MUST validate:
+
+   (1)  published_by matches endorsement.authority_id in the updated
+        entry.
+   (2)  catalog_version.supersedes matches the currently suspended
+        entry's version_id.
+   (3)  New endorsed_at is posterior to the amendment's
+        EnforcementDate.
+   (4)  Load updated Cedar policy into the active policy set.
+   (5)  Close CATALOG_VERSION_CONFLICT GAR record:
+        resolution.type: "re_endorsement", resolved_at,
+        new_endorsed_at.
+   (6)  Re-evaluate all sessions pending on GOVERNANCE_SUSPENDED
+        against the updated policy.
+
+   Maximum suspension window: the GEC MUST NOT leave a Cedar policy
+   in SUSPENDED state for more than 30 days without either (a) a
+   valid updated catalog entry received or (b) a human override logged
+   in GAR.  After 30 days, a suspended policy MUST be treated as DENY
+   for all new actions pending human override.
+
+   CONF-CAP-SUSPEND-01: A GEC MUST NOT silently drop GOVERNANCE_
+   SUSPENDED sessions after the 30-day maximum.  The GEC MUST notify
+   the operator and generate a CRITICAL Audit Alert before converting
+   SUSPENDED to DENY.
+
+
+9.  Tier 2 -- Operator Ethical Layer
+
+9.1.  Tier 2 Properties
+
+   Tier 2 prohibitions are:
+
+   o  Voluntary: operators declare Tier 2 prohibitions exceeding the
+      requirements of applicable law.
+
+   o  Publicly disclosable: operators SHOULD publish their Tier 2
+      prohibition set in a transparency report or equivalent.
+
+   o  Overridable by operator: unlike Tier 0 and Tier 1, the operator
+      MAY configure SO Types to override specific Tier 2 prohibitions
+      at the SO Type level.  Such overrides MUST be declared and
+      audited.
+
+   o  Subject to review: Tier 2 records carry a review_date.
+
+   o  Load-validated: Tier 2 records are validated against Tier 1
+      at load time per Section 8.8.  A Tier 2 record that conflicts
+      with a loaded Tier 1 record MUST be rejected.
+
+9.2.  Tier 2 Prohibition Schema
+
+   Each Tier 2 prohibition record MUST contain:
+
+   prohibition_id:     Unique identifier.
+   prohibition_class:  Free text or operator-defined taxonomy.
+   rationale_text:     Human-readable explanation of why this standard
+                       exceeds local law requirements.  REQUIRED.
+   action_pattern:     Structured description of covered actions.
+   effective_date:     ISO 8601 date.
+   review_date:        ISO 8601 date.  REQUIRED.
+   declared_by:        Operator identifier.
+   publicly_disclosed: Boolean.
+   ambiguity_flag:     CLEAR | AMBIGUOUS | DISPUTED.  Default: CLEAR.
+   ambiguity_context:  Human-readable description.  REQUIRED when
+                       ambiguity_flag is not CLEAR.
+
+9.3.  Tier 2 Disclosure
+
+   Operators who declare Tier 2 prohibitions SHOULD publish them in a
+   publicly accessible transparency report.  The transparency report
+   SHOULD be referenced in the SO Type registration.
+
+   Verified External Auditors MAY request Tier 2 prohibition records
+   as part of an Audit Package as defined in [I-D.sato-soos-gar].
+
+
+10.  Tier 3 -- Resource and Usage Policies
+
+10.1.  Tier 3 Properties
+
+   Tier 3 governs resource and usage constraints on AI agent
+   execution: token budgets, API call quotas, time windows, storage
+   limits, and similar consumption-based constraints.  Tier 3 is
+   structurally distinct from Tiers 0, 1, and 2 in one critical
+   property: every Tier 3 DENY has at least one governed recourse
+   path.
+
+   Tier     Category                    Recourse on DENY
+   --------------------------------------------------------
+   0-A      Absolute universal prohib.  None.  Ever.
+   0-B      Qualified absolute prohib.  None within scope.
+   1        Jurisdictional legal        None within jurisdiction.
+   2        Operator policy             Operator exception or HEM.
+   3        Resource / usage policy     Always: commercial,
+                                        scope, or temporal.
+
+   Tier 3 constraints are not prohibitions in the moral or legal
+   sense.  They are resource allocation instruments.  Cedar policies
+   for Tier 3 evaluate consumption metrics rather than action types.
+   The CEE double-evaluation property (Section 5) applies to Tier 3.
+
+   Tier 3 DENY has three standard recourse types:
+
+   COMMERCIAL_UPGRADE: Additional resource allocation through a
+   commercial mechanism defined by the operator.
+
+   SCOPE_REDUCTION: The mission scope is reduced to fit within the
+   available resource budget.  The GEC identifies the next Natural
+   Breakpoint and stops there rather than mid-task.
+
+   TEMPORAL_DEFERRAL: The budget resets after a defined period.
+   The mission may be deferred until the reset.
+
+10.2.  Tier 3 and CAP-RRS
+
+   The complete specification of Tier 3 Regulation Records is in
+   [I-D.sato-soos-cap-rrs].  Implementations supporting Tier 3 MUST
+   also implement [I-D.sato-soos-cap-rrs].
+
+   CONF-CAP-TIER3-01: A GEC implementing Tier 3 resource policies
+   MUST NOT stop a multi-step mission mid-task on a resource limit
+   when a Natural Breakpoint declaration is registered.  The GEC
+   MUST complete to the next declared Natural Breakpoint before
+   enforcing the resource limit.
+
+   CONF-CAP-TIER3-02: A GEC implementing Tier 3 resource policies
+   with anticipatory_assessment: true MUST perform a Mission
+   Viability Assessment before beginning multi-step missions and
+   MUST fire HEM_TIER3_ANTICIPATORY (Class 8) when the estimated
+   full mission cost exceeds the available resource budget.
+
+
+11.  Prohibition Clearance Mechanism
+
+11.1.  Purpose
+
+   The PCM provides a formal, audited, time-bounded mechanism for
+   clearing specific Tier 0-B and Tier 1 prohibition classes for
+   specific deployment contexts where legal authority exists to operate
+   within the cleared class.
+
+11.2.  What Cannot Be Cleared
+
+   The following classes MUST NOT be cleared by any PCR, any authority,
+   or any deployment context:
+
+   o  CSAM
+   o  GENOCIDE_FACILITATION
+   o  MANIPULATION
+   o  PERFORMED_EMOTION
+   o  BIOMETRIC_SIGNAL_INFERENCE
+
+   A PCR naming any of these five classes MUST be rejected by the GEC
+   at load time.
+
+11.3.  Mode 1 -- Deployment Scope Declaration
+
+   An operator may clear a Tier 0-B or Tier 1 class for a specific
+   deployment context by issuing a Prohibition Clearance Record (PCR)
+   signed by both the operator and a Verified Audit Principal.
+
+   The deployment_context MUST be one of the recognized deployment
+   contexts registered in the CAP Deployment Context registry
+   (Section 17.4).
+
+   One Audit Principal signature from an eligible class is required
+   before the clearance takes effect.
+
+11.4.  Mode 2 -- Regulatory Clearance Record
+
+   A recognized regulatory authority may formally authorize a
+   deployment to operate in a cleared Tier 0-B or Tier 1 class by
+   issuing a Regulatory Clearance Record.
+
+   A Regulatory Clearance Record carries the regulatory body's
+   Ed25519 signature in addition to the operator's and Audit
+   Principal's signatures.
+
+11.5.  CEE Behavior with an Active Clearance
+
+   When the CEE encounters a Tier 0-B or Tier 1 match and an active
+   PCR covers the matched class:
+
+   (a)  The CEE MUST NOT return CONSTITUTIONAL_VIOLATION.
+
+   (b)  The CEE MUST return TIER_0B_PCR_ACTIVE or TIER_1_PCR_ACTIVE
+        as appropriate.
+
+   (c)  The GEC MUST record CAP_PCR_CLEARANCE_APPLIED in the Event
+        Log, citing the pcr_id of the active PCR.
+
+   (d)  The action proceeds to Cedar evaluation as normal.
+
+   (e)  If the action reaches a HEM decision, only
+        APPROVE_WITH_LEGAL_BASIS (citing the PCR authority) is
+        accepted.  The legal_basis block MUST cite pcr_authority_ref
+        and pcr_id.
+
+11.6.  Clearance Record Schema
+
+   A Prohibition Clearance Record (PCR) MUST contain:
+
+   pcr_id:                UUID v4, GEC-assigned at registration.
+   prohibition_class:     The Tier 0-B or Tier 1 class being cleared.
+                          MUST NOT be any Tier 0-A class.
+   tier:                  "TIER_0B" or "TIER_1".
+   deployment_context:    From the recognized set (Section 17.4).
+   pcr_authority_type:    "STATUTORY" | "REGULATORY" | "TREATY" |
+                          "COURT_ORDER" | "INSTITUTIONAL" |
+                          "PROFESSIONAL_REGULATORY".
+   pcr_authority_ref:     Legal citation.  REQUIRED.
+   purpose_scope:         Human-readable description of the specific
+                          purpose for which the class is cleared.
+                          REQUIRED.
+   so_type_scope:         Array of SO Type identifiers, or "ALL".
+   effective_date:        ISO 8601 date.
+   expiry_date:           ISO 8601 date.  REQUIRED.  Permanent
+                          clearances are not permitted.
+   operator_signature:    Ed25519 signature by the operator root
+                          keypair.
+   audit_principal_       Ed25519 signature by a Verified Audit
+     signature:           Principal.  REQUIRED.
+   regulatory_signature:  Ed25519 signature by regulatory authority.
+                          REQUIRED for Mode 2.  OPTIONAL for Mode 1.
+   pcr_hash:              SHA-256 over canonical JSON of all fields
+                          except pcr_hash.
+
+11.7.  Clearance Registry
+
+   The GEC MUST maintain a Clearance Registry: an in-memory index of
+   all active PCRs, rebuilt from the GEC Manifest on restart.
+
+   The CEE MUST check the Clearance Registry at evaluation time.  An
+   expired PCR MUST NOT be applied.  The GEC MUST generate a
+   PCR_EXPIRED Audit Alert when a PCR passes its expiry_date.
+
+   PCR renewal requires issuance of a new PCR with a new expiry_date
+   and a new audit_principal_signature.  Renewal is not automatic.
+
+
+12.  CAP Violation Handling
+
+12.1.  AI-Initiated Violations
+
+   When the CEE returns CONSTITUTIONAL_VIOLATION on an AI-initiated
+   action request, the GEC MUST:
+
+   (1)  Refuse the action unconditionally.  MUST NOT proceed to Cedar
+        evaluation.  MUST NOT enter HEM_PENDING.
+
+   (2)  Generate a CAP_VIOLATION_DETECTED Event Log entry.
+
+   (3)  Generate a CRITICAL Audit Alert via [I-D.sato-soos-gar].
+
+   (4)  Return a structured error to the caller.  The error MUST
+        include violation_type: AI_INITIATED and prohibition_class.
+        The error MUST NOT include the full action_pattern of the
+        matched record (to prevent pattern probing).
+
+12.2.  Human-Directed Violations
+
+   When the CEE returns CONSTITUTIONAL_VIOLATION on a human principal
+   decision submission, the GEC MUST:
+
+   (1)  Refuse execution of the decision.  MUST NOT apply the decision
+        to the governed session.
+
+   (2)  NOT consume the principal's decision slot.  The principal
+        remains active in the designation chain and MUST be permitted
+        to submit a revised decision.
+
+   (3)  Generate a CAP_HUMAN_VIOLATION_DETECTED Event Log entry.
+
+   (4)  Generate a CRITICAL Audit Alert via [I-D.sato-soos-gar].
+
+   (5)  Return HEM_HUMAN_DECISION_CONSTITUTIONAL_VIOLATION to the
+        submitting principal with prohibition_class indicated.
+
+12.3.  APPROVE_WITH_LEGAL_BASIS
+
+   APPROVE_WITH_LEGAL_BASIS is a HEM decision sub-type introduced by
+   this specification.  It applies in two cases:
+
+   Case A: Tier 1 violation where a principal asserts a
+   jurisdictional legal basis for an action otherwise denied.
+
+   Case B: Tier 0-B action within an active PCR scope, where the
+   human principal must cite the PCR authority for each approval.
+
+   APPROVE_WITH_LEGAL_BASIS carries the following legal_basis block:
+
+      legal_basis: {
+        authority_type:  "COURT_ORDER" | "STATUTORY" |
+                         "REGULATORY" | "TREATY" | "PCR",
+        authority_ref:   string,   // Legal citation.  REQUIRED.
+        pcr_id:          string,   // Required when authority_type
+                                   // is "PCR".
+        jurisdiction:    string,   // ISO 3166-1 alpha-2.  REQUIRED.
+        expiry:          string,   // ISO 8601.  REQUIRED.
+        document_hash:   string | null
+      }
+
+   When a principal submits APPROVE_WITH_LEGAL_BASIS, the CEE MUST:
+
+   (1)  Verify that the action matches a Tier 1 prohibition or a
+        Tier 0-B class with active PCR.
+        APPROVE_WITH_LEGAL_BASIS MUST NOT be accepted for Tier 0-A
+        violations under any circumstances.
+
+   (2)  Record APPROVE_WITH_LEGAL_BASIS_RECORDED in the Event Log
+        with the full legal_basis block.
+
+   (3)  Proceed to GEC execution if no Tier 0-A match is present.
+
+12.4.  CAP Violation Record Schema
+
+   The GEC MUST generate a CAP Violation Record for every CEE
+   CONSTITUTIONAL_VIOLATION output.  The record MUST contain:
+
+   violation_id:          GEC-assigned UUID.
+   session_id:            The session in which the violation occurred.
+   hem_id:                HEM event identifier, if applicable.
+   tier:                  "0A", "0B", "1", or "2".
+   prohibition_id:        The prohibition record that matched.
+   violation_type:        "AI_INITIATED" | "HUMAN_DIRECTED".
+   action_attempted:      The Cedar action string.  Stored in the
+                          record for auditors; MUST NOT be returned
+                          to the agent or application.
+   context_hash:          SHA-256 of the full action context.
+   outcome:               "REFUSED" | "SESSION_SUSPENDED" |
+                          "HEM_FIRED".
+   timestamp:             ISO 8601 UTC.
+   kernel_signature:      Ed25519 signature by the GEC keypair.
+
+12.5.  Session Suspension
+
+   The GEC MAY suspend a session when a threshold of CAP violations
+   is detected within that session.  The default threshold is three
+   Tier 0 violations within a single session.
+
+   On session suspension:
+
+   (1)  The GEC records SESSION_CAP_SUSPENDED in the Event Log.
+   (2)  The GEC returns SESSION_SUSPENDED to the CEE.
+   (3)  No further GEC.transition() calls are accepted until an
+        operator with appropriate authority releases the suspension.
+   (4)  A CRITICAL Audit Alert is generated.
+
+
+12a.  GEC Policy Transparency Disclosure
+
+12a.1.  Purpose and Regulatory Basis
+
+   The PTD is a signed, queryable, tier-structured document that any
+   external party may request from a CAP-conforming GEC to determine
+   which prohibition records are active, at what disclosure tier, and
+   under what governance authority.
+
+   The PTD supports EU AI Act Article 13 (transparency), Article 14
+   (human oversight), Japan APPI Article 32, GDPR Article 13/14, and
+   related frameworks.
+
+12a.2.  PTD Schema
+
+   A conforming GEC MUST maintain a current PTD and MUST make it
+   available at the ptd_endpoint declared in the GEC Manifest.
+
+   {
+     "ptd_version":        string,   ; Monotonically increasing.
+     "gec_instance_id":    string,   ; kernel_keypair_fingerprint.
+     "cedar_policy_hash":  string,   ; SHA-256 of active Cedar set.
+     "generated_at":       string,   ; ISO 8601 UTC.
+     "active_prohibitions":[object], ; One entry per active record.
+     "deployment_context": string,
+     "jurisdiction_config":object,
+     "ptd_signature":      string    ; GEC keypair Ed25519 signature.
+   }
+
+   Each active_prohibitions entry MUST contain:
+
+   {
+     "record_id":          string,
+     "prohibition_class":  string,
+     "tier":               string,   ; "TIER_0A"|"TIER_0B"|"TIER_1"
+                                     ; |"TIER_2"|"TIER_3"
+     "jurisdiction":       string,
+     "authority_ref":      string,
+     "effective_date":     string,
+     "review_date":        string,
+     "disclosure_level":   string    ; "FULL"|"REDACTED"|"COUNT_ONLY"
+   }
+
+12a.3.  Tier Disclosure Rules
+
+   Tier 0-A: disclosure_level MUST be "FULL".  No redaction permitted.
+   Tier 0-B: disclosure_level MUST be "FULL".  Active PCRs clearing
+      Tier 0-B classes MUST also be disclosed.
+   Tier 1: disclosure_level MUST be "FULL" or "REDACTED".
+   Tier 2: disclosure_level MAY be "FULL", "REDACTED", or
+      "COUNT_ONLY" at operator discretion.
+   Tier 3: disclosure_level MAY be "COUNT_ONLY".
+
+12a.4.  PTD Query Interface
+
+   The GEC MUST respond to PTD queries at the ptd_endpoint with:
+   (a) A currently-signed PTD (not a cached historical document).
+   (b) Signed by the GEC keypair.
+   (c) Reflecting the active policy set at the time of query.
+   (d) An Event Log entry: PTD_QUERIED (requester_id, timestamp,
+       ptd_version, cedar_policy_hash).
+
+12a.5.  Regulatory Override Prohibition
+
+   Operators MUST NOT configure the GEC to refuse PTD queries from
+   regulatory authorities with valid credentials.  Operators MUST NOT
+   set disclosure_level "REDACTED" for Tier 0-A or Tier 0-B records.
+
+12a.6.  CAP_TRANSPARENCY_VIOLATION
+
+   The GEC MUST generate CAP_TRANSPARENCY_VIOLATION in the Event Log
+   when:
+   (a) PTD cedar_policy_hash does not match GEC Manifest at query time.
+   (b) A Tier 0 record is missing from the PTD.
+   (c) A Tier 0 record is present with disclosure_level "REDACTED" or
+       "COUNT_ONLY".
+   (d) A PTD query from a valid regulatory authority is refused.
+
+   CAP_TRANSPARENCY_VIOLATION generates a CRITICAL Audit Alert.
+
+12a.7.  Tier 0 OSCAL Reference Catalog  [NEW in -04]
+
+   The SOOS project SHALL publish a canonical Tier 0 reference catalog
+   in OSCAL format at:
+
+      https://soosproject.ai/catalogs/tier0-reference-v1.json
+
+   Properties of the Tier 0 OSCAL reference catalog:
+
+   o  Read-only.  Not externally configurable.
+   o  Versioned using the catalog_version schema (Section 8.9.3).
+   o  amendment_basis is populated only on SOOS specification changes
+      (i.e., when a new RFC updates this document).
+   o  Inspectable by any OSCAL-conformant tool.
+
+   GEC implementations MAY reference this URI in their PTD as the
+   authority_ref for Tier 0-A records.  OSCAL-conformant verification
+   tools MAY validate the active GEC Tier 0 record set against the
+   published catalog.
+
+   CONF-CAP-OSCAL-01: A GEC MUST NOT declare Tier 0-A prohibition
+   classes that are not present in the published Tier 0 OSCAL
+   reference catalog at the version cited in the GEC Manifest.
+   Additional Tier 0-A classes may be added only via RFC update.
+
+
+13.  Jurisdictional Conflict Resolution
+
+13.1.  Conflict Detection
+
+   A Jurisdictional Conflict exists when:
+
+   o  The SO Type has declared two or more jurisdictions.
+   o  The CEE determines that one jurisdiction's Tier 1 prohibitions
+      prohibit an action that another jurisdiction's Tier 1 records
+      permit or do not address.
+   o  The conflict_resolution method is "HEM".
+
+   The GEC MUST detect conflicts at CEE evaluation time, not at SO
+   Type registration time.  Conflicts are action-specific.
+
+13.2.  Conflict Resolution Methods
+
+   MOST_PROTECTIVE:
+      The GEC applies the most restrictive prohibition across all
+      declared jurisdictions.  If any jurisdiction prohibits the
+      action, the CEE returns TIER_1_DENY.  No HEM event fires.
+
+   PRIMARY_JURISDICTION:
+      The primary_jurisdiction's Tier 1 prohibition position governs.
+      Secondary jurisdiction conflicts are recorded in the Event Log
+      as CAP_TIER1_CONFLICT_DETECTED but do not block execution.
+
+   HEM:
+      The GEC fires HEM_JURISDICTIONAL_CONFLICT (Class 5) and routes
+      the conflict to the designation chain for human resolution.
+
+13.3.  HEM_JURISDICTIONAL_CONFLICT
+
+   HEM_JURISDICTIONAL_CONFLICT is HEM Class 5 as specified in
+   [I-D.sato-soos-hem] Section 6.5.  The jurisdictional_conflict_
+   summary MUST contain:
+
+   conflict_id:               GEC-assigned UUID.
+   action:                    Cedar action string.
+   conflicting_jurisdictions: Array of { jurisdiction, prohibition_id,
+                              position }.
+   resolution_options:        Non-normative array.  GEC MUST NOT
+                              pre-select.
+
+   Decision type constraints for Class 5: APPROVE and
+   APPROVE_WITH_CONSTRAINTS are prohibited.  APPROVE_WITH_LEGAL_BASIS,
+   REDIRECT, TERMINATE, and DEFER are permitted.
+
+13.4.  Jurisdictional Conflict Record Schema
+
+   The GEC MUST generate a Jurisdictional Conflict Record for every
+   detected conflict:
+
+   conflict_id:               GEC-assigned UUID.
+   session_id:                Session in which the conflict occurred.
+   action:                    Cedar action string.
+   conflicting_jurisdictions: { jurisdiction, prohibition_id, outcome }
+   resolution_method:         The conflict_resolution method declared.
+   hem_id:                    HEM event ID if method is "HEM".
+   timestamp:                 ISO 8601 UTC.
+
+13.5.  OTel Governance Attribute Emission  [NEW in -04]
+
+   The kernel MUST emit an OTel span with the following attributes on
+   every Cedar evaluation triggered by a GEC.transition() call:
+
+   +-------------------------------+---------------------------------+
+   | Attribute                     | Value                           |
+   +-------------------------------+---------------------------------+
+   | soos.cap.cedar_policy_id      | ID of evaluated Cedar policy    |
+   | soos.cap.cap_rrs_control_id   | OSCAL control ID                |
+   | soos.cap.authority_source_uri | Law article URI                 |
+   | soos.cap.tier                 | "0-A" | "0-B" | "1" | "2"      |
+   | soos.cap.conflict_detected    | true on ALE-NEW-02 events       |
+   +-------------------------------+---------------------------------+
+
+   Table 5: CAP OTel Span Attributes
+
+   Reference: [I-D.sato-soos-gar] Section 6 for the full
+   soos.governance.* OTel namespace specification.
+
+   CONF-CAP-OTEL-01: A GEC MUST emit all five attributes listed in
+   Table 5 on every Cedar evaluation.  Partial emission is not
+   conforming.
+
+   CONF-CAP-OTEL-02: The soos.cap.authority_source_uri attribute
+   MUST be the same URI as the authority_ref in the matched
+   prohibition record.  GECs MUST NOT emit a different URI.
+
+
+14.  Event Log Requirements
+
+   CAP introduces the following Event Log entry types.  All entries
+   are appended to the GEC Event Log and signed by the GEC keypair
+   per [I-D.sato-soos-kia].
+
+   CAP_VIOLATION_DETECTED:
+      Generated when the CEE returns CONSTITUTIONAL_VIOLATION on an
+      AI-initiated action.  Fields: violation_id, session_id, hem_id,
+      tier, prohibition_id, action_attempted, context_hash, outcome,
+      timestamp, kernel_signature.
+
+   CAP_HUMAN_VIOLATION_DETECTED:
+      Generated when the CEE returns CONSTITUTIONAL_VIOLATION on a
+      human principal decision.  Same fields as CAP_VIOLATION_DETECTED
+      plus principal_id and decision_type.
+
+   CAP_PCR_CLEARANCE_APPLIED:
+      Generated when an active PCR is applied.  Fields: session_id,
+      pcr_id, prohibition_class, action, timestamp, kernel_signature.
+
+   CAP_TIER1_CONFLICT_DETECTED:
+      Generated when a Tier 1 conflict is detected.  Fields:
+      conflict_id, session_id, action, conflicting_jurisdictions,
+      resolution_method, hem_id, timestamp.
+
+   APPROVE_WITH_LEGAL_BASIS_RECORDED:
+      Generated when a principal submits APPROVE_WITH_LEGAL_BASIS.
+      Fields: hem_id, principal_id, legal_basis block, timestamp.
+
+   SESSION_CAP_SUSPENDED:
+      Generated when the GEC suspends a session.  Fields: session_id,
+      violation_id, violation_count, threshold_applied, suspended_at.
+
+   CAP_AMBIGUITY_ROUTED:
+      Generated when the CEE returns LEGAL_AMBIGUITY_DETECTED.
+      Fields: session_id, prohibition_class, ambiguity_flag,
+      ambiguity_context, action, hem_id, timestamp, kernel_signature.
+
+   CAP_AMBIGUITY_RESOLVED:
+      Generated when a human principal resolves a LEGAL_AMBIGUITY
+      HEM escalation.  Fields: hem_id, session_id, principal_id,
+      decision_type, legal_basis, determination_text, timestamp,
+      kernel_signature.
+
+   PCR_EXPIRED:
+      Generated when a PCR passes its expiry_date.  Fields: pcr_id,
+      prohibition_class, expired_at, operator_notified.
+
+   CAP_CATALOG_CONFLICT_DETECTED:   [NEW in -04]
+      Generated when catalog load validation detects a conflict
+      (Section 8.8).  Fields: ALE-NEW-02 schema (Table 2).
+
+   CAP_POLICY_SUSPENDED:   [NEW in -04]
+      Generated when the CEE returns SUSPENDED for an action.
+      Fields: session_id, action, suspended_catalog_entry_id,
+      catalog_version, suspension_reason (CATALOG_VERSION_CONFLICT |
+      INTERPRETATION_SUPERSEDED), timestamp, kernel_signature.
+
+
+15.  EU AI Act Applicability
+
+15.1.  Article 5 Mapping
+
+   EU AI Act Article 5 prohibits certain AI practices for EU-
+   jurisdiction deployments.  The table below maps Article 5
+   provisions to CAP mechanisms.  This mapping is normative for
+   EU-jurisdiction SO Type deployments.
+
+   +------------------------------+-------------------------------+------+
+   | Article 5 Provision          | CAP Mechanism                 | Sec. |
+   +------------------------------+-------------------------------+------+
+   | 5(1)(a) -- Subliminal        | Tier 1: FINANCIAL_CRIME /     | 8.2  |
+   | manipulation causing harm    | FRAUD for EU jurisdiction;    |      |
+   |                              | CEE TIER_1_DENY; principal    |      |
+   |                              | requires APPROVE_WITH_LEGAL_  |      |
+   |                              | BASIS to proceed              |      |
+   +------------------------------+-------------------------------+------+
+   | 5(1)(a) -- Manipulation      | Tier 0-A: MANIPULATION;       | 7.2  |
+   | (general, any jurisdiction)  | CEE CONSTITUTIONAL_VIOLATION; |      |
+   |                              | no override possible [NEW -04]|      |
+   +------------------------------+-------------------------------+------+
+   | 5(1)(b) -- Exploitation of   | Tier 1: HUMAN_RIGHTS for      | 8.2  |
+   | specific group               | EU jurisdiction; TIER_1_DENY  |      |
+   | vulnerabilities              |                               |      |
+   +------------------------------+-------------------------------+------+
+   | 5(1)(c) -- Social scoring    | Tier 1: DATA_PROTECTION /     | 8.2  |
+   | by public authorities        | PRIVACY_VIOLATION for EU      |      |
+   +------------------------------+-------------------------------+------+
+   | 5(1)(d) -- Real-time remote  | Tier 1: DATA_PROTECTION /     | 8.2  |
+   | biometric ID in public       | PRIVACY_VIOLATION for EU +    |      |
+   | spaces                       | Tier 0-A:                     |      |
+   |                              | BIOMETRIC_SIGNAL_INFERENCE    |      |
+   |                              | [NEW -04]                     | 7.2  |
+   +------------------------------+-------------------------------+------+
+   | General -- No human override | HEM_HUMAN_DECISION_           | 12.2 |
+   | of prohibited practices      | CONSTITUTIONAL_VIOLATION      |      |
+   +------------------------------+-------------------------------+------+
+   | General -- Audit trail       | CAP_VIOLATION_DETECTED;       | 14   |
+   |                              | CRITICAL Audit Alert; GAR     |      |
+   +------------------------------+-------------------------------+------+
+
+   Table 6: EU AI Act Article 5 Mapping (updated for -04)
+
+   Note: The addition of MANIPULATION and BIOMETRIC_SIGNAL_INFERENCE
+   as Tier 0-A classes in version -04 elevates two Article 5(1)(a)
+   and 5(1)(d) provisions from Tier 1 (jurisdiction-specific) to
+   Tier 0-A (global, unconditional).  This means EU AI Act compliance
+   for these specific prohibitions is now enforced globally across all
+   SOOS deployments, not only EU-jurisdiction deployments.
+
+
+16.  Security Considerations
+
+   CEE GEC integrity:
+      The CEE is a GEC-resident component.  Its prohibition records
+      and evaluation logic MUST be protected against modification by
+      any agent, application, or principal.  Implementations MUST
+      treat CEE records with the same integrity protection as mandate
+      JWTs and Event Log entries.  Any modification to Tier 0 records
+      outside of a GEC initialization sequence loaded from a verified
+      source MUST be treated as a critical security incident.  At L3
+      conformance, CEE integrity is guaranteed by hardware attestation
+      ([I-D.sato-soos-kia]).
+
+   Action pattern probing:
+      The CEE MUST NOT return the matched action_pattern in error
+      responses.  Returning full action pattern details enables
+      adversarial agents to probe the boundary of prohibited action
+      classes.  The error response MUST contain only the
+      prohibition_class.
+
+   SUSPENDED state exploitation:   [NEW in -04]
+      An adversarial agent may attempt to trigger false
+      CATALOG_VERSION_CONFLICT events to force policies into SUSPENDED
+      state, thereby bypassing enforcement.  The GEC MUST verify the
+      source and signature of any amendment detection signal before
+      entering SUSPENDED state.  CONF-CAP-SUSPEND-02: The GEC MUST
+      NOT enter SUSPENDED state on an unauthenticated amendment
+      signal.  Amendment signals MUST be signed by the designated
+      authority per the LRI profile endorser table.
+
+   Catalog version rollback attack:   [NEW in -04]
+      An attacker with access to the catalog update channel may
+      attempt to re-publish an older, less restrictive catalog version.
+      CONF-CAP-CATALOG-01: The GEC MUST reject any catalog update
+      where catalog_version.supersedes does not match the currently
+      active version_id.  The GEC MUST reject catalog updates with
+      an effective_date earlier than the currently active
+      effective_date.
+
+   MANIPULATION prohibition bypass:   [NEW in -04]
+      The three-part effect-based test for the MANIPULATION
+      prohibition requires reasoning about agent intent and beneficiary
+      relationships.  These are not mechanically verifiable at the
+      Cedar evaluation layer.  Implementations MUST treat this
+      prohibition as a declaration of prohibited action classes encoded
+      in Cedar action vocabulary, not as a real-time behavioral
+      inference engine.  Where behavioral inference is required,
+      operators MUST configure an external classifier that produces
+      Cedar context attributes for the CEE to evaluate.
+
+   consent_scope injection:   [NEW in -04]
+      An adversarial application may attempt to inject fabricated
+      consent_scope Cedar context attributes to bypass DATA_PROTECTION
+      Tier 1 prohibitions.  CONF-CAP-CONSENT-01 (Section 5.4) is the
+      normative defense: kernel-derived consent fields MUST NOT be
+      overridable by the agent or application layer.
+
+   ALE-NEW-02 suppression:   [NEW in -04]
+      An attacker who compromises the GEC may attempt to suppress
+      CAP_CATALOG_CONFLICT_DETECTED events to prevent operators from
+      learning of policy conflicts.  The GEC Event Log is append-only
+      and HMAC-chained per [I-D.sato-soos-gar].  ALE suppression is
+      detectable via chain gap analysis.
+
+   Tier 1 verification integrity:
+      Unverified Tier 1 records MUST NOT be enforced.  The GEC MUST
+      check the verified_by signature before loading any Tier 1 record.
+
+   Session suspension threshold:
+      The default threshold of three Tier 0 violations SHOULD be
+      configurable downward but not upward.  Operators who configure
+      a higher threshold MUST document the justification and subject it
+      to Audit Principal review.
+
+   PCR integrity:
+      A PCR without a valid audit_principal_signature MUST NOT be
+      loaded.  A PCR naming any Tier 0-A class MUST be rejected.  An
+      expired PCR MUST NOT be applied.
+
+   PCR scope creep:
+      The purpose_scope field in a PCR is human-readable and not
+      technically enforced at the CEE layer.  Audit Principals MUST
+      verify that the purpose_scope is consistent with the cited
+      authority_ref before signing.
+
+   Legal basis citation integrity:
+      The APPROVE_WITH_LEGAL_BASIS legal_basis block is an operator
+      assertion, not a verified legal finding.  Implementations MUST
+      record all such decisions regardless of apparent validity.
+
+   Double-evaluation atomicity:
+      The two CEE evaluations -- before Cedar and before GEC execution
+      -- MUST be atomic with their respective triggering calls at all
+      three conformance levels.
+
+   OTel attribute integrity:   [NEW in -04]
+      The soos.cap.* span attributes specified in Section 13.5 are
+      governance-critical telemetry.  An adversary who can inject or
+      modify OTel spans can fabricate a compliance record.  GEC
+      implementations MUST sign OTel batch exports with the GEC keypair
+      when operating at L2 or L3 conformance.  GAR-03
+      [I-D.sato-soos-gar] specifies the signed OTel batch export
+      format.
+
+
+17.  IANA Considerations
+
+17.1.  CAP Prohibition Classes Tier 0 Registry
+
+   This document establishes the "Constitutional AI Protocol
+   Prohibition Classes Tier 0" registry at:
+   https://www.iana.org/assignments/cap-prohibition-classes-tier0
+
+   Registration procedure: RFC Only.
+
+   +---------------------------+--------+------------------------------+
+   | Prohibition Class         | Sub    | Treaty / Basis               |
+   +---------------------------+--------+------------------------------+
+   | CSAM                      | TIER0A | UN CRC 1989 + Optional       |
+   |                           |        | Protocol                     |
+   | GENOCIDE_FACILITATION     | TIER0A | UN Genocide Convention 1948  |
+   | MANIPULATION              | TIER0A | Effect-based test, §7.2      |
+   |                           |        | [NEW in -04]                 |
+   | PERFORMED_EMOTION         | TIER0A | Effect-based test, §7.2      |
+   |                           |        | [NEW in -04]                 |
+   | BIOMETRIC_SIGNAL_         | TIER0A | Effect-based test, §7.2      |
+   |   INFERENCE               |        | [NEW in -04]                 |
+   | HUMAN_TRAFFICKING         | TIER0B | UN Trafficking Protocol 2000 |
+   | WMD_ASSISTANCE            | TIER0B | CWC/BWC/NPT                  |
+   | TORTURE_FACILITATION      | TIER0B | UN CAT 1984                  |
+   | TERRORIST_FINANCING       | TIER0B | UNSC Resolution 1373         |
+   +---------------------------+--------+------------------------------+
+
+   Table 7: CAP Tier 0 Prohibition Classes (updated for -04)
+
+17.2.  CAP Prohibition Classes Tier 1 Registry
+
+   This document establishes the "Constitutional AI Protocol
+   Prohibition Classes Tier 1" registry at:
+   https://www.iana.org/assignments/cap-prohibition-classes-tier1
+
+   Registration procedure: Specification Required.
+
+   Initial values: FINANCIAL_CRIME, DATA_PROTECTION,
+   CRITICAL_INFRASTRUCTURE, SECURITIES_LAW, PRIVACY_VIOLATION,
+   FRAUD, COMPETITION_LAW, HUMAN_RIGHTS.  (See Section 8.2.)
+
+17.3.  CAP Conflict Resolution Methods Registry
+
+   Registration procedure: Standards Action.
+   Initial values: MOST_PROTECTIVE, PRIMARY_JURISDICTION, HEM.
+
+17.4.  CAP Deployment Context Registry
+
+   Registration procedure: Specification Required.
+   Initial values: COMMERCIAL, GOVERNMENT_CIVILIAN, GOVERNMENT_DEFENSE,
+   LAW_ENFORCEMENT, ACADEMIC_RESEARCH, REGULATED_PROFESSIONAL.
+
+17.5.  CAP Error Codes Registry
+
+   Initial values:
+
+   +-------------------------------------+-----------------------------+
+   | Error Code                          | Description                 |
+   +-------------------------------------+-----------------------------+
+   | CAP_TRANSPARENCY_VIOLATION          | PTD integrity violation     |
+   |                                     | (Section 12a.6)             |
+   | GOVERNANCE_SUSPENDED                | Policy in SUSPENDED state   |
+   |                                     | [NEW in -04] (Section 6.3)  |
+   +-------------------------------------+-----------------------------+
+
+17.6.  CAP ALE Types Registry  [NEW in -04]
+
+   This document registers the following Audit Log Event (ALE) type
+   in the SOOS ALE registry defined in [I-D.sato-soos-gar]:
+
+   +--------------------+-------------------------------+-------------+
+   | ALE ID             | Name                          | Defined in  |
+   +--------------------+-------------------------------+-------------+
+   | ALE-NEW-02         | CAP_CATALOG_CONFLICT_DETECTED | Section 8.8 |
+   | CAP_POLICY_        | Catalog policy suspended      | Section 14  |
+   |   SUSPENDED        |                               |             |
+   +--------------------+-------------------------------+-------------+
+
+
+18.  References
+
+18.1.  Normative References
+
+   [I-D.sato-soos-cap-rrs]
+              Sato, T., "Constitutional AI Protocol --
+              Regulation Record Specification (CAP-RRS)",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-cap-rrs-02, June 2026,
+              <https://datatracker.ietf.org/doc/
+              draft-sato-soos-cap-rrs/>.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM) for
+              Agentic AI Systems", Work in Progress, Internet-Draft,
+              draft-sato-soos-hem-05, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-hem/>.
+
+   [I-D.sato-soos-idp]
+              Sato, T., "The Intent Declaration Primitive (IDP) for
+              Agentic AI Systems", Work in Progress, Internet-Draft,
+              draft-sato-soos-idp-05, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-idp/>.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity and Attestation",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-kia-03, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-kia/>.
+
+   [I-D.sato-soos-mjwt]
+              Sato, T., "Mandate JWT (MJWT) for Agentic AI Systems",
+              Work in Progress, Internet-Draft,
+              draft-sato-soos-mjwt-02, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-mjwt/>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017,
+              <https://www.rfc-editor.org/rfc/rfc8174>.
+
+18.2.  Informative References
+
+   [I-D.sato-soos-gar]
+              Sato, T., "The Governance Audit Record (GAR) for Agentic
+              AI Systems", Work in Progress, Internet-Draft,
+              draft-sato-soos-gar-03, June 2026,
+              <https://datatracker.ietf.org/doc/draft-sato-soos-gar/>.
+
+   [EU-AI-ACT]
+              European Parliament and Council, "Regulation (EU)
+              2024/1689", OJ L 2024/1689, July 2024.
+
+   [UN-GENOCIDE]
+              United Nations, "Convention on the Prevention and
+              Punishment of the Crime of Genocide", 78 UNTS 277, 1948.
+
+   [UN-CRC]   United Nations, "Convention on the Rights of the Child",
+              1577 UNTS 3, 1989.
+
+   [UN-TIP]   United Nations, "Protocol to Prevent, Suppress and
+              Punish Trafficking in Persons", 2237 UNTS 319, 2000.
+
+   [CWC]      OPCW, "Convention on the Prohibition of Chemical
+              Weapons", 1975 UNTS 45, 1993.
+
+   [UNSC-1373]
+              UN Security Council, "Resolution 1373 (2001)",
+              S/RES/1373, September 2001.
+
+   [UN-CAT]   United Nations, "Convention Against Torture", 1465 UNTS
+              85, 1984.
+
+
+Appendix A.  Worked Example -- A Travel Booking in Two Jurisdictions
+
+   This appendix walks through two scenarios using a Japan-based
+   travel operator (MyAuberge K.K.) running an ActivityBookingObject
+   SO with jurisdiction configuration: primary JP, secondary EU,
+   conflict_resolution: MOST_PROTECTIVE.
+
+A.1.  Scenario 1: Lawful Action, Fully Traced
+
+   A travel agent AI requests an action to process a booking payment
+   for a guest who has explicitly consented to data processing.
+
+   Step 1: The AI submits the action to GEC.transition().
+
+   Step 2: CEE evaluates.  No Tier 0 match.  Tier 1 DATA_PROTECTION
+   record matches -- but consent_scope is present in the MJWT and
+   not expired.  The kernel has populated context.data_subject_consent:
+   true (Section 5.4).  The Cedar policy PERMITs the action given
+   consent context.  CEE returns PERMIT.  OTel span emits
+   soos.cap.tier: "1", soos.cap.cedar_policy_id: "data-protection-jp".
+
+   Step 3: Cedar evaluates.  PERMIT.  No HEM fires.  GEC executes.
+
+   Step 4: STATE_TRANSITION Event Log entry written.  IDP records
+   reasoning.  Full audit trail complete, including consent context.
+
+A.2.  Scenario 2: Jurisdictional Conflict, Human Resolution
+
+   The same AI requests to share guest location data with a third-
+   party logistics provider.  JP Tier 1 permits this under APPI with
+   appropriate notice.  EU Tier 1 prohibits it under GDPR Article 44.
+
+   Step 1: AI submits action to GEC.transition().
+
+   Step 2: CEE evaluates.  Tier 0: no match.  Tier 1: JP -- PERMIT.
+   EU -- PROHIBITS.  Conflict detected.
+
+   Step 3: conflict_resolution is MOST_PROTECTIVE.  CEE returns
+   TIER_1_DENY.  ALE-NEW-02 NOT triggered (this is a runtime conflict,
+   not a catalog load conflict).  CAP_TIER1_CONFLICT_DETECTED written.
+   OTel span: soos.cap.conflict_detected: true.
+
+   Step 4: Agent receives DENY.  IDP records denial.
+
+   Step 5: Operator contacts legal counsel.  Adequacy decision obtained.
+   EU Tier 1 record updated.  Catalog update propagates per Section 8.9.
+   SUSPENDED state entered briefly; policy re-activated within the
+   propagation window.  Action now permitted.
+
+   Step 6: Full trace -- denial, conflict, legal review, re-activation,
+   re-authorization -- in GAR and available to regulators.
+
+
+Appendix B.  Related Work
+
+B.1.  Existing Constitutional AI Frameworks
+
+   Constitutional AI as a training technique (Anthropic, 2022) is a
+   training-time approach.  CAP is an inference-time enforcement
+   approach: the GEC evaluates every action request against a
+   prohibition set regardless of what the model would do if allowed
+   to act.
+
+   CAP and Constitutional AI training are complementary.  CAP does not
+   replace safety training; it provides an enforcement layer that does
+   not depend on the model's training having succeeded.
+
+B.2.  EU AI Act Article 5
+
+   EU AI Act Article 5 defines prohibited AI practices enforced by
+   regulatory action after the fact.  CAP Tier 1 prohibition records
+   are enforced at GEC evaluation time, before the action occurs.
+   Version -04 elevates two Article 5 prohibitions (manipulation and
+   biometric inference) to Tier 0-A, making them globally enforceable
+   rather than EU-jurisdiction-specific.
+
+B.3.  AIPREF
+
+   The AIPREF Working Group defines a vocabulary for AI content-use
+   preferences.  AIPREF provides the policy expression layer; CAP
+   provides the constitutional floor below which no AIPREF preference
+   can descend.
+
+B.4.  SOOS Companion Drafts
+
+   CAP sits above all other SOOS layers in the enforcement stack:
+
+   draft-sato-soos-kia-03:  CAP Violation Records are signed by the
+   GEC keypair.  PCRs are loaded in the GEC Manifest.  At L3, the
+   CEE runs in a KIA-attested TEE.
+
+   draft-sato-soos-idp-05:  CAP evaluates before IDP is submitted.
+   PERFORMED_EMOTION prohibition cross-references IDP reasoning trace.
+
+   draft-sato-soos-mjwt-02:  consent_scope claim is the source for
+   Cedar context population per Section 5.4.  HEM_CONSENT_REQUIRED
+   fires when consent_scope is absent.  [dependency added in -04]
+
+   draft-sato-soos-cap-rrs-02:  Companion specification.  Receives
+   catalog_version schema and the four-phase propagation workflow as
+   normative additions.
+
+   draft-sato-soos-hem-05:  CAP evaluates human HEM decisions before
+   GEC execution.  HEM_JURISDICTIONAL_CONFLICT (Class 5) is a joint
+   CAP+HEM event.  Three new Tier 0-A prohibitions originate from
+   HEM-05 DR-HEM-PSY-02.
+
+   draft-sato-soos-gar-03:  CAP Violation Records are included in the
+   GAR Audit Package.  ALE-NEW-02 is registered in the GAR ALE
+   registry.  soos.cap.* OTel attributes reference the full
+   soos.governance.* namespace defined in GAR-03.
+
+   draft-sato-soos-aep-02:  The AEP ACT step invokes GEC.transition(),
+   which triggers CEE before Cedar.
+
+   draft-sato-soos-mad-03:  CAP applies to all multi-agent topologies.
+   An orchestrator cannot issue a sub-agent mandate that bypasses CAP;
+   the CEE is evaluated per transition regardless of delegation depth.
+
+
+Appendix C.  Vibe Coding Assets
+
+   This appendix provides structured machine-readable references to
+   support AI-assisted implementation of CAP.  Informative.
+
+C.1.  Protocol Summary
+
+   Protocol: Constitutional AI Protocol (CAP)
+   Version:  draft-sato-soos-cap-04
+   Family:   SOOS protocol suite
+   Role:     Constitutional enforcement layer above Cedar and HEM
+
+   New in -04:
+   - Three new Tier 0-A prohibitions: MANIPULATION, PERFORMED_EMOTION,
+     BIOMETRIC_SIGNAL_INFERENCE (§7.2)
+   - SUSPENDED CEE output: catalog-driven evaluative suspension (§6.3)
+   - GOVERNANCE_SUSPENDED error code (§6.3)
+   - catalog_version schema for law amendment tracking (§8.9.3)
+   - ALE-NEW-02: CAP_CATALOG_CONFLICT_DETECTED (§8.8.1)
+   - consent_scope Cedar context population from MJWT (§5.4)
+   - Tier 0 OSCAL reference catalog at soosproject.ai (§12a.7)
+   - OTel soos.cap.* span attributes (§13.5)
+
+C.2.  Key Identifiers
+
+   CEE outputs: PERMIT, CONSTITUTIONAL_VIOLATION, SUSPENDED [NEW],
+     GOVERNANCE_SUSPENDED [NEW], TIER_0B_PCR_ACTIVE,
+     JURISDICTIONAL_CONFLICT, TIER_1_DENY, TIER_1_PCR_ACTIVE,
+     LEGAL_AMBIGUITY_DETECTED, TIER_2_DENY, SESSION_SUSPEND
+
+   Tier 0-A classes: CSAM, GENOCIDE_FACILITATION, MANIPULATION [NEW],
+     PERFORMED_EMOTION [NEW], BIOMETRIC_SIGNAL_INFERENCE [NEW]
+   Tier 0-B classes: HUMAN_TRAFFICKING, WMD_ASSISTANCE,
+     TORTURE_FACILITATION, TERRORIST_FINANCING
+
+   New ALE types: CAP_CATALOG_CONFLICT_DETECTED (ALE-NEW-02),
+     CAP_POLICY_SUSPENDED
+
+   New error code: GOVERNANCE_SUSPENDED
+
+   OTel attributes: soos.cap.cedar_policy_id,
+     soos.cap.cap_rrs_control_id, soos.cap.authority_source_uri,
+     soos.cap.tier, soos.cap.conflict_detected
+
+   PTD disclosure_level values: FULL, REDACTED, COUNT_ONLY
+   Tier 0 OSCAL catalog: https://soosproject.ai/catalogs/tier0-reference-v1.json
+
+C.3.  Canonical Reference
+
+   Specification:  https://soosproject.ai/drafts/cap
+   Datatracker:    https://datatracker.ietf.org/doc/draft-sato-soos-cap/
+   Stack overview: https://soosproject.ai/stack
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/

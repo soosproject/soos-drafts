@@ -1,0 +1,2324 @@
+Internet Engineering Task Force                              T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                           7 July 2026
+Expires: 7 January 2027
+
+
+         The Sovereign Object (SOV) for Agentic AI Systems
+                       draft-sato-soos-sov-02
+
+Abstract
+
+   When an AI agent acts on your behalf, it acts on something: a
+   document, a booking, a contract, a financial instruction.  No
+   existing IETF specification defines what that something is, what
+   states it can be in, who governs it, or how it is irreversibly
+   erased when the relationship ends.
+
+   Agentic AI governance protocols -- including intent declaration,
+   human escalation, audit recording, and constitutional prohibition --
+   all require a normative definition of the governed resource that
+   agents operate on: the structured, stateful, policy-carrying entity
+   to which agent authority is bound and upon which governed transitions
+   execute.  No existing IETF specification defines this primitive.
+
+   This document defines the Sovereign Object (SO): a causally ordered,
+   policy-governed, typed, living document that evolves through a
+   predefined finite state space under Governing Enforcement Component
+   (GEC) authority.  The SO is the unit of governance in the SOOS
+   protocol family: the thing agents operate on, the GEC governs, and
+   human principals reason about.
+
+   This document specifies the SO's five-layer structure (Identity,
+   State, Event Stream, Typed Graph, Attachment Index), its Zone A /
+   Zone B boundary model, its five-phase lifecycle, its SO Type system,
+   its Cedar policy context model, and the binding model by which a
+   Mandate JWT binds an agent to a specific SO instance.
+
+   Version -02 extends SOV-01 with: (a) SO Type registry governance
+   including a SOV-02 subtype model for structured SO Type composition;
+   (b) the Standing Plan Object (SPO) as a normative SOV-02 subtype,
+   specifying declarative scope constraints, Cedar bundle reference,
+   CAP-RRS catalog reference, and IDP structural validation integration;
+   (c) the Mission Plan SO and Mission Status SO as normative SOV-02
+   subtypes for multi-agent orchestration over directed-acyclic-graph
+   task structures; (d) event stream integrity normative requirements
+   including GEC-signed append-only guarantees, kernel_id binding, and
+   OpenTelemetry integration for observability bridging; (e) expanded
+   Security Considerations addressing SO state manipulation, event
+   stream tampering, SO Type spoofing, and stale state_constraint
+   exploitation; and (f) IANA registrations for the SO Type code
+   namespace and SPO media type.
+
+   The Sovereign Object is the architectural foundation referenced
+   normatively by [I-D.sato-soos-idp], [I-D.sato-soos-hem],
+   [I-D.sato-soos-gar], [I-D.sato-soos-cap], and [I-D.sato-soos-mjwt].
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 7 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Problem Statement
+     3.1.  The Missing Governed Resource Primitive
+     3.2.  Why Existing Primitives Are Insufficient
+     3.3.  Relationship to Thomas Howe's Agent Architecture Layering
+   4.  The Sovereign Object
+     4.1.  Definition
+     4.2.  Five-Layer Structure
+       4.2.1.  Layer 1 -- Identity Layer
+       4.2.2.  Layer 2 -- State Layer
+       4.2.3.  Layer 3 -- Event Stream
+       4.2.4.  Layer 4 -- Typed Graph
+       4.2.5.  Layer 5 -- Attachment Index
+     4.3.  Zone A / Zone B Boundary
+       4.3.1.  Zone A -- Protocol Core
+       4.3.2.  Zone B -- Attached Periphery
+       4.3.3.  Zone Boundary Invariants
+   5.  SO Type System
+     5.1.  SO Type Declaration
+     5.2.  SO Type Registry
+     5.3.  SO Type Discovery
+     5.4.  SO Type Registry Governance
+     5.5.  SOV-02 Subtype Model
+   6.  Standing Plan Object (SPO)
+     6.1.  SPO Role and Motivation
+     6.2.  SPO SO Type Declaration
+     6.3.  Declarative Scope Constraints
+     6.4.  Cedar Bundle Reference
+     6.5.  CAP-RRS Catalog Reference
+     6.6.  IDP Structural Validation Integration
+     6.7.  SPO Lifecycle
+     6.8.  SPO Use Case -- Disaster Response Activation
+   7.  Mission Plan SO and Mission Status SO
+     7.1.  Mission Plan SO
+       7.1.1.  DAG Model Reference
+       7.1.2.  Sub-Goal Tracking
+       7.1.3.  Mission Plan SO Type Declaration
+     7.2.  Mission Status SO
+       7.2.1.  Live Execution State
+       7.2.2.  Mission Status SO Type Declaration
+     7.3.  Mission Plan / Mission Status Binding
+   8.  SO Lifecycle
+     8.1.  Five Lifecycle Phases
+     8.2.  Phase Transition Rules
+     8.3.  Cryptographic Erasure
+   9.  Event Stream Integrity
+     9.1.  GEC-Signed Append-Only Requirement
+     9.2.  kernel_id Binding
+     9.3.  OpenTelemetry Integration
+   10.  Cedar Policy Context
+     10.1.  SO State as Cedar Attribute
+     10.2.  Zone Access Policy Model
+     10.3.  Policy Evaluation Order
+   11.  Mandate JWT Binding
+     11.1.  Binding Model
+     11.2.  Narrowing Property at the SO Level
+     11.3.  Binding Verification
+   12.  GEC Association
+     12.1.  GEC-SO Association Model
+     12.2.  Multi-GEC Coordination
+   13.  Relationship to Other SOOS Drafts
+     13.1.  Relationship to DAWN and Adjacent Work
+   14.  Security Considerations
+     14.1.  SO State Manipulation
+     14.2.  Event Stream Tampering
+     14.3.  SO Type Spoofing
+     14.4.  Stale state_constraint Exploitation
+     14.5.  Agent Session Revocation
+     14.6.  Infrastructure Security
+   15.  Privacy Considerations
+   16.  IANA Considerations
+     16.1.  SO Type Registry
+     16.2.  SO Type Code Namespace
+     16.3.  SO Lifecycle Phase Registry
+     16.4.  SO Event Type Registry
+     16.5.  SPO Media Type
+   17.  References
+     17.1.  Normative References
+     17.2.  Informative References
+   Appendix A.  ATP Booking Object -- Reference Implementation
+     A.1.  SO Type Registration
+     A.2.  State Machine
+     A.3.  Zone A / Zone B Application
+     A.4.  SO Lifecycle Mapping
+   Appendix B.  Disaster Response SPO -- Reference Implementation
+     B.1.  SPO Registration
+     B.2.  Scope Constraints
+     B.3.  Cedar Bundle Reference
+     B.4.  Activation Scenario
+   Appendix C.  Vibe Coding Assets
+     C.1.  Protocol Summary
+     C.2.  Key Identifiers
+     C.3.  Canonical Reference
+   Acknowledgements
+   Author's Address
+
+
+1.  Introduction
+
+   The IETF community has made significant progress in specifying how AI
+   agents authenticate [I-D.ietf-wimse-arch], how they express intent
+   before acting [I-D.sato-soos-idp], how human oversight is enforced
+   [I-D.sato-soos-hem], and how agent actions are recorded for audit
+   [I-D.sato-soos-gar].  Each of these specifications refers, explicitly
+   or implicitly, to a governed resource: the entity that the agent is
+   acting upon, that the authorization policy applies to, and that the
+   human principal is reasoning about.
+
+   None of them defines that resource.
+
+   If you are building an agentic AI system today, the absence of a
+   normative governed resource definition means that your authorization
+   system authorizes actions in the abstract -- not actions on a
+   specific, stateful, auditable object under a specific human
+   principal's authority.  SOV closes this gap by defining the
+   Sovereign Object: the typed, stateful, policy-carrying primitive
+   that makes authorization binding specific, delegation revocable, and
+   erasure obligations satisfiable.  Without it, "authorized to perform
+   action X" has no normative referent -- any resource will do, and no
+   audit trail is structurally required.
+
+   The Intent Declaration Primitive [I-D.sato-soos-idp] requires an
+   agent to declare what governed object its action targets.  The Human
+   Escalation Mechanism [I-D.sato-soos-hem] triggers escalation events
+   bound to the state of a specific governed object instance.  The
+   Governance Audit Record [I-D.sato-soos-gar] records transitions on
+   governed objects.  The Mandate JWT specification
+   [I-D.sato-soos-mjwt] binds agent authority to a specific governed
+   object instance.  In every case, the governed resource is assumed
+   but not specified.
+
+   This document fills that gap.  The Sovereign Object (SO) is the
+   unit of governance in the SOOS protocol family: a causally ordered,
+   policy-governed, typed, living document that evolves through a
+   predefined finite state space under GEC authority.  It is the thing
+   agents operate on, the GEC governs, and human principals reason about.
+
+   The SO is not a database record.  A database record is a passive
+   data container.  The SO carries its own state machine, its own Cedar
+   policy context, its own tamper-evident event history, and its own
+   lifecycle -- including eventual cryptographic erasure.  It is the
+   architectural resource that gives SOOS its coherence: the
+   abstraction layer below which protocol-specific implementation
+   details vary and above which governance, authorization, audit, and
+   human oversight operate uniformly.
+
+   The SO is also the primitive that gives Mandate JWT binding its
+   specificity.  An agent is not authorized to perform actions of type
+   X in the abstract.  It is authorized to perform actions of type X on
+   SO instance Y, in lifecycle phase P, under human principal H.  That
+   binding is what makes the authorization auditable, revocable, and
+   scoped.
+
+   Version -01 of this document defined the core Sovereign Object
+   primitive: five-layer structure, Zone A / Zone B boundary, five
+   lifecycle phases, SO Type system, Cedar policy context model, and
+   Mandate JWT binding.
+
+   Version -02 extends the SO Type system with structured type registry
+   governance and the SOV-02 subtype model, introduces the Standing Plan
+   Object (SPO) as the first normative SOV-02 subtype for declarative
+   operational planning, introduces the Mission Plan SO and Mission
+   Status SO as normative subtypes for multi-agent task orchestration,
+   strengthens event stream integrity requirements, expands Security
+   Considerations, and registers the SO Type code namespace and SPO
+   media type with IANA.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   This document uses the following terms:
+
+   Sovereign Object (SO):
+      A causally ordered, policy-governed, typed, living document that
+      evolves through a predefined finite state space under GEC
+      authority.  The unit of governance in the SOOS protocol family.
+
+   SO Instance:
+      A specific instantiation of an SO Type with a globally unique
+      identifier, its own event stream, and its own current lifecycle
+      state.  An SO Instance is the entity to which a Mandate JWT
+      binds agent authority.
+
+   SO Type:
+      A declaration that specifies the state machine, Zone A schema,
+      Cedar policy set, and permissible attachment types for a class of
+      Sovereign Objects.  SO Types are registered in the SO Type
+      Registry.
+
+   SOV-02 Subtype:
+      An SO Type that conforms to the SOV-02 Subtype Model (Section 5.5):
+      it extends a registered parent SO Type, inherits its state machine
+      and Cedar policy set, and adds subtype-specific Zone A fields and
+      attachment types declared in a subtype extension declaration.
+
+   SO Type Registry:
+      A registry of SO Type declarations, analogous to the IANA MIME
+      type registry, that enables interoperating implementations to
+      discover and validate SO Type definitions.
+
+   Standing Plan Object (SPO):
+      A normative SOV-02 subtype that carries a declarative operational
+      plan as a first-class Sovereign Object.  An SPO instance specifies
+      scope constraints, a Cedar bundle reference, a CAP-RRS catalog
+      reference, and IDP structural validation parameters.  The SPO
+      governs how agents activate and execute against a standing plan.
+
+   Mission Plan SO:
+      A normative SOV-02 subtype that represents a multi-step
+      operational task as a directed acyclic graph (DAG) of sub-goals,
+      each represented as a child SO Instance.  The Mission Plan SO is
+      the governance container for a multi-agent orchestration run.
+
+   Mission Status SO:
+      A normative SOV-02 subtype that carries the live execution state
+      of an active Mission Plan.  The Mission Status SO is the real-time
+      read surface for monitoring and escalation; the Mission Plan SO is
+      the authoritative governance record.
+
+   Zone A:
+      The Protocol Core zone of an SO.  GEC-governed.  Schema
+      determined by the SO Type state machine.  Required nodes enforced
+      as invariants.  Personal data MUST NOT be stored in Zone A.
+
+   Zone B:
+      The Attached Periphery zone of an SO.  Agent-accessible, GEC-
+      referenced, but not directly GEC-governed.  Arbitrarily complex
+      external content referenced by integrity-verified attachment
+      records in the Attachment Index.
+
+   SO Lifecycle Phase:
+      One of five phases that every SO Instance traverses: ACTIVE,
+      OPERATIONALLY_COMPLETE, ADMINISTRATIVELY_CLOSED, ARCHIVED, and
+      CRYPTOGRAPHICALLY_ERASED.
+
+   Event Stream:
+      The append-only, causally ordered, tamper-evident log of all
+      transitions executed against an SO Instance.  The Event Stream
+      is the ground truth of the SO's history.
+
+   Typed Graph:
+      The current materialization of an SO Instance's Event Stream as
+      a labeled property graph.  Derived from the Event Stream; in
+      case of conflict, the Event Stream is authoritative.
+
+   Attachment Index:
+      The set of integrity-verified references to Zone B content
+      associated with an SO Instance.
+
+   Governing Enforcement Component (GEC):
+      As defined in [I-D.sato-soos-idp]: a runtime component that
+      enforces authorization policy, records agent actions to a tamper-
+      evident Event Log, and mediates agent access to governed objects.
+
+   Mandate JWT:
+      As defined in [I-D.sato-soos-mjwt]: a JSON Web Token that binds
+      an agent's authorization to a specific SO Instance.
+
+   Cedar:
+      A policy language and evaluation engine [Cedar] used by the GEC
+      to evaluate authorization decisions against SO Instance state and
+      agent intent.
+
+   Human Principal:
+      A natural person who holds authority over an SO Instance, as
+      identified in the Mandate JWT human_principal_id field.
+
+   Narrowing Property:
+      The invariant by which a child Mandate JWT is always a strict
+      subset of its parent in all authorization dimensions.
+
+   kernel_id:
+      The GEC's globally unique, cryptographically stable identifier
+      bound to the GEC signing key.  Recorded in Event Stream entries
+      as soos.governance.kernel_id.  Enables cross-entry verification
+      that all entries in an Event Stream were produced by the same GEC
+      instance.
+
+
+3.  Problem Statement
+
+3.1.  The Missing Governed Resource Primitive
+
+   SOOS governance protocols -- IDP, HEM, GAR, CAP, and MJWT -- are
+   built around the concept of a governed resource: a typed, stateful
+   entity that agents operate on under GEC authority.  The governance
+   properties of the SOOS stack -- auditability, revocability, human
+   oversight, constitutional prohibition, and federated trust -- all
+   derive their coherence from the properties of this governed resource.
+
+   As of the submission of this document, no IETF specification defines
+   this resource normatively.  The existing SOOS drafts use the term
+   "governed object" descriptively but without a formal definition.
+   This creates three concrete problems:
+
+   (a) Binding ambiguity.  The Mandate JWT binds agent authority to a
+       governed object instance.  Without a formal definition of what
+       a governed object is -- what properties it has, what state it
+       can be in, what lifecycle phases it traverses -- the binding has
+       no normative referent.  Implementations cannot interoperate on
+       the meaning of the binding.
+
+   (b) Policy imprecision.  Cedar policies evaluated by the GEC can
+       reference SO Instance state attributes.  Without a normative
+       definition of what state attributes are available and how they
+       are derived from the SO's event history, policy authors cannot
+       write portable policies and evaluators cannot evaluate them
+       consistently.
+
+   (c) Lifecycle opacity.  Regulatory obligations on governed data --
+       including data minimization, erasure on request, and audit
+       retention -- apply to the governed resource and its event
+       history.  Without a normative definition of the SO's lifecycle,
+       including its Cryptographic Erasure phase, implementations
+       cannot demonstrate compliance with these obligations.
+
+3.2.  Why Existing Primitives Are Insufficient
+
+   Three existing primitive types might appear to serve the role of the
+   Sovereign Object.  Each is insufficient for distinct reasons.
+
+   URI-addressed API endpoints.  Generic REST endpoints are passive:
+   they accept requests and return responses.  They have no state
+   machine, no causal event history, no Cedar policy context, and no
+   lifecycle.  An agent authorized to invoke an endpoint is not
+   authorized to perform a specific state transition on a specific
+   stateful resource under human principal oversight.  The
+   authorization semantics are categorically different.
+
+   Database records.  A database record is a passive data container.
+   It may carry a status field that approximates state, but that field
+   is not enforced by a GEC, is not derived from a tamper-evident
+   event history, and does not carry Cedar policy context.  The
+   record's "state" can be overwritten without triggering HEM
+   escalation, without generating a GAR audit entry, and without
+   verifying that the agent holds a valid Mandate JWT authorizing the
+   transition.
+
+   vCon [I-D.ietf-vcon-vcon-container].  The vCon container records
+   the history of a completed conversation or interaction.  vCon is
+   retrospective: it captures what happened after the fact in a
+   portable, shareable format.
+
+   The Sovereign Object is prospective: it carries the Cedar policy
+   context, lifecycle state, and mandate tree that governs agent
+   behavior before and during execution.
+
+   The SO does not replace vCon; the two primitives compose.  A vCon
+   carrying IDP, GAR, and HEM records can be produced from an SO's
+   Event Stream after a session completes.  The SO is the structured
+   source of those records during execution; vCon is the portable
+   container for them after the fact.  For applications that need both
+   governed execution and portable post-session record packaging,
+   implementations SHOULD use SO during execution and produce a vCon
+   at OPERATIONALLY_COMPLETE phase transition.
+
+   Thomas Howe's work on vCon and on agentic architecture layering
+   informs the SOV design.  The vCon / SO composition pattern is the
+   implementation answer to his observation that agent action records
+   must be both machine-auditable during execution and human-portable
+   after completion.
+
+3.3.  Relationship to Thomas Howe's Agent Architecture Layering
+
+   Howe (personal communication, May 2026) proposes an eight-layer
+   architecture for agentic AI systems covering transport, identity,
+   credential issuance, authorization, orchestration, tool invocation,
+   audit, and oversight.  This layering correctly identifies the major
+   functional concerns of agentic governance but does not identify the
+   governed resource as a distinct architectural primitive.  In Howe's
+   model, the Mandate JWT binds to an unspecified resource -- an
+   implicit target of authorization that his layers do not define.
+
+   The Sovereign Object is that missing primitive.  It sits below the
+   authorization and delegation layer as the structured, stateful,
+   policy-carrying resource that the Mandate JWT refers to and that
+   Cedar policy governs access to.  Without the SO, authorization
+   binding is generic: an agent is authorized to perform actions of
+   type X.  With the SO, the binding is specific: an agent is
+   authorized to perform actions of type X on SO Instance Y, in
+   lifecycle phase P, under human principal H, while the SO's state
+   machine is in state S.  That specificity is what makes the
+   authorization auditable and revocable.
+
+
+4.  The Sovereign Object
+
+4.1.  Definition
+
+   A Sovereign Object (SO) is a causally ordered, policy-governed,
+   typed, living document that evolves through a predefined finite state
+   space under Governing Enforcement Component authority.
+
+   "Causally ordered" means that every state transition recorded in the
+   Event Stream is causally linked to its predecessor: no transition
+   can be inserted between two existing entries, and no transition
+   can reference a future state.
+
+   "Policy-governed" means that every state transition MUST be
+   evaluated by a Cedar policy set defined in the SO's Type declaration
+   before execution.  The GEC MUST reject transitions that do not
+   satisfy the applicable Cedar policy.
+
+   "Typed" means that every SO Instance MUST conform to a declared SO
+   Type that specifies its state machine, Zone A schema, and Cedar
+   policy set.
+
+   "Living" means that the SO's current state is always derived from
+   its Event Stream.  The Typed Graph is a materialization of the Event
+   Stream at a given point in time, not an independent data store.  The
+   Event Stream is authoritative.
+
+   "Finite state space" means that the set of states the SO can occupy
+   is declared in the SO Type and is finite.  The GEC MUST reject any
+   transition that would move the SO to a state not declared in its
+   SO Type.
+
+4.2.  Five-Layer Structure
+
+   Every Sovereign Object Instance has five layers.  Layers 1 through 3
+   are mandatory.  Layers 4 and 5 are RECOMMENDED for production
+   implementations.
+
+4.2.1.  Layer 1 -- Identity Layer
+
+   The Identity Layer provides the globally unique, immutable identifier
+   for an SO Instance.
+
+   so_id:
+      REQUIRED.  A UUID v7 [RFC9562] identifier.  UUID v7 is selected
+      for its time-ordered property, which enables efficient range
+      queries over SO Instances by creation time.  The so_id MUST NOT
+      change for the lifetime of the SO Instance, including after
+      Cryptographic Erasure.
+
+   so_type_id:
+      REQUIRED.  The identifier of the SO Type this instance conforms
+      to.  MUST reference a registered entry in the SO Type Registry.
+
+   created_at:
+      REQUIRED.  ISO 8601 timestamp of SO Instance creation.
+
+   human_principal_id:
+      REQUIRED.  The identifier of the human principal who holds
+      authority over this SO Instance.
+
+   gec_id:
+      REQUIRED.  The identifier of the GEC currently associated with
+      this SO Instance.  See Section 12.1.
+
+   The Identity Layer MUST be committed to the Event Stream as the
+   first entry when an SO Instance is created.  The entry MUST be
+   GEC-signed.
+
+4.2.2.  Layer 2 -- State Layer
+
+   The State Layer records the SO Instance's current position in its
+   SO Type's state machine.
+
+   current_state:
+      REQUIRED.  The current state of the SO Instance.  MUST be a
+      state declared in the SO Type's state machine.
+
+   current_phase:
+      REQUIRED.  The current SO Lifecycle Phase.  One of: ACTIVE,
+      OPERATIONALLY_COMPLETE, ADMINISTRATIVELY_CLOSED, ARCHIVED,
+      CRYPTOGRAPHICALLY_ERASED.  See Section 8.
+
+   state_entered_at:
+      REQUIRED.  ISO 8601 timestamp of the most recent state transition.
+
+   The State Layer is derived from the Event Stream.  The GEC MUST
+   maintain a current-state cache for performance, but MUST treat the
+   Event Stream as authoritative in any conflict.
+
+4.2.3.  Layer 3 -- Event Stream
+
+   The Event Stream is the append-only, causally ordered, tamper-
+   evident log of all transitions executed against an SO Instance.
+   The Event Stream is the ground truth of the SO's history.
+   Section 9 specifies Event Stream integrity requirements.
+
+   Every Event Stream entry MUST include:
+
+   event_id:
+      A UUID v7 identifier for this entry, assigned by the GEC at
+      commitment.
+
+   event_type:
+      One of the event types defined in Section 16.4.
+
+   prior_event_id:
+      The event_id of the preceding entry.  MUST be null for the
+      SO_CREATED entry.  MUST NOT be null for all subsequent entries.
+      This field enforces causal ordering.
+
+   occurred_at:
+      ISO 8601 timestamp.
+
+   gec_signature:
+      The GEC signature over this entry, covering event_id, event_type,
+      prior_event_id, occurred_at, and all event-type-specific fields.
+      The signing key and label MUST conform to the GEC's conformance
+      level as defined in [I-D.sato-soos-idp] Section 9.
+
+   soos.governance.kernel_id:
+      The kernel_id of the GEC that produced this entry.  MUST be
+      present in every Event Stream entry.  Enables cross-entry
+      verification per Section 9.2.
+
+   agent_id:
+      The identifier of the agent that triggered this event, if
+      applicable.  NULL for GEC-initiated events.
+
+   mandate_id:
+      The Mandate JWT identifier authorizing this event, if applicable.
+      NULL for GEC-initiated events.
+
+   Event Stream entries MUST be written to a SCITT transparency log
+   [I-D.ietf-scitt-architecture] at Level 3 conformance.  At Level 1
+   and Level 2 conformance, SCITT submission is RECOMMENDED.
+
+4.2.4.  Layer 4 -- Typed Graph
+
+   The Typed Graph is the current materialization of the Event Stream
+   as a labeled property graph.  It provides efficient query access to
+   the SO Instance's current state without requiring full Event Stream
+   replay.
+
+   The Typed Graph schema is defined by the SO Type.  The GEC MUST
+   update the Typed Graph atomically with each Event Stream commitment.
+   In any conflict between the Typed Graph and the Event Stream, the
+   Event Stream is authoritative.
+
+   The Typed Graph MUST expose the following minimum node set:
+   - The SO Instance identity (Layer 1 fields).
+   - The current state and phase (Layer 2 fields).
+   - The set of currently bound Mandate JWTs.
+   - The current Attachment Index (Layer 5).
+
+4.2.5.  Layer 5 -- Attachment Index
+
+   The Attachment Index is the set of integrity-verified references to
+   Zone B content associated with an SO Instance.
+
+   Every Attachment Index entry MUST include:
+
+   attachment_id:
+      A UUID v7 identifier.
+
+   attachment_type:
+      A type declared in the SO Type's attachment type list.
+
+   content_uri:
+      The URI of the Zone B content.
+
+   content_hash:
+      A SHA-256 [RFC6234] hash of the Zone B content at attachment time.
+      The GEC MUST verify content integrity on access.
+
+   attached_at:
+      ISO 8601 timestamp.
+
+   gec_signature:
+      GEC signature over this Attachment Index entry.
+
+   Attachment and detachment operations MUST generate ZONE_B_ATTACHED
+   and ZONE_B_DETACHED Event Stream entries.
+
+4.3.  Zone A / Zone B Boundary
+
+4.3.1.  Zone A -- Protocol Core
+
+   Zone A is the Protocol Core of an SO Instance.  It is the set of
+   data fields governed directly by the GEC and constrained by the SO
+   Type's schema.
+
+   Properties of Zone A:
+   - Schema determined by the SO Type state machine.
+   - Required nodes enforced as invariants by the GEC.
+   - All writes mediated by the GEC.
+   - All transitions subject to Cedar policy evaluation.
+   - All transitions recorded to the Event Stream.
+
+   Zone A Invariant (INV-ZA-1):
+      Personal data as defined under GDPR Article 4(1) [GDPR], APPI
+      Article 2 [APPI], and equivalent jurisdictional definitions
+      MUST NOT be stored in Zone A.  Zone A contains only identifiers,
+      state references, and policy-relevant metadata.  Personal data
+      is always Zone B content, referenced from Zone A via the
+      Attachment Index.
+
+   This invariant enables Zone A and the Event Stream to be retained
+   for audit purposes after a Cryptographic Erasure event (Section 8.3)
+   while Zone B content is irreversibly erased.
+
+4.3.2.  Zone B -- Attached Periphery
+
+   Zone B is the Attached Periphery of an SO Instance.  It contains
+   external content referenced by the Attachment Index.
+
+   Properties of Zone B:
+   - Arbitrarily complex external content.
+   - Not directly governed by the GEC.
+   - Accessible to agents holding appropriate Zone B read capability
+     in their Mandate JWT.
+   - Content integrity verified by the GEC on access via content_hash.
+
+   Zone B content includes, but is not limited to: documents, images,
+   consent records, health declarations, identity verification results,
+   and any other personal data associated with the SO Instance.
+
+4.3.3.  Zone Boundary Invariants
+
+   INV-ZA-1:  Personal data MUST NOT be stored in Zone A.
+
+   INV-ZA-2:  Zone A fields MUST be defined in the SO Type schema.
+              The GEC MUST reject writes to undefined Zone A fields.
+
+   INV-ZB-1:  Zone B content MUST be referenced from Zone A via a
+              signed Attachment Index entry.
+
+   INV-ZB-2:  The GEC MUST verify Zone B content integrity on every
+              access.  Content failing integrity verification MUST NOT
+              be returned to the requesting agent.
+
+
+5.  SO Type System
+
+5.1.  SO Type Declaration
+
+   An SO Type declaration is a JSON object with the following fields:
+
+   {
+     "so_type_id": "<string: unique SO Type identifier>",
+     "so_type_name": "<string: human-readable name>",
+     "so_type_version": "<string: semantic version>",
+     "parent_so_type_id": "<string: parent SO Type id, or null>",
+     "state_machine": {
+       "states": ["<state_name>", ...],
+       "initial_state": "<state_name>",
+       "transitions": [
+         {
+           "from": "<state_name>",
+           "to": "<state_name>",
+           "cedar_action": "<action_name>",
+           "requires_hem": <boolean>
+         }
+       ]
+     },
+     "zone_a_schema": {
+       "<field_name>": {
+         "type": "<json_schema_type>",
+         "required": <boolean>,
+         "personal_data": false
+       }
+     },
+     "cedar_policy_set_uri": "<URI of Cedar policy set>",
+     "attachment_types": ["<attachment_type_name>", ...],
+     "registrant": "<organization name>",
+     "registered_at": "<ISO 8601 timestamp>"
+   }
+
+   The zone_a_schema MUST NOT define fields with personal_data: true.
+   The GEC MUST reject SO Type registration requests that include
+   personal data fields in the Zone A schema.
+
+   The cedar_policy_set_uri MUST resolve to a Cedar policy set that
+   defines permit and forbid rules for all cedar_action values
+   referenced in the state machine transitions.
+
+   The parent_so_type_id field MUST be null for root SO Types.  For
+   SOV-02 subtypes (Section 5.5), it MUST reference the registered
+   parent SO Type identifier.
+
+5.2.  SO Type Registry
+
+   The SO Type Registry is the authoritative catalog of registered SO
+   Types.  It is analogous to the IANA MIME type registry in function.
+   IANA Considerations are specified in Section 16.1.
+
+   SO Type identifiers use a hierarchical naming convention:
+
+      <registrant-prefix>/<type-name>/<version>
+
+   Example: "atp/booking-object/1.0"
+
+   SO Type identifiers MUST be globally unique within the registry.
+
+5.3.  SO Type Discovery
+
+   A GEC MAY expose an SO Type Discovery endpoint returning the set of
+   SO Types it supports, as a JSON array of SO Type declarations.
+   The discovery endpoint URI is implementation-defined.
+
+5.4.  SO Type Registry Governance
+
+   The SO Type Registry operates under the following governance model.
+
+   Registration Authority:
+      IANA is the registration authority for the SO Type Registry.
+      Registration of an SO Type requires a Designated Expert review
+      per [RFC8126] Section 4.5.
+
+   Registration Requirements:
+      An SO Type registration submission MUST include: (a) a unique
+      so_type_id in the form <registrant-prefix>/<type-name>/<version>;
+      (b) a complete SO Type declaration as specified in Section 5.1;
+      (c) a cedar_policy_set_uri resolving to a published Cedar policy
+      set; (d) the name and contact information of the registrant
+      organization; (e) for SOV-02 subtypes, the parent_so_type_id of
+      the registered parent type.
+
+   Expert Review Criteria:
+      The Designated Expert MUST verify: (a) the so_type_id is globally
+      unique; (b) the zone_a_schema contains no personal_data fields;
+      (c) the Cedar policy set at cedar_policy_set_uri is accessible
+      and syntactically valid; (d) for SOV-02 subtypes, the subtype
+      extension does not contradict the parent type's Cedar prohibitions.
+
+   Registry Updates:
+      A registered SO Type MAY be updated by the original registrant
+      by incrementing the version component of the so_type_id.  The
+      prior version remains in the registry and MUST NOT be deleted.
+      Deprecation is indicated by adding a deprecated_at field to the
+      registry entry.
+
+   Conflict Resolution:
+      If two registration submissions claim the same so_type_id, the
+      Designated Expert MUST reject the later submission and notify the
+      submitter.  The registrant-prefix namespace is maintained by IANA
+      to prevent prefix conflicts.
+
+5.5.  SOV-02 Subtype Model
+
+   The SOV-02 Subtype Model enables structured composition of SO Types.
+   A SOV-02 subtype is an SO Type that:
+
+   (a) Declares a parent_so_type_id referencing a registered SO Type.
+
+   (b) Inherits the parent SO Type's state machine.  A SOV-02 subtype
+       MUST NOT remove states or transitions defined in its parent.
+       A SOV-02 subtype MAY add states and transitions, subject to the
+       constraint that new transitions MUST NOT violate the parent
+       type's Cedar policy prohibitions.
+
+   (c) Inherits the parent SO Type's Cedar policy set and MUST
+       declare its own cedar_policy_set_uri pointing to a Cedar policy
+       set that extends the parent.  The subtype Cedar policy set MUST
+       be evaluated after the parent policy set.  A DENY from the
+       parent policy set MUST NOT be overridden by the subtype policy
+       set.
+
+   (d) MAY declare additional Zone A fields in zone_a_schema beyond
+       those declared by the parent.  Inherited Zone A fields MUST NOT
+       be redefined or narrowed.
+
+   (e) MAY declare additional attachment types beyond those declared
+       by the parent.
+
+   The inheritance chain MAY have at most three levels: root type,
+   SOV-02 subtype, and SOV-02 sub-subtype.  Deeper inheritance chains
+   are NOT RECOMMENDED and MUST NOT exceed five levels.
+
+   The SOV-02 subtype model is the mechanism by which the Standing
+   Plan Object (Section 6) and Mission Plan SO (Section 7) are defined
+   as normative subtypes.
+
+
+6.  Standing Plan Object (SPO)
+
+6.1.  SPO Role and Motivation
+
+   An operational plan is a first-class governance artifact in agentic
+   AI deployments.  Plans declare what agents are permitted to do, in
+   what sequence, under what constraints, and subject to what
+   constitutional restrictions.  Without a Sovereign Object to carry
+   the plan, agents execute against informal instructions that are not
+   GEC-governed, not Cedar-evaluable, and not auditable.
+
+   The Standing Plan Object (SPO) closes this gap.  An SPO instance is
+   a Sovereign Object that carries a declarative operational plan.  It
+   specifies the scope within which agents may act when the plan is
+   activated, references the Cedar policy bundle governing plan
+   execution, references the CAP-RRS catalog governing plan
+   constitutional compliance, and specifies the IDP structural
+   validation constraints that all Intent Declarations submitted under
+   the plan must satisfy.
+
+   The reference use case is disaster response activation: when a
+   government agency activates a disaster response plan, the activation
+   creates an SPO instance that carries the operational authority for
+   all agents acting under the plan.  Every agent action in the
+   disaster response is governed by the SPO.  Every HEM escalation is
+   bound to the SPO instance.  Every GAR record references the SPO
+   so_id.
+
+6.2.  SPO SO Type Declaration
+
+   The Standing Plan Object is a SOV-02 subtype of the root SO Type
+   "soos/sovereign-object/1.0".  Its so_type_id is:
+
+      soos/standing-plan-object/1.0
+
+   SPO state machine:
+
+   States: DRAFT, APPROVED, ACTIVE, SUSPENDED, COMPLETED, REVOKED
+
+   Transitions:
+   DRAFT -> APPROVED:     cedar_action: spo.approve
+                          requires_hem: true
+   APPROVED -> ACTIVE:    cedar_action: spo.activate
+                          requires_hem: false
+   ACTIVE -> SUSPENDED:   cedar_action: spo.suspend
+                          requires_hem: true
+   SUSPENDED -> ACTIVE:   cedar_action: spo.resume
+                          requires_hem: true
+   ACTIVE -> COMPLETED:   cedar_action: spo.complete
+                          requires_hem: false
+   ACTIVE -> REVOKED:     cedar_action: spo.revoke
+                          requires_hem: true
+   APPROVED -> REVOKED:   cedar_action: spo.revoke
+                          requires_hem: true
+
+   The APPROVED -> ACTIVE transition (spo.activate) does not require
+   HEM because activation by an authorized agent is within the scope
+   of the approval already granted.  All other transitions that
+   change the plan's operative status require HEM.
+
+   SPO Zone A schema (in addition to inherited fields):
+
+   plan_name:            REQUIRED. String. Human-readable plan name.
+   plan_version:         REQUIRED. String. Semantic version of the plan.
+   activating_authority: REQUIRED. String. Identifier of the authority
+                         whose approval moves the plan to APPROVED.
+   scope_constraints:    REQUIRED. Object. See Section 6.3.
+   cedar_bundle_ref:     REQUIRED. URI. See Section 6.4.
+   cap_rrs_catalog_ref:  REQUIRED. URI. See Section 6.5.
+   idp_validation_ref:   REQUIRED. URI. See Section 6.6.
+   activation_at:        CONDITIONAL. ISO 8601 timestamp. Set when the
+                         SPO transitions to ACTIVE.
+   completion_at:        CONDITIONAL. ISO 8601 timestamp. Set when the
+                         SPO transitions to COMPLETED or REVOKED.
+
+6.3.  Declarative Scope Constraints
+
+   The scope_constraints object in the SPO Zone A schema defines the
+   boundary within which agents operating under this plan are permitted
+   to act.  The GEC MUST enforce scope constraints at the Transition
+   Request level: a Transition Request that would act outside the scope
+   defined by scope_constraints MUST be denied before Cedar evaluation.
+
+   scope_constraints structure:
+
+   {
+     "geographic_scope": [
+       { "jurisdiction": "<ISO 3166-1 alpha-2 code>",
+         "sub_jurisdiction": "<region/prefecture code or null>" }
+     ],
+     "so_type_scope": [
+       "<so_type_id>", ...
+     ],
+     "agent_role_scope": [
+       "<role_identifier>", ...
+     ],
+     "temporal_scope": {
+       "not_before": "<ISO 8601 timestamp or null>",
+       "not_after":  "<ISO 8601 timestamp or null>"
+     },
+     "max_delegation_depth": <integer>
+   }
+
+   geographic_scope:
+      The set of jurisdictions within which agents may take governed
+      actions under this plan.  MUST be non-empty for plans with
+      jurisdiction-specific restrictions.  An empty array indicates
+      no geographic restriction.
+
+   so_type_scope:
+      The set of SO Types against which agents may execute Transition
+      Requests under this plan.  Agents MUST NOT execute Transition
+      Requests against SO Types not listed.  An empty array indicates
+      no SO Type restriction.
+
+   agent_role_scope:
+      The set of agent roles permitted to operate under this plan.
+      An agent whose Mandate JWT does not carry a listed role MUST NOT
+      receive an activation mandate scoped to this SPO.
+
+   temporal_scope:
+      The time window within which the plan is operative.  The GEC
+      MUST reject Transition Requests submitted outside the temporal
+      scope even if the SPO is in ACTIVE state.
+
+   max_delegation_depth:
+      The maximum number of mandate delegation levels permitted for
+      agents operating under this plan.  MUST NOT exceed the
+      max_delegation_depth declared in the applicable MAD cluster
+      [I-D.sato-soos-mad].
+
+6.4.  Cedar Bundle Reference
+
+   The cedar_bundle_ref field references the Cedar policy bundle
+   governing all agent transitions executed under this SPO.  The
+   referenced Cedar bundle MUST be a versioned, content-addressed
+   artifact: the URI MUST resolve to a Cedar policy set whose SHA-256
+   hash matches the hash recorded in the SPO Event Stream entry at
+   activation time.
+
+   The GEC MUST load the Cedar bundle at cedar_bundle_ref at SPO
+   activation and MUST use that bundle for all Cedar evaluations for
+   Transition Requests governed by this SPO until the SPO is completed,
+   revoked, or superseded.
+
+   Cedar bundle update:
+      If the Cedar bundle must be updated during an active SPO (for
+      example, to incorporate a regulatory change), the update MUST be
+      authorized by a human principal with plan authority and MUST
+      generate a CEDAR_BUNDLE_UPDATED Event Stream entry recording the
+      prior bundle URI and hash and the new bundle URI and hash.
+
+6.5.  CAP-RRS Catalog Reference
+
+   The cap_rrs_catalog_ref field references the CAP-RRS policy catalog
+   [I-D.sato-soos-cap] applicable to this plan.  The GEC MUST apply
+   the CAP-RRS catalog at cap_rrs_catalog_ref as the constitutional
+   constraint layer for all Transition Requests governed by this SPO.
+
+   The CAP-RRS catalog reference enables plan-specific constitutional
+   constraints.  A disaster response plan may activate a CAP-RRS
+   catalog that permits actions that are prohibited in normal operation
+   (for example, access to medical records under disaster exception
+   provisions), provided those permissions are within the Tier 0
+   prohibitions defined in [I-D.sato-soos-cap].  CAP Tier 0 prohibitions
+   MUST NOT be relaxed by any SPO CAP-RRS catalog.
+
+6.6.  IDP Structural Validation Integration
+
+   The idp_validation_ref field references an IDP structural validation
+   schema [I-D.sato-soos-idp] that all Intent Declarations submitted
+   under this SPO MUST satisfy.
+
+   The IDP structural validation schema specifies:
+
+   (a) Required IDP fields that MUST be present in all IDPs submitted
+       under this plan.
+
+   (b) Permitted action types.  IDPs whose action_type is not listed
+       MUST be rejected by the GEC before Cedar evaluation.
+
+   (c) Context reference requirements.  IDPs MUST include context_refs
+       pointing to specified classes of antecedent events (for example,
+       the activating SPO Event Stream entry).
+
+   The GEC MUST apply IDP structural validation before Cedar policy
+   evaluation for all Transition Requests submitted under a governed
+   SPO.
+
+6.7.  SPO Lifecycle
+
+   An SPO instance follows the SOV five-phase lifecycle (Section 8)
+   with the additional constraint that the SPO MUST transition to
+   OPERATIONALLY_COMPLETE when its state machine reaches COMPLETED
+   or REVOKED.
+
+   The GEC MUST record an SPO_ACTIVATED Event Stream entry when the
+   SPO transitions to ACTIVE, including the activating agent_id,
+   the mandate_id of the activating mandate, and the activation_at
+   timestamp.
+
+   The GEC MUST record an SPO_DEACTIVATED Event Stream entry when the
+   SPO transitions out of ACTIVE state, including the deactivating
+   agent_id, the mandate_id (or human_principal_id for human-initiated
+   deactivation), and the reason code.
+
+6.8.  SPO Use Case -- Disaster Response Activation
+
+   The following narrative illustrates the SPO in the disaster response
+   context (see Appendix B for a worked implementation).
+
+   When an M7.2 earthquake strikes, a prefectural government activates
+   its standing disaster response plan.  The activation creates an SPO
+   instance with so_type_id "soos/standing-plan-object/1.0".  The SPO
+   Zone A records: the plan name ("北海道 地震対応計画 rev.3"), the
+   activating authority (北海道知事), the scope constraints (geographic:
+   Hokkaido prefecture; SO types: DisasterEventSO, ShelterSO,
+   ResourceRequestSO; temporal: not_after 30 days from activation),
+   the Cedar bundle governing disaster response agent authorities, and
+   the CAP-RRS catalog that activates the disaster exception profile.
+
+   Every agent action in the disaster response -- from DMAT deployment
+   authorization to shelter occupancy management to victim relief
+   payment initiation -- is governed by the SPO.  Every HEM escalation
+   references the SPO so_id.  Every GAR record references the SPO
+   so_id as the governing plan identifier.  When the disaster response
+   concludes, the SPO transitions to COMPLETED and then to
+   OPERATIONALLY_COMPLETE, sealing the complete governance record.
+
+
+7.  Mission Plan SO and Mission Status SO
+
+7.1.  Mission Plan SO
+
+7.1.1.  DAG Model Reference
+
+   A Mission Plan SO represents a multi-step operational task as a
+   directed acyclic graph (DAG) of sub-goals.  Each node in the DAG
+   is a sub-goal, represented as a child SO Instance.  The Mission
+   Plan SO is the governance container for a multi-agent orchestration
+   run; it carries the DAG structure and the authority configuration
+   for the agents executing the mission.
+
+   The DAG is stored in the Mission Plan SO's Zone A as a serialized
+   adjacency list:
+
+   {
+     "dag_nodes": [
+       {
+         "node_id": "<string>",
+         "so_id": "<UUID v7 of child SO Instance>",
+         "so_type_id": "<so_type_id of child SO>",
+         "dependencies": ["<node_id>", ...],
+         "required": <boolean>
+       }
+     ],
+     "dag_version": "<string: semantic version>"
+   }
+
+   Each node references the so_id of a child SO Instance that
+   represents the sub-goal.  The dependencies array lists node_ids
+   that MUST be in a terminal success state before this node's
+   agent may begin execution.
+
+   The GEC MUST enforce the DAG dependency order: an agent MUST NOT
+   receive a Mandate JWT scoped to a child SO whose dependencies have
+   not yet reached terminal success state.
+
+7.1.2.  Sub-Goal Tracking
+
+   Each sub-goal in the DAG is an SO Instance with its own Event
+   Stream, Cedar policy set, and lifecycle.  The Mission Plan SO
+   tracks sub-goal completion via the SUBGOAL_COMPLETED and
+   SUBGOAL_FAILED Event Stream entries.
+
+   When all required sub-goals reach terminal success state, the GEC
+   MUST generate a MISSION_COMPLETE Event Stream entry on the Mission
+   Plan SO and transition it to its COMPLETED state.
+
+   If any required sub-goal reaches a terminal failure state that
+   cannot be recovered by the GEC, the GEC MUST generate a
+   MISSION_FAILED Event Stream entry and invoke HEM escalation
+   against the Mission Plan SO.
+
+7.1.3.  Mission Plan SO Type Declaration
+
+   so_type_id: soos/mission-plan/1.0
+   parent_so_type_id: null (root type)
+
+   States: PLANNING, APPROVED, EXECUTING, COMPLETED, FAILED, REVOKED
+
+   Transitions:
+   PLANNING -> APPROVED:    cedar_action: mission.approve
+                            requires_hem: true
+   APPROVED -> EXECUTING:   cedar_action: mission.start
+                            requires_hem: false
+   EXECUTING -> COMPLETED:  cedar_action: mission.complete
+                            requires_hem: false
+   EXECUTING -> FAILED:     cedar_action: mission.fail
+                            requires_hem: true
+   EXECUTING -> REVOKED:    cedar_action: mission.revoke
+                            requires_hem: true
+   APPROVED -> REVOKED:     cedar_action: mission.revoke
+                            requires_hem: true
+
+   Zone A fields (in addition to inherited SO fields):
+   mission_name:       REQUIRED. String.
+   dag_structure:      REQUIRED. Object per Section 7.1.1.
+   governing_spo_id:   OPTIONAL. UUID v7. so_id of the SPO governing
+                       this mission, if any.
+   max_subgoal_count:  REQUIRED. Integer. Maximum number of DAG nodes.
+   started_at:         CONDITIONAL. ISO 8601 timestamp.
+   completed_at:       CONDITIONAL. ISO 8601 timestamp.
+
+7.2.  Mission Status SO
+
+7.2.1.  Live Execution State
+
+   The Mission Status SO carries the live execution state of an active
+   Mission Plan.  It is the real-time read surface for monitoring
+   dashboards, HEM escalation handlers, and human principals who need
+   a snapshot of mission progress without replaying the Mission Plan
+   SO's full Event Stream.
+
+   The Mission Status SO is a materialized view of the Mission Plan SO's
+   execution state.  The Mission Plan SO's Event Stream is authoritative;
+   the Mission Status SO is a performance optimization surface.
+
+   The GEC MUST update the Mission Status SO atomically with each
+   Event Stream entry committed to the Mission Plan SO.  A stale
+   Mission Status SO MUST NOT be presented to requesting agents; the
+   GEC MUST serve the Mission Plan SO Event Stream directly if the
+   Mission Status SO is more than one committed entry behind.
+
+7.2.2.  Mission Status SO Type Declaration
+
+   so_type_id: soos/mission-status/1.0
+   parent_so_type_id: null (root type)
+
+   States: INITIALIZING, LIVE, DEGRADED, COMPLETED, FAILED
+
+   Zone A fields (in addition to inherited SO fields):
+   mission_plan_so_id: REQUIRED. UUID v7. so_id of the authoritative
+                       Mission Plan SO this status mirrors.
+   dag_execution_map:  REQUIRED. Object. Current completion state of
+                       each DAG node: node_id -> state enum
+                       (PENDING, RUNNING, COMPLETED, FAILED).
+   active_agent_count: REQUIRED. Integer. Number of agents currently
+                       executing against child SO Instances in this
+                       mission.
+   last_event_id:      REQUIRED. UUID v7. event_id of the last Mission
+                       Plan SO Event Stream entry reflected in this
+                       Mission Status SO.
+   status_updated_at:  REQUIRED. ISO 8601 timestamp.
+
+7.3.  Mission Plan / Mission Status Binding
+
+   A Mission Plan SO and its Mission Status SO are bound at creation.
+   The Mission Status SO MUST carry the so_id of its Mission Plan SO
+   in the mission_plan_so_id field.  The Mission Plan SO MUST record
+   the so_id of its Mission Status SO in a MISSION_STATUS_BOUND Event
+   Stream entry generated at Mission Status SO creation.
+
+   The GEC MUST enforce the following binding invariants:
+
+   (a) A Mission Plan SO MUST have exactly one associated Mission
+       Status SO for its entire EXECUTING phase.
+
+   (b) The Mission Status SO MUST NOT be updated except by the GEC
+       in response to Mission Plan SO Event Stream entries.  Agent-
+       initiated writes to Mission Status SO Zone A fields are
+       prohibited.
+
+   (c) Divergence between Mission Status SO state and Mission Plan
+       SO Event Stream MUST trigger a MISSION_STATUS_DIVERGENCE Event
+       Stream entry on the Mission Plan SO and a HEM escalation
+       classified as HEM_CLASS_GOVERNANCE_INCONSISTENCY.
+
+
+8.  SO Lifecycle
+
+8.1.  Five Lifecycle Phases
+
+   Every SO Instance progresses through a sequence of lifecycle phases.
+   Phase transitions are irreversible.
+
+   Phase 1 -- ACTIVE:
+      Normal operation.  All Cedar-governed state transitions permitted,
+      subject to the SO Type's state machine and Cedar policy set.
+
+   Phase 2 -- OPERATIONALLY_COMPLETE:
+      Terminal operational state reached.  Agent-initiated state
+      transitions are prohibited.  Administrative transitions for
+      billing, audit, and dispute resolution remain permitted subject
+      to Cedar policy and human principal authority.
+
+   Phase 3 -- ADMINISTRATIVELY_CLOSED:
+      All state transitions prohibited except DISPUTE_OPENED, if
+      defined by the SO Type.  Only human principals with explicit
+      dispute authority may initiate transitions.
+
+   Phase 4 -- ARCHIVED:
+      All write operations prohibited.  The SO Instance is read-only.
+      The Event Stream is retained.  Zone B content retention is
+      governed by the data_residency policy and applicable law.
+
+   Phase 5 -- CRYPTOGRAPHICALLY_ERASED:
+      Zone B content has been irreversibly erased per Section 8.3.
+      Zone A data and the Event Stream are retained for audit.  No
+      further phase transitions are possible.
+
+8.2.  Phase Transition Rules
+
+   Phase transitions MUST be initiated by the GEC, not by agents
+   directly.  Phase transitions MUST generate a PHASE_TRANSITIONED
+   Event Stream entry recording the prior phase, the new phase, the
+   authorizing human principal (if applicable), and the GEC signature.
+
+   Phase transition rules:
+
+   ACTIVE -> OPERATIONALLY_COMPLETE:
+      When the SO Type's state machine reaches a declared terminal
+      state.  The GEC MAY initiate this transition automatically.
+
+   OPERATIONALLY_COMPLETE -> ADMINISTRATIVELY_CLOSED:
+      After the administrative tail period declared in the SO Type has
+      elapsed.  MUST be authorized by a human principal with lifecycle
+      authority.
+
+   ADMINISTRATIVELY_CLOSED -> ARCHIVED:
+      After all dispute resolution windows and applicable regulatory
+      retention requirements have elapsed.  MUST be authorized by a
+      human principal with lifecycle authority.
+
+   ARCHIVED -> CRYPTOGRAPHICALLY_ERASED:
+      At any time after ARCHIVED phase, subject to regulatory retention
+      requirements.  MUST be authorized by a human principal with
+      erasure authority, or initiated automatically by the GEC when
+      data_residency.retention_days has elapsed.
+
+8.3.  Cryptographic Erasure
+
+   Cryptographic Erasure irreversibly erases Zone B content by
+   destroying the encryption keys protecting it.
+
+   Cryptographic Erasure MUST:
+
+   (a) Destroy all encryption keys protecting Zone B content for this
+       SO Instance.
+
+   (b) Generate an ERASURE_INITIATED Event Stream entry before beginning
+       key destruction.
+
+   (c) Generate an ERASURE_COMPLETED Event Stream entry after key
+       destruction is confirmed.
+
+   (d) Retain Zone A data and the complete Event Stream intact.
+
+   (e) Update current_phase to CRYPTOGRAPHICALLY_ERASED.
+
+   Cryptographic Erasure satisfies the right to erasure under GDPR
+   Article 17 [GDPR] for Zone B content while preserving the Event
+   Stream as an audit record.
+
+
+9.  Event Stream Integrity
+
+9.1.  GEC-Signed Append-Only Requirement
+
+   The Event Stream is the ground truth of an SO Instance's history.
+   Its integrity properties MUST be enforced as follows.
+
+   (a) The GEC MUST sign every Event Stream entry using the GEC's
+       Governance Identity Key (GIK) as defined in [I-D.sato-soos-kia].
+       The signature MUST cover: event_id, event_type, prior_event_id,
+       occurred_at, soos.governance.kernel_id, and all event-type-
+       specific fields.
+
+   (b) The Event Stream MUST be append-only.  No entry MUST be modified,
+       deleted, or reordered after commitment.  An implementation MUST
+       treat any request to modify a committed Event Stream entry as a
+       security incident requiring HEM escalation (Section 14.2).
+
+   (c) Every Event Stream entry MUST include prior_event_id referencing
+       the immediately preceding entry.  A verifier MUST be able to
+       construct the complete causal chain from the SO_CREATED entry
+       to the most recent entry by following prior_event_id links and
+       verifying each GEC signature.
+
+   (d) The GEC MUST reject any attempt to commit an Event Stream entry
+       whose prior_event_id does not match the current head of the
+       Event Stream.  This prevents concurrent write races and ensures
+       linearizability of the causal chain.
+
+9.2.  kernel_id Binding
+
+   The soos.governance.kernel_id attribute is the GEC's globally
+   unique, cryptographically stable identifier bound to the GEC's
+   Governance Identity Key.  It is defined in [I-D.sato-soos-kia].
+
+   Every Event Stream entry MUST carry the soos.governance.kernel_id
+   of the GEC that signed it.  A verifier MUST:
+
+   (a) Confirm that all entries in an Event Stream carry the same
+       kernel_id, or carry a different kernel_id only in a GEC_TRANSITIONED
+       entry that documents a legitimate GEC migration.
+
+   (b) Verify the GEC signature on each entry against the public key
+       published by the GEC identified by kernel_id at entry commitment
+       time, retrievable via the KIA attestation record
+       [I-D.sato-soos-kia].
+
+   An Event Stream containing kernel_id values that do not correspond
+   to documented GEC_TRANSITIONED entries MUST be treated as a tampered
+   record and reported as a critical security incident.
+
+9.3.  OpenTelemetry Integration
+
+   Event Stream entries SHOULD be surfaced as OpenTelemetry [OTel]
+   trace spans to enable integration with standard observability
+   infrastructure.  The following mapping applies:
+
+   OTel Span Attributes:
+      soos.so.so_id:          The SO Instance identifier (so_id).
+      soos.so.so_type_id:     The SO Type identifier.
+      soos.governance.kernel_id: The GEC kernel_id.
+      soos.event.event_id:    The Event Stream entry identifier.
+      soos.event.event_type:  The Event Stream entry type.
+      soos.event.prior_event_id: The prior_event_id for causal linking.
+
+   OTel Span Naming:
+      Spans SHOULD be named "soos.so.<event_type>" using the Event
+      Stream event_type value in snake_case.
+
+   OTel Causality:
+      The OTel parent span SHOULD reference the span corresponding to
+      the prior_event_id entry, enabling visualization tools to render
+      the causal Event Stream as a trace tree.
+
+   Implementations MAY export Event Stream entries to an OTel collector
+   in addition to SCITT transparency log submission.  OTel export does
+   NOT substitute for SCITT submission.  The GEC MUST complete SCITT
+   submission before considering an Event Stream entry committed.
+
+
+10.  Cedar Policy Context
+
+10.1.  SO State as Cedar Attribute
+
+   The GEC MUST make the following SO Instance attributes available as
+   Cedar context attributes during policy evaluation:
+
+   so.so_id:           The SO Instance identifier.  Type: String.
+   so.so_type_id:      The SO Type identifier.  Type: String.
+   so.current_state:   Current state machine position.  Type: String.
+   so.current_phase:   Current lifecycle phase.  Type: String.
+   so.human_principal_id:  Human principal identifier.  Type: String.
+   so.prior_denial_count:  Count of GEC DENY responses targeting this
+                           SO Instance in the current session.
+                           Type: Long.  Composes with the
+                           prior_denial_count attribute in
+                           [I-D.sato-soos-idp] Section 5.4.
+   so.mandate_count:   Number of active Mandate JWTs bound to this SO
+                       Instance.  Type: Long.
+
+   For SPO instances, the following additional Cedar attributes MUST
+   be available:
+
+   spo.plan_name:          String.
+   spo.activation_at:      String (ISO 8601) or null.
+   spo.temporal_scope.not_after: String (ISO 8601) or null.
+
+   For Mission Plan SO instances, the following additional Cedar
+   attributes MUST be available:
+
+   mission.dag_node_count:    Long.
+   mission.completed_count:   Long.
+   mission.failed_count:      Long.
+
+10.2.  Zone Access Policy Model
+
+   Zone B read access and Zone B write access are separate Cedar action
+   types and MUST be declared separately in the SO Type's Cedar policy
+   set.  A Cedar policy permitting a state transition MUST NOT
+   implicitly permit Zone B access.
+
+10.3.  Policy Evaluation Order
+
+   The GEC MUST evaluate Cedar policies in the following order:
+
+   (1) CAP Tier 0 (constitutional) prohibitions [I-D.sato-soos-cap].
+       A Tier 0 prohibition results in immediate DENY.
+
+   (2) CAP Tier 1 (jurisdictional) prohibitions [I-D.sato-soos-cap].
+
+   (3) SPO scope constraint enforcement (Section 6.3), if the
+       Transition Request is governed by an active SPO.  A scope
+       violation results in immediate DENY before Cedar evaluation.
+
+   (4) SO Type Cedar policy (and SOV-02 subtype Cedar policy, if
+       applicable), with SO Instance state attributes per Section 10.1
+       and IDP intent attributes per [I-D.sato-soos-idp] Section 5.4.
+       For SOV-02 subtypes, parent Cedar policy is evaluated before
+       subtype Cedar policy.  A DENY from parent policy MUST NOT be
+       overridden by subtype policy.
+
+   (5) Mandate JWT scope verification [I-D.sato-soos-mjwt].
+
+   A PERMIT requires all five layers to permit the action.  A DENY at
+   any layer results in immediate DENY without proceeding further.
+
+
+11.  Mandate JWT Binding
+
+11.1.  Binding Model
+
+   A Mandate JWT [I-D.sato-soos-mjwt] binds agent authority to a
+   specific SO Instance with the following properties:
+
+   Instance specificity:
+      A Mandate JWT MUST reference the so_id of a specific SO Instance.
+      A Mandate JWT MUST NOT authorize actions against an SO Type in
+      general.
+
+   State awareness:
+      The Mandate JWT MAY declare the set of SO states in which the
+      authorized Cedar actions may be performed.  The GEC MUST reject
+      Transition Requests referencing Cedar actions outside the state-
+      restricted set for the SO Instance's current state.
+
+   Phase restriction:
+      The Mandate JWT MAY declare lifecycle phase restrictions.  The
+      GEC MUST reject Transition Requests targeting an SO Instance in
+      a phase not permitted by the Mandate JWT.
+
+   Temporal validity:
+      The Mandate JWT MUST carry a standard JWT exp claim.  The GEC
+      MUST reject expired Mandate JWTs.
+
+   Human principal linkage:
+      The Mandate JWT MUST carry the human_principal_id of the SO
+      Instance's human principal.  The GEC MUST verify that this value
+      matches the human_principal_id in the SO Instance's Identity Layer.
+
+11.2.  Narrowing Property at the SO Level
+
+   The Narrowing Property is a normative invariant: a child Mandate JWT
+   MUST be a strict subset of its parent in all authorization
+   dimensions.  At the SO level:
+
+   (a) SO Instance scope: A child mandate MUST reference the same
+       so_id or a subset of SO Instances covered by its parent.
+
+   (b) Cedar action scope: A child mandate's authorized action set
+       MUST be a subset of its parent's.
+
+   (c) State restrictions: A child mandate's permitted SO states MUST
+       be a subset of its parent's.
+
+   (d) Phase restrictions: A child mandate's permitted lifecycle phases
+       MUST be a subset of its parent's.
+
+   (e) Temporal validity: A child mandate's exp claim MUST NOT be
+       later than its parent's.
+
+   The GEC MUST verify the Narrowing Property when a child Mandate JWT
+   is presented.  A violation MUST result in a NARROWING_VIOLATION deny
+   code.
+
+11.3.  Binding Verification
+
+   On receiving a Transition Request, the GEC MUST verify before Cedar
+   evaluation:
+
+   (a) The Mandate JWT signature MUST be valid.
+   (b) The Mandate JWT MUST not be expired.
+   (c) The so_id in the Mandate JWT MUST match the targeted SO Instance.
+   (d) The human_principal_id MUST match the SO Instance Identity Layer.
+   (e) The Mandate JWT MUST not appear in the revocation registry.
+   (f) If a child mandate, the Narrowing Property MUST be verified.
+
+   Binding verification failure MUST result in a DENY response recorded
+   in the SO Instance's Event Stream.
+
+
+12.  GEC Association
+
+12.1.  GEC-SO Association Model
+
+   Every SO Instance MUST be associated with exactly one GEC at any
+   given time, recorded as gec_id in the Identity Layer.  The GEC is
+   responsible for: evaluating all Transition Requests, maintaining the
+   Event Stream, enforcing Cedar policy, executing HEM escalation,
+   generating GAR audit records, enforcing CAP prohibitions, and
+   managing Mandate JWT revocation.
+
+   A GEC transition MUST generate a GEC_TRANSITIONED Event Stream entry
+   signed by both the outgoing and incoming GEC.  During a GEC
+   transition, the SO Instance MUST be placed in a non-transitionable
+   state until the new GEC confirms association.
+
+12.2.  Multi-GEC Coordination
+
+   A single SO Instance MUST NOT be governed by more than one GEC
+   simultaneously.  A trust domain MAY designate shadow GECs for
+   resilience; shadow GECs MUST receive Event Stream entries in real
+   time but MUST NOT accept Transition Requests except following formal
+   failover.  Multi-GEC coordination protocols are outside the scope of
+   this document.
+
+
+13.  Relationship to Other SOOS Drafts
+
+   IDP [I-D.sato-soos-idp]:
+      The "governed object" in IDP is an SO Instance as defined in
+      this document.  The IDP context_refs field may reference SO Event
+      Stream entries by event_id.  The so.prior_denial_count Cedar
+      attribute (Section 10.1) composes with the prior_denial_count
+      attribute defined in [I-D.sato-soos-idp] Section 5.4.  The SPO's
+      idp_validation_ref (Section 6.6) provides plan-specific IDP
+      structural validation constraints.
+
+   HEM [I-D.sato-soos-hem]:
+      HEM events are bound to SO Instances.  HEM_TRIGGERED and
+      HEM_RESOLVED events MUST be recorded in the SO Instance's Event
+      Stream.  The HEM_PENDING state prohibits all agent-initiated
+      Transition Requests against the SO Instance until a human
+      principal provides a decision.  Mission Plan SO failures trigger
+      HEM_CLASS_GOVERNANCE_INCONSISTENCY per Section 7.3.
+
+   GAR [I-D.sato-soos-gar]:
+      Governance Audit Records are generated from SO Instance Event
+      Stream entries.  The SO's Cryptographic Erasure event MUST be
+      recorded in the GAR Event Log as an ERASURE_COMPLETED entry
+      and generates a SAR entry at session close per
+      [I-D.sato-soos-gar] Section 6.
+
+   CAP [I-D.sato-soos-cap]:
+      CAP prohibitions are enforced at the SO level before Cedar
+      evaluation per Section 10.3.  The SPO's cap_rrs_catalog_ref
+      (Section 6.5) enables plan-specific CAP-RRS policy activation.
+
+   MJWT [I-D.sato-soos-mjwt]:
+      The Mandate JWT binds agent authority to a specific SO Instance
+      per Section 11.  The Mandate JWT's so_id field is the normative
+      reference to the SO Instance Identity Layer.
+
+   KIA [I-D.sato-soos-kia]:
+      The GEC's Governance Identity Key (GIK) used to sign Event Stream
+      entries is attested via KIA.  The soos.governance.kernel_id field
+      in Event Stream entries references the KIA-attested GEC identity.
+      Event Stream integrity verification per Section 9 depends on KIA
+      attestation.
+
+   MAD [I-D.sato-soos-mad]:
+      MAD cluster governance operates over shared SO instances.
+      so_authority_principal is declared at cluster formation.
+      The SPO's max_delegation_depth (Section 6.3) MUST NOT exceed the
+      max_delegation_depth declared in the applicable MAD cluster.
+      Mission Plan SO DAG enforcement (Section 7.1) coordinates with
+      MAD for multi-agent sub-goal assignment.
+
+   FAIP [I-D.sato-soos-faip]:
+      The Federated Agent Intelligence Protocol specifies cross-domain
+      federated analytics derived from SO Instance Event Streams.  The
+      data_residency field declared in [I-D.sato-soos-idp] Section 4.2
+      controls per-IDP-record FAIP tier eligibility; this field is
+      carried in Event Stream entries generated from IDP records.
+      Zone B content is excluded from FAIP analytics by the Zone A
+      Invariant (INV-ZA-1).
+
+13.1.  Relationship to DAWN and Adjacent Work
+
+   The Decentralized Agent Workload Networking (DAWN) BoF at IETF 126
+   addresses requirements for how AI agents discover, negotiate, and
+   operate across distributed workload environments.  SOV is directly
+   relevant to DAWN's requirements in one specific dimension: the
+   governed resource that agent authority is bound to.
+
+   DAWN addresses agent-to-agent communication and workload routing.
+   SOV addresses what agents operate on when they arrive at a workload:
+   the structured, stateful, policy-carrying resource that authorization
+   policy governs.  These are complementary, not competing.
+
+   SOV's DAWN written comment will address three points:
+
+   (a) The SO as the normative binding target for agent authorization
+       in multi-workload topologies.  Any DAWN agent capability
+       discovery mechanism that produces authorization grants SHOULD
+       reference a specific SO Instance, not an abstract capability
+       type.  SOV provides the structural definition for that referent.
+
+   (b) The Zone A / Zone B boundary as a portable interoperability
+       surface.  Zone A fields are SO-Type-defined and interoperable
+       across GEC implementations.  Zone B content is implementation-
+       specific.  DAWN workload routing can use Zone A state to make
+       routing decisions without touching personal data.
+
+   (c) The SO Type Registry as an IANA-analogous coordination point
+       for governed resource type definitions across DAWN workloads.
+
+   The SPO (Section 6) and Mission Plan SO (Section 7) are directly
+   relevant to DAWN's orchestration requirements: the SPO defines the
+   governance container for a cross-workload operational plan, and the
+   Mission Plan SO defines the DAG-structured task graph that DAWN
+   agents traverse.
+
+   Adjacent IETF work:
+
+   draft-ietf-wimse-arch:
+      WIMSE defines workload identity; SOV defines what the GEC
+      governs.
+
+   draft-ietf-scitt-architecture:
+      Event Stream entries are committed to a SCITT transparency log
+      at Level 3 conformance.  SOV is an event-centric SCITT
+      application: SCITT is artifact-centric; SOV is governance-
+      event-centric.
+
+   draft-ietf-vcon-vcon-container:
+      Composition: SO governs during execution; vCon packages the
+      resulting records for portable post-session use.  See Section 3.2.
+
+   draft-singla-agent-identity-protocol et al.:
+      Identity drafts establish what identity an agent presents.
+      SOV operates after identity is established: the SO defines
+      what the authorized agent acts upon, not who the agent is.
+
+
+14.  Security Considerations
+
+   This section documents the principal attack surfaces against the
+   Sovereign Object model.  Implementers MUST address all attack
+   vectors documented here.
+
+14.1.  SO State Manipulation
+
+   Attack:
+      An adversary with application-layer access (but without GEC
+      authority) attempts to write the current_state field of an SO
+      Instance directly to the underlying data store, bypassing the
+      GEC and Cedar policy evaluation.
+
+   Mechanism:
+      If the SO's state store is accessible to application-layer
+      processes independently of the GEC, an adversary who compromises
+      an application process can overwrite current_state, causing the
+      GEC's next Cedar policy evaluation to use the false state and
+      potentially permitting a transition that would otherwise be denied.
+
+   Defense:
+      The GEC MUST be the sole writer of Zone A fields.  The SO state
+      store MUST be access-controlled such that only the GEC process
+      can write Zone A data.  The GEC MUST verify SO state consistency
+      on every Transition Request by replaying the Event Stream head
+      against the cached current_state and MUST treat any divergence
+      as a critical security incident.
+
+   Residual risk:
+      If the GEC process itself is compromised, state manipulation
+      is not detectable by the GEC alone.  Defense in depth requires
+      SCITT transparency log submission of all Event Stream entries:
+      an external verifier can detect state manipulation by comparing
+      the transparency log with the SO state store.
+
+14.2.  Event Stream Tampering
+
+   Attack:
+      An adversary attempts to modify, delete, or reorder committed
+      Event Stream entries to alter the apparent history of SO
+      transitions -- for example, to remove evidence of a prohibited
+      transition.
+
+   Mechanism:
+      Entry deletion removes the GAR and SCITT records of a transition.
+      Entry modification changes the transition record.  Entry reordering
+      changes the apparent causal sequence.
+
+   Defense:
+      The GEC MUST sign every Event Stream entry (Section 9.1).  The
+      prior_event_id chain MUST be verifiable from SO_CREATED to head.
+      SCITT transparency log submission (Section 9.1) provides external
+      verifiability.  The GEC MUST treat any request to delete or
+      modify a committed Event Stream entry as a critical security
+      incident, immediately triggering HEM escalation with class
+      HEM_CLASS_INTEGRITY_VIOLATION.
+
+      The GEC MUST NOT serve an Event Stream with a broken prior_event_id
+      chain.  A broken chain MUST be reported as INTEGRITY_VIOLATION.
+
+   Residual risk:
+      An adversary with access to both the SO state store and the
+      SCITT transparency log submission endpoint could attempt to
+      suppress SCITT submission while manipulating the Event Stream.
+      Defense requires that SCITT submission be performed by an
+      independent process, not by the GEC, to prevent single-point
+      suppression.
+
+14.3.  SO Type Spoofing
+
+   Attack:
+      An adversary submits a Transition Request claiming an SO Type
+      that grants broader Cedar permissions than the SO Instance's
+      actual registered type, causing the GEC to evaluate the request
+      against a more permissive policy set.
+
+   Mechanism:
+      If the GEC resolves the SO Type's Cedar policy set from the
+      so_type_id field in the Transition Request (rather than from
+      the SO Instance's registered type), an adversary can substitute
+      a more permissive so_type_id.
+
+   Defense:
+      The GEC MUST resolve the SO Type and Cedar policy set exclusively
+      from the SO Instance's Identity Layer (Layer 1) so_type_id field,
+      as committed to the Event Stream at SO_CREATED.  The GEC MUST NOT
+      accept the so_type_id from the Transition Request itself.  The
+      GEC MUST verify that the SO Instance's so_type_id matches a
+      registered entry in the SO Type Registry at policy evaluation
+      time.
+
+      For SOV-02 subtypes, the GEC MUST resolve the complete Cedar
+      policy inheritance chain from the registry, not from the
+      Transition Request, and MUST verify that no link in the chain
+      has been tampered with since the SO Instance was created.
+
+   Residual risk:
+      If the SO Type Registry is compromised and a malicious Cedar
+      policy set is substituted at the registered URI, the GEC would
+      evaluate against the malicious policy.  Defense requires that
+      the cedar_policy_set_uri be content-addressed: the GEC MUST
+      verify the SHA-256 hash of the Cedar policy set against a hash
+      committed to the Event Stream at SO_CREATED or most recent
+      CEDAR_BUNDLE_UPDATED entry.
+
+14.4.  Stale state_constraint Exploitation
+
+   Attack:
+      An adversary presents a Mandate JWT with a state_constraint
+      (permitted SO states) that was valid at the time the JWT was
+      issued but no longer matches the SO Instance's current state.
+      The adversary hopes the GEC will evaluate the JWT's
+      state_constraint against a cached (stale) SO state rather than
+      the current Event Stream head.
+
+   Mechanism:
+      If the GEC uses a cached current_state for Mandate JWT
+      state_constraint evaluation and the cache is stale, a transition
+      to state B may have occurred after the JWT was issued that renders
+      the JWT's state_constraint invalid.  The adversary times the
+      Transition Request to exploit the cache staleness window.
+
+   Defense:
+      The GEC MUST evaluate state_constraint against the current Event
+      Stream head state, not a cached state.  The GEC MUST acquire
+      a read lock on the Event Stream before reading current_state for
+      Mandate JWT validation and MUST NOT release the lock until the
+      Transition Request is either committed or denied.
+
+      The GEC SHOULD set Mandate JWT lifetimes (exp claims) short
+      enough that the probability of state divergence during a JWT's
+      validity window is minimal.  Mandate JWTs with state_constraint
+      fields SHOULD have exp claims no longer than the expected
+      duration of the constrained state.
+
+   Residual risk:
+      In distributed GEC deployments where shadow GECs may have
+      slightly delayed Event Stream views, stale state evaluation
+      remains possible even with locking.  Implementations MUST ensure
+      that Transition Requests are always processed by the primary GEC,
+      not shadow GECs, when state_constraint validation is required.
+
+14.5.  Agent Session Revocation
+
+   The Sovereign Object operates within the SOOS session lifecycle
+   model.  When an agent session is revoked -- whether by operator
+   action, CAEP signal, or CAP constitutional violation -- ongoing
+   Transition Requests against the SO Instance are superseded by the
+   MAD session revocation procedure [I-D.sato-soos-mad] Section 3.6.
+
+   Implementations MUST NOT process agent-initiated Transition Requests
+   against an SO Instance after receiving a session revocation signal
+   for the agent session that bound the active Mandate JWT.
+
+   All pending Event Stream entries at point of revocation MUST be
+   marked with completion_state PARTIAL or CLEAN per
+   [I-D.sato-soos-mad] Section 3.6.3.  The SO Instance MUST remain in
+   a non-transitionable state until a human principal with lifecycle
+   authority clears the revocation condition.
+
+14.6.  Infrastructure Security
+
+   SO Instance identifiers (so_id) are UUID v7 values carrying timing
+   information.  Implementations that consider SO creation timing
+   sensitive MUST treat so_id values as sensitive and avoid exposing
+   them in unauthenticated contexts.
+
+   Zone B content integrity depends on the security of the Zone B
+   storage system.  Implementations MUST ensure Zone B storage provides
+   integrity guarantees appropriate to the sensitivity of stored content.
+
+   The GEC-SO association model (Section 12) creates a single point of
+   authority over an SO Instance.  Implementations MUST protect GEC
+   signing keys at the conformance level declared by the GEC per
+   [I-D.sato-soos-idp] Section 9.
+
+   The Narrowing Property (Section 11.2) is a security invariant.  Any
+   implementation permitting a child mandate to exceed its parent's
+   scope creates an authorization escalation vulnerability.
+
+
+15.  Privacy Considerations
+
+   Zone A Invariant INV-ZA-1 prohibits personal data in Zone A.  This
+   is the primary privacy protection in the SO design: it ensures that
+   Zone A data and the Event Stream can be retained for audit after
+   Cryptographic Erasure without retaining personal data.
+
+   Zone B content MUST be encrypted at rest.  Cryptographic Erasure
+   (Section 8.3) satisfies erasure obligations under GDPR Article 17
+   [GDPR] and APPI Article 19 [APPI] by destroying Zone B encryption
+   keys.
+
+   The human_principal_id field is a persistent identifier for a
+   natural person.  Access MUST be controlled by Cedar policy.
+
+   The Event Stream may contain agent identifiers and action records
+   that constitute personal data under applicable law.  Implementations
+   MUST apply appropriate access controls to Event Stream queries and
+   ensure retention periods comply with applicable data retention law.
+
+   The SPO scope_constraints.geographic_scope field (Section 6.3) is
+   a structured jurisdiction declaration.  It does not constitute
+   personal data but MUST be treated as operationally sensitive, as
+   it reveals the jurisdictions in which an operator's agents are
+   permitted to act.
+
+   The Mission Status SO's dag_execution_map and active_agent_count
+   fields (Section 7.2) reveal live operational state.  Access to
+   Mission Status SO Zone A fields MUST be governed by Cedar policy
+   and restricted to authorized monitoring principals.
+
+
+16.  IANA Considerations
+
+16.1.  SO Type Registry
+
+   Registry name: Sovereign Object Type Registry
+   Registration procedure: Specification Required per [RFC8126]
+     Section 4.6.  Registration requests must include all fields
+     defined in Section 5.1 and satisfy the Expert Review Criteria
+     specified in Section 5.4.
+   Designated Expert: To be assigned by IANA.
+   Initial registrations: None.  The first registration is expected
+   from the ATP Foundation following RFC publication, registering
+   "atp/booking-object" as the reference implementation SO Type.
+   The second registration is expected from SOOS Project, registering
+   "soos/standing-plan-object", "soos/mission-plan", and
+   "soos/mission-status" as normative SOOS subtypes.
+
+16.2.  SO Type Code Namespace
+
+   IANA is requested to reserve the "soos/" prefix in the Sovereign
+   Object Type Registry for SO Types defined in SOOS specifications.
+   Third-party registrants MUST NOT use the "soos/" prefix.
+
+   IANA is requested to reserve the "ietf/" prefix for SO Types
+   defined in IETF Standards Track documents.
+
+   All other prefixes are open for registration by any registrant,
+   subject to the registration procedure in Section 16.1.
+
+16.3.  SO Lifecycle Phase Registry
+
+   Registry name: Sovereign Object Lifecycle Phase Registry
+   Registration procedure: Specification Required.
+
+   Initial registrations:
+
+   Phase Name                  Description
+   ACTIVE                      Normal operation phase.
+   OPERATIONALLY_COMPLETE      Terminal operational state reached.
+   ADMINISTRATIVELY_CLOSED     Administrative closure phase.
+   ARCHIVED                    Read-only retention phase.
+   CRYPTOGRAPHICALLY_ERASED    Zone B content erased.
+
+16.4.  SO Event Type Registry
+
+   Registry name: Sovereign Object Event Type Registry
+   Registration procedure: Specification Required.
+
+   Initial registrations:
+
+   Event Type                   Description
+   SO_CREATED                   SO Instance created.
+   STATE_TRANSITIONED           State machine transition executed.
+   ZONE_B_ATTACHED              Zone B content attached.
+   ZONE_B_DETACHED              Zone B content detached.
+   MANDATE_BOUND                Mandate JWT bound to SO Instance.
+   MANDATE_REVOKED              Mandate JWT revoked.
+   HEM_TRIGGERED                HEM escalation triggered.
+   HEM_RESOLVED                 HEM escalation resolved.
+   PHASE_TRANSITIONED           Lifecycle phase transition.
+   ERASURE_INITIATED            Cryptographic erasure initiated.
+   ERASURE_COMPLETED            Cryptographic erasure completed.
+   GEC_TRANSITIONED             GEC association transferred.
+   SPO_ACTIVATED                Standing Plan Object activated.
+   SPO_DEACTIVATED              Standing Plan Object deactivated.
+   CEDAR_BUNDLE_UPDATED         SPO Cedar bundle updated mid-plan.
+   SUBGOAL_COMPLETED            Mission Plan sub-goal completed.
+   SUBGOAL_FAILED               Mission Plan sub-goal failed.
+   MISSION_COMPLETE             All required sub-goals completed.
+   MISSION_FAILED               Required sub-goal in terminal failure.
+   MISSION_STATUS_BOUND         Mission Status SO bound to Mission Plan.
+   MISSION_STATUS_DIVERGENCE    Mission Status SO diverged from Plan SO.
+
+16.5.  SPO Media Type
+
+   IANA is requested to register the following media type:
+
+   Type name:               application
+   Subtype name:            soos-standing-plan-object+json
+   Required parameters:     None.
+   Optional parameters:     version (string, semantic version of the
+                            SPO specification).
+   Encoding considerations: Binary (UTF-8 encoded JSON).
+   Security considerations: See Section 14 of this document.
+   Interoperability considerations: The SPO JSON structure is defined
+                            in Section 6.2 of this document.
+   Published specification: This document.
+   Applications that use this media type: SOOS GEC implementations,
+                            disaster response systems, multi-agent
+                            orchestration platforms, and any system
+                            implementing the Standing Plan Object
+                            governance model.
+   Fragment identifier considerations: None.
+   Restrictions on usage:   None.
+   Author:                  Tom Sato, tomsato@myauberge.jp
+   Change controller:       IETF
+
+
+17.  References
+
+17.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [RFC8126]  Cotton, M., Leiba, B., and T. Narten, "Guidelines for
+              Writing an IANA Considerations Section in RFCs",
+              BCP 26, RFC 8126, June 2017.
+
+   [RFC9562]  Davis, B., Peabody, C., and P. Leach, "Universally
+              Unique IDentifiers (UUIDs)", RFC 9562, May 2024.
+
+   [RFC6234]  Eastlake, D. and T. Hansen, "US Secure Hash Algorithms
+              (SHA and SHA-based HMAC and HKDF)", RFC 6234, May 2011.
+
+   [Cedar]    Amazon Web Services, "Cedar Policy Language Specification",
+              https://docs.cedarpolicy.com/
+
+   [I-D.sato-soos-idp]
+              Sato, T., "The Intent Declaration Primitive (IDP) for
+              Agentic AI Systems", draft-sato-soos-idp-05, June 2026.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM) for
+              Agentic AI Systems", draft-sato-soos-hem-05, June 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "Governance Audit Record (GAR) for Agentic
+              AI Systems", draft-sato-soos-gar-03, June 2026.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "Constitutional AI Protocol (CAP) for Agentic
+              AI Systems", draft-sato-soos-cap-04, June 2026.
+
+   [I-D.sato-soos-mjwt]
+              Sato, T., "The Mandate JWT (MJWT) for Agentic AI Systems",
+              draft-sato-soos-mjwt-02, June 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Attestation (KIA) for Agentic
+              AI Systems", draft-sato-soos-kia-03, June 2026.
+
+   [I-D.sato-soos-mad]
+              Sato, T., "Multi-Agent Delegation (MAD) for Agentic
+              AI Systems", draft-sato-soos-mad-03, June 2026.
+
+   [I-D.ietf-scitt-architecture]
+              Birkholz, H., et al., "An Architecture for Trustworthy
+              and Transparent Digital Supply Chains",
+              draft-ietf-scitt-architecture, work in progress.
+
+   [GDPR]     European Parliament, "General Data Protection Regulation",
+              Regulation (EU) 2016/679, April 2016.
+
+   [APPI]     Government of Japan, "Act on the Protection of Personal
+              Information", Act No. 57 of 2003, as amended.
+
+17.2.  Informative References
+
+   [I-D.ietf-wimse-arch]
+              Salomoni, D., et al., "WIMSE Architecture",
+              draft-ietf-wimse-arch, work in progress.
+
+   [I-D.ietf-vcon-vcon-container]
+              Howe, T., et al., "The vCon Container",
+              draft-ietf-vcon-vcon-container, work in progress.
+
+   [I-D.sato-soos-faip]
+              Sato, T., "Federated Agent Intelligence Protocol (FAIP)",
+              draft-sato-soos-faip-01, forthcoming.
+
+   [OTel]     OpenTelemetry Authors, "OpenTelemetry Specification",
+              https://opentelemetry.io/docs/specs/otel/
+
+
+Appendix A.  ATP Booking Object -- Reference Implementation
+
+   The ATP Booking Object is the reference implementation of the
+   Sovereign Object primitive.  It is the SO Type that the Activity
+   Travel Protocol [ATP] defines for governing travel transactions
+   across AI agents, operators, and travellers.  It has been operational
+   as a reference implementation at MyAuberge K.K. (Chino, Nagano,
+   Japan) since early 2026.
+
+A.1.  SO Type Registration
+
+   so_type_id:    "atp/booking-object/1.0"
+   registrant:    ATP Foundation (activity-travel-protocol.org)
+   specification: https://activitytravel.pro/layer3/
+
+A.2.  State Machine
+
+   The ATP Booking Object has eleven canonical states:
+
+   State                    Description
+   INQUIRY                  Booking intent declared; no commitment.
+   FEASIBILITY_CHECK        Async feasibility validation in progress.
+   AWAITING_CONFIRMATION    Feasibility passed; supplier confirmation
+                            pending.
+   CONFIRMED                All parties confirmed; booking live.
+   PRE_ACTIVITY             Pre-activity collection phase.
+   IN_JOURNEY               Traveller in experience; tracks sub-phases.
+   COMPLETED                Journey finished; duty-of-care met.
+   CANCELLED                Booking cancelled.
+   EXPIRED                  Booking lapsed without confirmation.
+   BOOKING_SUSPENDED        Cross-cutting disruption state; overlays
+                            any other state.
+   DISPUTED                 Dispute opened post-completion.
+
+   The IN_JOURNEY state carries eight sub-phases: PRE_DEPARTURE,
+   TRANSIT, ARRIVAL, ORIENTATION, ACTIVITY, POST_ACTIVITY, RETURN,
+   POST_JOURNEY.
+
+   BOOKING_SUSPENDED is a cross-cutting state modifier that may overlay
+   any non-terminal state.  When active, all agent-initiated transitions
+   are prohibited until a human principal resolves the suspension.
+
+A.3.  Zone A / Zone B Application
+
+   Zone A fields: so_id, so_type_id, current_state, booking_reference,
+   operator_id, supplier_id, activity_id, journey_date, policy_version.
+
+   Zone B attachments: traveller identity documents, health declarations,
+   consent records, insurance certificates, and all other personal data
+   associated with the booking.
+
+   This separation enables the ATP Booking Object Event Stream to be
+   retained for audit after Cryptographic Erasure of traveller personal
+   data, satisfying GDPR Article 17 erasure obligations without
+   destroying the governance audit record.
+
+A.4.  SO Lifecycle Mapping
+
+   The ATP Booking Object's eleven operational states exist entirely
+   within SO Lifecycle Phase 1 (ACTIVE).  The SO Lifecycle Phase
+   transitions of Section 8 govern the Booking Object's progression
+   from active operation through archival and eventual Cryptographic
+   Erasure of traveller personal data.
+
+   The two-axis model -- Booking Object state (operational) and SO
+   Lifecycle Phase (governance) -- are orthogonal.  A booking in
+   IN_JOURNEY state is simultaneously in SO Phase 1 (ACTIVE).  A
+   booking in COMPLETED state transitions to SO Phase 2
+   (OPERATIONALLY_COMPLETE) after billing and duty-of-care obligations
+   are satisfied.
+
+
+Appendix B.  Disaster Response SPO -- Reference Implementation
+
+   This appendix illustrates the Standing Plan Object (Section 6) in
+   the context of the 北海道 M7.2 disaster response scenario.  This
+   is an informative reference implementation.
+
+B.1.  SPO Registration
+
+   so_type_id:    "soos/standing-plan-object/1.0"
+   registrant:    SOOS Project (soosproject.ai)
+   specification: This document, Section 6.
+
+B.2.  Scope Constraints
+
+   The disaster response SPO for the 北海道 M7.2 scenario carries
+   the following scope_constraints:
+
+   {
+     "geographic_scope": [
+       { "jurisdiction": "JP", "sub_jurisdiction": "JP-01" }
+     ],
+     "so_type_scope": [
+       "soos/disaster-event/1.0",
+       "soos/shelter-resource/1.0",
+       "soos/resource-request/1.0",
+       "soos/victim-relief/1.0"
+     ],
+     "agent_role_scope": [
+       "disaster_response_coordinator",
+       "shelter_operator",
+       "logistics_agent",
+       "medical_dispatch_agent"
+     ],
+     "temporal_scope": {
+       "not_before": "2026-07-07T00:00:00Z",
+       "not_after":  "2026-08-07T00:00:00Z"
+     },
+     "max_delegation_depth": 3
+   }
+
+B.3.  Cedar Bundle Reference
+
+   cedar_bundle_ref: "https://soosproject.ai/cedar/
+                      disaster-response-jp/hokkaido-m72-
+                      2026-07-07.cedar"
+
+   The Cedar bundle activates the disaster exception profile for
+   DMAT deployment authorization, medical data access under disaster
+   provisions (経路B/C per the medical data governance framework), and
+   対口支援 external personnel access with scoped CAP-RRS permissions.
+
+B.4.  Activation Scenario
+
+   At T+130s (disaster scenario timeline), the SOOS GEC activates the
+   disaster response SPO.  The activation sequence:
+
+   (1) SPO Instance created with state DRAFT; so_id assigned.
+   (2) 北海道知事 approves the plan: SPO transitions DRAFT -> APPROVED;
+       HEM escalation HEM-004 resolved; APPROVED Event Stream entry
+       GEC-signed.
+   (3) Authorized agent activates the plan: SPO transitions
+       APPROVED -> ACTIVE; SPO_ACTIVATED Event Stream entry generated;
+       Cedar bundle loaded; CAP-RRS disaster profile activated.
+   (4) All subsequent agent Transition Requests in the disaster
+       response reference the SPO so_id.  Every HEM escalation
+       (HEM-001 through HEM-013 in the disaster demo timeline)
+       references the SPO so_id as the governing plan identifier.
+   (5) At disaster response conclusion, authorized agent completes
+       the plan: SPO transitions ACTIVE -> COMPLETED; SPO_DEACTIVATED
+       Event Stream entry generated.
+
+
+Appendix C.  Vibe Coding Assets
+
+   This appendix provides structured machine-readable references to
+   support AI-assisted implementation of SOV.  Informative.
+
+C.1.  Protocol Summary
+
+   Protocol: Sovereign Object (SOV)
+   Version:  draft-sato-soos-sov-02
+   Family:   SOOS protocol suite
+   Role:     Governed resource primitive -- the typed, stateful,
+             policy-carrying entity that agents operate on, the GEC
+             governs, and human principals reason about
+   Stack position: Foundation layer.  All SOOS governance protocols
+                   (IDP, HEM, GAR, CAP, MJWT, MAD, AEP, KIA) operate
+                   on SO Instances.  The SO is the missing normative
+                   referent that gives Mandate JWT binding its
+                   specificity and makes authorization auditable,
+                   revocable, and scoped.
+   -02 additions: SPO (Standing Plan Object), Mission Plan SO,
+                  Mission Status SO, SO Type registry governance,
+                  SOV-02 subtype model, event stream integrity,
+                  OTel integration, IANA SO Type code namespace,
+                  SPO media type.
+
+C.2.  Key Identifiers
+
+   SO Instance identifier: so_id (UUID v7, time-ordered)
+   SO lifecycle phases: ACTIVE, OPERATIONALLY_COMPLETE,
+     ADMINISTRATIVELY_CLOSED, ARCHIVED, CRYPTOGRAPHICALLY_ERASED
+
+   Five layers: Identity (Layer 1), State (Layer 2), Event Stream
+     (Layer 3), Typed Graph (Layer 4), Attachment Index (Layer 5)
+
+   Zone model: Zone A (Protocol Core, no personal data, GEC-governed),
+     Zone B (Attached Periphery, personal data, integrity-verified)
+
+   Zone invariants: INV-ZA-1 (no personal data in Zone A),
+     INV-ZA-2 (Zone A fields must be schema-defined),
+     INV-ZB-1 (Zone B referenced via Attachment Index),
+     INV-ZB-2 (GEC verifies Zone B integrity on access)
+
+   Cedar context attributes (Section 10.1):
+     so.so_id, so.so_type_id, so.current_state, so.current_phase,
+     so.human_principal_id, so.prior_denial_count, so.mandate_count
+
+   SPO additional Cedar attributes:
+     spo.plan_name, spo.activation_at,
+     spo.temporal_scope.not_after
+
+   Mission Plan additional Cedar attributes:
+     mission.dag_node_count, mission.completed_count,
+     mission.failed_count
+
+   IANA registries: SO Type Registry, SO Type Code Namespace,
+     SO Lifecycle Phase Registry, SO Event Type Registry,
+     SPO Media Type (Section 16)
+
+   Normative SOOS subtypes: soos/standing-plan-object/1.0,
+     soos/mission-plan/1.0, soos/mission-status/1.0
+
+   Reference implementations: atp/booking-object/1.0 (Appendix A),
+     disaster response SPO (Appendix B)
+
+C.3.  Canonical Reference
+
+   Specification:  https://soosproject.ai/drafts/sov
+   Datatracker:    https://datatracker.ietf.org/doc/draft-sato-soos-sov/
+   Stack overview: https://soosproject.ai/stack
+
+Acknowledgements
+
+   The Sovereign Object design synthesizes patterns from multiple IETF
+   working groups.  The Event Stream causal ordering model draws on the
+   SCITT architecture [I-D.ietf-scitt-architecture].  The Zone A / Zone
+   B boundary model was developed through structured architectural review
+   of the SOOS Cluster 1 Examination sessions and informs the FAIP
+   analytics surface boundary.  The vCon / SO composition pattern
+   (Section 3.2) builds on Thomas Howe's work on agentic architecture
+   layering and the vCon container specification.  The ATP Booking Object
+   reference implementation (Appendix A) has been operational at
+   MyAuberge K.K. since early 2026 and serves as the primary validation
+   surface for the SOV design.  The disaster response SPO reference
+   implementation (Appendix B) is grounded in real Japanese government
+   disaster response law and the 防災AX architecture developed for the
+   Cabinet Office AX initiative engagement.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/sov

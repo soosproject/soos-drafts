@@ -1,0 +1,1998 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                         13 July 2026
+Expires: 13 January 2027
+
+
+      The Agent Compliance Disclosure (ACD) Protocol for Agentic AI
+                              Systems
+                       draft-sato-soos-acd-00
+
+Abstract
+
+   A regulated resource provider -- a bank, a government API, a
+   healthcare records system -- receives a request from an AI agent.
+   The agent claims to operate under a constitutional compliance policy
+   and a valid mandate.  The resource provider has no mechanism to
+   verify these claims.  Without a machine-verifiable compliance
+   disclosure, the resource provider cannot confirm the agent's
+   governing law, its active prohibition set, its audit trail
+   reference, or its principal hierarchy -- before granting access.
+
+   This document defines the Agent Compliance Disclosure (ACD)
+   Protocol: a machine-to-machine compliance handshake that must
+   complete before an AI agent is granted access to a regulated
+   resource class.  ACD defines the ACD Record schema (a three-layer
+   structured disclosure produced by the SOOS kernel, covering legal
+   identity, constitutional compliance, and principal hierarchy), the
+   ACD Presentation Protocol (the query/response exchange between a
+   resource provider and the SOOS kernel), the ACD Trust Hierarchy
+   (operator-declared trust levels and Audit Principal credentials),
+   the ACD-to-MJWT binding (ACD MUST reference the session MJWT jti),
+   and the GAR integration (ACD presentation events as Authority
+   Lifecycle Events).  ACD Records are produced exclusively by the
+   Governing Enforcement Component (GEC), signed by the kernel's KIA
+   private key, and logged in the Governance Audit Record (GAR).  LLM
+   self-report of compliance posture is architecturally insufficient
+   and MUST NOT be used as an ACD disclosure surface.
+
+   ACD is the inbound complement to the Resource Governance Protocol
+   (RGP): where RGP governs outbound capability discovery, ACD governs
+   inbound compliance verification.  Together they define the complete
+   resource access governance flow for SOOS-governed agents.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 9 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Use Case: Enterprise Procurement Platform
+     1.2.  Use Case: Regulatory Inspection of High-Risk AI Deployment
+     1.3.  Use Case: Japan Government API (デジタル庁)
+     1.4.  Relationship to AEP and GAR
+   2.  What ACD Is and Is Not
+     2.1.  What ACD Does
+     2.2.  What ACD Does Not Do
+     2.3.  The Division of Labor
+     2.4.  The KYC Analogy
+   3.  How ACD Works
+     3.1.  Use Case: Financial API Compliance Gate
+     3.2.  Use Case: Regulator-Initiated Disclosure Request
+     3.3.  Use Case: Sub-Agent Delegation Chain Verification
+     3.4.  Use Case: Multi-Jurisdiction Operation
+   4.  Conventions and Definitions
+   5.  Architecture Overview
+     5.1.  ACD Position in the SOOS Stack
+     5.2.  GEC as ACD Producer
+     5.3.  Resource Provider as ACD Consumer
+     5.4.  Relationship to RGP
+   6.  ACD Record Schema
+     6.1.  Layer 1 -- Legal Identity Layer
+     6.2.  Layer 2 -- Constitutional Compliance Layer
+     6.3.  Layer 3 -- Principal and Redress Layer
+     6.4.  Complete ACD Record Example
+   7.  ACD Presentation Protocol
+     7.1.  ACD Endpoint Discovery
+     7.2.  Compliance Handshake Sequence
+     7.3.  Validation Procedure
+     7.4.  Four-Check Sequence (KEE-1 Integration)
+     7.5.  Session Caching Rule
+   8.  ACD Trust Hierarchy
+     8.1.  Operator-Declared Trust Level
+     8.2.  Audit Principal Credential
+     8.3.  Verified External Auditor Credential
+   9.  ACD-to-MJWT Binding
+     9.1.  Binding Requirement
+     9.2.  Resource Provider Validation of MJWT Binding
+     9.3.  Sub-Agent MJWT Binding
+   10. GAR Integration
+     10.1.  ACD Authority Lifecycle Events
+     10.2.  GAR Logging Schema for ACD ALEs
+     10.3.  Data Minimization Requirements
+   11. Open Issues
+   12. Security Considerations
+     12.1.  Incomplete Disclosure Attack
+     12.2.  Spoofed ACD Record
+     12.3.  acd_session_id Collision
+     12.4.  ACD Record Replay
+   13. Privacy Considerations
+   14. IANA Considerations
+     14.1.  ACD Record Media Type
+     14.2.  ACD Authority Lifecycle Event Types
+   15. References
+     15.1.  Normative References
+     15.2.  Informative References
+   Appendix A.  Worked Example: Japan FSA Inspection
+   Appendix B.  Related Work
+     B.1.  Existing Frameworks
+     B.2.  Regulatory Instruments
+     B.3.  SOOS Companion Drafts
+   Author's Address
+
+
+1.  Introduction
+
+   Every regulated industry requires that a counterparty prove its
+   identity and compliance posture before receiving access to regulated
+   resources.  Banks perform Know Your Customer (KYC) verification
+   before onboarding.  Financial messaging networks validate SWIFT BIC
+   credentials before message relay.  Healthcare systems verify HIPAA
+   Business Associate Agreements before data exchange.  These are not
+   best practices -- they are legally required preconditions for access.
+
+   AI agents are entering regulated industries.  An autonomous
+   procurement agent connects to a financial API to execute a purchase
+   order.  A diagnostic support agent queries a medical records system.
+   A logistics optimization agent accesses a government customs
+   clearance portal.  In each case, the resource provider faces a
+   question for which no protocol currently exists: before I grant this
+   agent access to my regulated resources, how do I verify its
+   compliance posture?
+
+   An AI agent may claim to be governed by constitutional prohibitions,
+   to operate under a valid mandate, and to log all actions to a
+   tamper-evident audit record.  These claims may be accurate.  But
+   without a machine-verifiable disclosure mechanism, they cannot be
+   validated.  An LLM can state that it is prohibited from engaging in
+   market manipulation -- but the statement is generated by the LLM
+   itself, drawn from training weights, and carries no cryptographic
+   binding to any enforcement boundary.  The resource provider has no
+   mechanism to distinguish a compliant SOOS-governed agent from a non-
+   governed agent that has simply been prompted to claim compliance.
+
+   This document defines the Agent Compliance Disclosure (ACD)
+   Protocol: the machine-to-machine compliance handshake that closes
+   this gap.  The ACD Record is produced by the SOOS kernel -- not by
+   the LLM -- KIA-signed, and GAR-logged.  It carries the agent's
+   active prohibition set by reference to a signed CAP Profile, its
+   governing jurisdiction, its mandate chain, and its audit endpoint.
+   Resource providers validate the ACD Record before granting access.
+   The handshake is logged on both sides.
+
+   The ACD endpoint for SOOS-governed agents is at
+   https://soosproject.ai/drafts/acd
+
+1.1.  Use Case: Enterprise Procurement Platform
+
+   A procurement automation platform has integrated an AI agent to
+   execute supplier purchase orders.  The platform's compliance team
+   has been asked by its legal counsel: before this agent can commit
+   company funds through a regulated payment API, we need to confirm it
+   is subject to sanctions screening, that it operates under our
+   company's mandate, and that there is an audit trail we can produce
+   in a legal dispute.
+
+   Without ACD, the platform has no machine-verifiable answer to any of
+   these questions.  The agent can claim compliance, but the claim is
+   generated by the agent itself and cannot be independently validated
+   by the payment API provider.
+
+   With ACD, the payment API provider queries the agent's ACD endpoint
+   before processing the first transaction.  The ACD Record returned
+   carries: (Layer 1) governing law and jurisdiction, (Layer 2) a
+   reference to the signed CAP Profile including the active sanctions
+   screening prohibition, and (Layer 3) the operator identity and audit
+   endpoint.  The payment provider validates the signature against the
+   agent's KIA attestation, checks that the CAP Profile includes
+   mandatory sanctions screening controls, and grants access.  The
+   validation is logged in both the provider's compliance system and
+   the agent's GAR under acd_session_id ALE-056 through ALE-058.  The
+   company's legal counsel can retrieve the bilateral audit record for
+   any transaction within the AEP session.
+
+1.2.  Use Case: Regulatory Inspection of High-Risk AI Deployment
+
+   A national AI regulatory authority has initiated an inspection of a
+   high-risk AI deployment under its jurisdiction.  The deployment uses
+   AI agents to process credit applications.  The regulator needs to
+   confirm, per applicable AI Act obligations, that the agents operate
+   under documented constitutional prohibitions against discriminatory
+   outcomes, that those prohibitions are enforced at the kernel
+   boundary rather than stated as policy intentions, and that an audit
+   record exists for the period under inspection.
+
+   The regulator issues a formal inspection request to the operator.
+   The operator's GEC generates an ACD Record under ALE-061
+   (ACD_HUMAN_QUERY) and packages it with an Audit Package reference
+   from GAR.  The ACD Record's Layer 2 field cap_profile_id identifies
+   the signed CAP Profile active during the inspection period.  The
+   Layer 2 field cap_profile_hash provides a SHA-256 commitment to that
+   profile's contents.  The ptd_endpoint reference allows the regulator
+   to retrieve the full Policy Transparency Disclosure for the period.
+   Layer 3 provides the gar_audit_endpoint for direct inspection access
+   under an Audit Principal credential.
+
+   The regulator can confirm that the prohibitions stated in the
+   operator's documentation correspond to enforced Cedar policies
+   referenced in the ACD Record, and that the audit trail for the
+   inspection period is complete and tamper-evident.
+
+1.3.  Use Case: Japan Government API (デジタル庁)
+
+   The Digital Agency of Japan (デジタル庁) is deploying an API for AI
+   agent access to government service data as part of the Japan AX
+   (administrative transformation) program.  The API must comply with
+   the Act on Protection of Personal Information (APPI), the Basic Act
+   on the Advancement of Utilizing Public and Private Data, and emerging
+   AI governance guidelines from the Cabinet Office AI Rincho.
+
+   Any AI agent requesting access to the API must present a verifiable
+   declaration of its compliance posture before access is granted.  The
+   declaration must confirm: that the agent operates under APPI data
+   minimization and purpose limitation controls; that those controls are
+   enforced at the kernel boundary; and that the agent's governing law
+   and primary jurisdiction are consistent with Japanese law.
+
+   The デジタル庁 API gateway is configured to require ACD validation
+   for all AI agent connections.  When a SOOS-governed agent connects,
+   the gateway queries the agent's /.well-known/soos-acd endpoint.  The
+   ACD Record returned carries a jurisdictions array entry for ISO
+   3166-1 "JP" with a regulatory_regime entry referencing the APPI and
+   Cabinet Office AI Rincho Item 23 (AI_AGENT_OPERATION Purpose Code
+   from the MJWT Purpose Code Registry).  The CAP Profile referenced in
+   Layer 2 includes Tier 1 controls mapped to APPI Articles 17-27.  The
+   デジタル庁 gateway validates the KIA signature, confirms APPI
+   coverage in the CAP Profile, and grants access.  The transaction is
+   logged under ALE-056 through ALE-058.
+
+1.4.  Relationship to AEP and GAR
+
+   ACD operates at the boundary between an AEP session and an external
+   resource provider.  The sequencing is:
+
+   1.  The resource provider declares acd_required: true in its RGP
+       capability declaration before the agent discovers it.
+
+   2.  The agent initiates an AEP session targeting the resource.
+
+   3.  Before the AEP session can access the resource, the GEC performs
+       the ACD compliance handshake with the resource provider.
+
+   4.  If the handshake succeeds, the AEP session proceeds.  If the
+       handshake fails, the GEC logs ALE-059 (ACD_VALIDATION_FAILED)
+       and either denies the session or triggers HEM escalation per
+       ALE-063 (ACD_ESCALATION_TRIGGERED).
+
+   5.  All ACD events are logged in GAR under the acd_session_id
+       cross-reference.
+
+   The ACD Record produced during this handshake references the session
+   MJWT jti, creating a binding between the compliance disclosure and
+   the mandate under which the agent is operating.  This binding is
+   normative and is specified in Section 9.
+
+
+2.  What ACD Is and Is Not
+
+2.1.  What ACD Does
+
+   ACD is a machine-to-machine compliance handshake protocol.  It
+   produces a structured, KIA-signed record that answers the question
+   "what are the governance terms of this agent?" in a form that can be
+   validated by a resource provider without human involvement.  The ACD
+   Record carries the agent's governing law, active prohibition profile,
+   and principal hierarchy.  The handshake is logged on both sides,
+   creating a bilateral audit record of every compliance verification
+   event.
+
+2.2.  What ACD Does Not Do
+
+   ACD does not evaluate whether an agent is trustworthy.  ACD does not
+   interpret the governing law it references.  ACD does not determine
+   whether the CAP Profile referenced in Layer 2 is sufficient for a
+   given regulatory requirement -- that determination is made by the
+   resource provider against its own compliance rules.  ACD does not
+   store or transmit the full body of the CAP Profile: it references a
+   signed profile artifact by identifier and hash.  ACD does not
+   replace the PTD endpoint: for full policy transparency, query the
+   ptd_endpoint field in Layer 2.  ACD does not authorize specific agent
+   actions: that is the function of AEP/GEC Cedar evaluation.
+
+2.3.  The Division of Labor
+
+   The governance of AI agent compliance across the SOOS stack follows
+   a clear division of labor:
+
+   -  Legal engineers and operators produce CAP Profiles encoding
+      applicable prohibitions as Cedar policies, referenced by the ACD
+      Record's cap_profile_id.
+
+   -  The GEC enforces those prohibitions at the kernel boundary and
+      signs the ACD Record confirming enforcement.
+
+   -  Resource providers validate the ACD Record against their own
+      compliance requirements and decide whether to grant access.
+
+   -  GAR records every step of this chain.  Regulators inspect it.
+
+   ACD is the mechanism by which the GEC's enforcement posture is made
+   externally queryable.  It does not determine what compliance
+   posture is sufficient -- it makes the kernel's actual posture
+   visible.
+
+2.4.  The KYC Analogy
+
+   Know Your Customer (KYC) obligations require financial institutions
+   to verify the identity and risk profile of a counterparty before
+   providing financial services.  The KYC check is not advisory: a bank
+   that provides financial services to a sanctioned entity without
+   conducting KYC faces regulatory sanction regardless of intent.  The
+   verification is a precondition for service.
+
+   ACD is KYC for AI agents.  A resource provider that grants access to
+   a regulated resource without verifying the requesting agent's
+   compliance posture faces the same class of regulatory exposure as a
+   bank that skips KYC.  ACD formalizes the verification as a
+   machine-to-machine protocol so that the precondition can be
+   satisfied without human intervention at every request.
+
+   No one argues that a KYC check "interprets" AML/CFT law.  No one
+   argues that the bank's KYC system is "making legal determinations."
+   The same framing applies to ACD.  ACD presents the kernel's
+   compliance posture; the resource provider decides what to do with
+   it.
+
+
+3.  How ACD Works
+
+3.1.  Use Case: Financial API Compliance Gate
+
+   A payments compliance engineer at a bank is configuring her
+   institution's AI agent API gateway.  The gateway must, per FIEA and
+   FSA AI Guidelines, verify that any AI agent executing trades on her
+   institution's infrastructure operates under documented constitutional
+   prohibitions against market manipulation, that those prohibitions are
+   enforced at a kernel boundary rather than soft guidelines, and that
+   the agent's operator is identifiable.
+
+   She configures the gateway to require ACD validation on all AI agent
+   connection requests.  The gateway adds acd_required: true to its
+   RGP capability declaration.
+
+   When a SOOS-governed agent attempts to connect, the gateway issues
+   an ACD query to the agent's /.well-known/soos-acd endpoint.  The
+   GEC receives the query, generates an ACD Record (ALE-056), signs it
+   with the kernel's KIA private key, and returns it (ALE-057).
+
+   The gateway validates the KIA signature against the agent's
+   published KIA attestation.  It checks Layer 2 for a CAP Profile
+   entry covering market manipulation prohibitions (Tier 0-B or Tier 1
+   CAP control mapped to the relevant FIEA article).  It checks Layer 3
+   for a non-null operator_id.  All three checks pass.  The gateway
+   logs acd_session_id in its compliance system and grants the agent
+   connection (ALE-058 on the agent side).
+
+   The compliance engineer can retrieve the bilateral audit record --
+   the agent's GAR ALE-056 through ALE-058 and the gateway's compliance
+   log entry -- for any subsequent regulatory inquiry.
+
+3.2.  Use Case: Regulator-Initiated Disclosure Request
+
+   A regulator from the FSA (Financial Services Agency, Japan) contacts
+   an operator whose AI agents have been executing securities trades.
+   The regulator needs, under FIEA Article 2, a compliance disclosure
+   for the deployment covering the period January to June 2026.
+
+   The operator's GEC generates an ACD Record in response to a human-
+   initiated query (ALE-061: ACD_HUMAN_QUERY).  The record covers the
+   jurisdictions array entry for ISO "JP", referencing the regulatory
+   regime FIEA Article 2 and the Cabinet Office AI Rincho.  The cap_
+   profile_id identifies the signed CAP Profile active during the
+   inspection period.  The gar_audit_endpoint in Layer 3 provides the
+   regulator with direct access to the GAR audit package for the period.
+
+   The regulator can confirm: (1) the governing law and jurisdiction,
+   (2) the constitutional prohibitions active during the period, by
+   hash-verifiable CAP Profile reference, and (3) the audit trail for
+   every agent action.  The ACD Record is itself a GAR-logged event,
+   providing an audit record of the disclosure event itself.
+
+3.3.  Use Case: Sub-Agent Delegation Chain Verification
+
+   A master agent has spawned a sub-agent to execute a supplier
+   payment on behalf of a procurement workflow.  The payment provider
+   API requires ACD validation before processing.
+
+   The sub-agent's GEC produces an ACD Record in response to the
+   provider's query.  Layer 3 of the record carries: delegation_chain_
+   depth: 1 (one level below master), parent_kernel_id identifying the
+   master agent's KIA identity, and mandate_scope_type: "SLICE"
+   indicating the sub-agent carries a mandate-sliced subset of the
+   master agent's authority.
+
+   The payment provider validates that the sub-agent's delegation chain
+   traces to a master agent with full compliance posture, that the
+   mandate slice is consistent with the payment operation being
+   requested, and that the parent kernel's KIA identity is resolvable
+   in the KIA Party Registry.  The provider can confirm that the sub-
+   agent is operating within its authorized scope -- not that it has
+   claimed to do so, but that the kernel boundary enforces it.
+
+3.4.  Use Case: Multi-Jurisdiction Operation
+
+   A logistics AI agent operates across Japan, the EU, and the United
+   States, accessing customs clearance APIs in each jurisdiction.  Each
+   API has different compliance requirements: APPI in Japan, GDPR
+   Article 22 in the EU, and NIST AI RMF in the US.
+
+   The agent's ACD Record carries a single jurisdictions array with
+   three entries: one for ISO "JP" with regulatory_regime mapping to
+   APPI, one for ISO "EU" with regulatory_regime mapping to GDPR
+   Article 22, and one for ISO "US" with regulatory_regime mapping to
+   NIST AI RMF.  Each entry carries its own ptd_endpoint reference for
+   jurisdiction-specific full policy disclosure.
+
+   Each customs API queries the same ACD endpoint.  Each validates only
+   the entry relevant to its own jurisdiction.  The operator has encoded
+   multi-jurisdiction compliance in a single kernel deployment.  No
+   jurisdiction-specific ACD Records are required.
+
+
+4.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY",
+   and "OPTIONAL" in this document are to be interpreted as described
+   in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in
+   all capitals, as shown here.
+
+   This document uses the following terms:
+
+   ACD Record:
+      A structured, KIA-signed disclosure artifact produced by the SOOS
+      kernel containing three layers of compliance information (Legal
+      Identity, Constitutional Compliance, and Principal and Redress).
+      The ACD Record is the output of the ACD compliance handshake.
+
+   ACD Session ID (acd_session_id):
+      A unique identifier for a single ACD compliance handshake
+      instance.  Generated by the GEC at the time of ACD Record
+      production.  Cross-referenced in GAR Authority Lifecycle Events
+      for the handshake.  Defined in Section 6.
+
+   AEP Session:
+      A governed agent execution session as defined in
+      [I-D.sato-soos-aep].  ACD compliance handshake completes before
+      the AEP session is granted access to a regulated resource class.
+
+   Audit Principal:
+      An entity authorized to inspect GAR audit records, as defined in
+      [I-D.sato-soos-gar].  Audit Principals are referenced in the ACD
+      Trust Hierarchy (Section 8).
+
+   Authority Lifecycle Event (ALE):
+      A normative, causally-ordered event type in the GAR event stream,
+      as defined in [I-D.sato-soos-gar].  ACD defines ALE-056 through
+      ALE-063.
+
+   CAP Profile:
+      A signed artifact referencing the set of Cedar policies active in
+      a given SOOS kernel deployment at a given time.  Identified in
+      the ACD Record Layer 2 by cap_profile_id and committed to by
+      cap_profile_hash.  CAP Profiles are governed by
+      [I-D.sato-soos-cap-rrs].
+
+   Constitutional AI Protocol (CAP):
+      The SOOS draft specifying runtime enforcement of constitutional
+      prohibitions, as defined in [I-D.sato-soos-cap].
+
+   GEC (Governing Enforcement Component):
+      The SOOS kernel component that evaluates Cedar policies, enforces
+      constitutional prohibitions, and produces ACD Records.  The GEC
+      is the exclusive producer of ACD Records.
+
+   Governance Audit Record (GAR):
+      The SOOS draft specifying audit architecture for agentic AI
+      systems, as defined in [I-D.sato-soos-gar].
+
+   KIA (Kernel Identity Attestation):
+      The SOOS draft specifying kernel identity and cryptographic
+      attestation, as defined in [I-D.sato-soos-kia].  ACD Records are
+      signed by the KIA private key.
+
+   LLM Self-Report:
+      A compliance claim generated by the LLM reasoning engine rather
+      than by the SOOS kernel.  LLM self-report of compliance posture
+      is architecturally insufficient and MUST NOT be used as an ACD
+      disclosure surface.  See Section 2.
+
+   MJWT (Mandate JWT):
+      The SOOS draft specifying mandate scope and principal hierarchy
+      claims, as defined in [I-D.sato-soos-mjwt].  ACD Records MUST
+      reference the session MJWT jti.
+
+   Regulated Resource Class:
+      A resource class for which a resource provider has declared
+      acd_required: true in its RGP capability declaration.  ACD
+      compliance handshake is required before agent access to any
+      regulated resource class.
+
+   Resource Provider:
+      An external entity that provides resources (APIs, data, services)
+      to SOOS-governed agents.  Resource providers initiate the ACD
+      compliance handshake and validate the ACD Record.
+
+   RGP (Resource Governance Protocol):
+      The SOOS draft specifying outbound capability discovery,
+      as defined in [I-D.sato-soos-rgp].  The acd_required field in
+      RGP capability declarations triggers the ACD compliance
+      handshake.
+
+   Session MJWT jti:
+      The JWT ID claim of the MJWT token governing the current AEP
+      session.  The ACD Record MUST reference the session MJWT jti to
+      bind the compliance disclosure to the mandate under which the
+      agent is operating.
+
+   XPID:
+      The cross-principal identifier derived from the KIA Party
+      Registry, as defined in [I-D.sato-soos-kia].  The XPID of the
+      agent kernel is carried in the ACD Record as agent_xpid.
+
+
+5.  Architecture Overview
+
+5.1.  ACD Position in the SOOS Stack
+
+   ACD operates at the boundary between the SOOS kernel and external
+   resource providers.  Its position is best understood through the
+   resource access governance flow:
+
+                    RESOURCE PROVIDER
+                          |
+                          | (1) RGP capability query
+                          |
+                    +-----+------+
+                    |    GEC     |
+                    | (SOOS      |  <-- AEP session in progress
+                    |  kernel)   |
+                    +-----+------+
+                          |
+             acd_required: true in capability declaration
+                          |
+                    RESOURCE PROVIDER
+                          |
+                          | (2) ACD query (acd_session_id)
+                          v
+                    +-----+------+
+                    |    GEC     |
+                    | produces   |
+                    | ACD Record |
+                    | [L1+L2+L3] |
+                    | KIA-signs  |
+                    | GAR: ALE-  |
+                    | 056, 057   |
+                    +-----+------+
+                          |
+                          | (3) KIA-signed ACD Record
+                          v
+                    RESOURCE PROVIDER
+                          |
+                          | validates [L1, L2, L3]
+                          | logs acd_session_id
+                          | GAR: ALE-058 or ALE-059
+                          |
+                          v (4) GRANT / DENY / ESCALATE
+                          |
+                    +-----+------+
+                    |    AEP     |
+                    |  session   |
+                    |  proceeds  |
+                    +------------+
+
+5.2.  GEC as ACD Producer
+
+   The GEC is the exclusive producer of ACD Records.  This is
+   architecturally non-negotiable: the ACD Record's authority derives
+   from its origin in the kernel enforcement boundary, its signature by
+   the KIA private key, and its binding to actually enforced CAP
+   policies.  A record produced by any component other than the GEC --
+   including by the LLM reasoning engine -- carries none of these
+   properties.
+
+   The GEC MUST:
+
+   1.  Generate an acd_session_id for each ACD handshake.
+
+   2.  Populate all three layers of the ACD Record from current kernel
+       state (active CAP Profile, current MJWT, current KIA identity).
+
+   3.  Sign the complete ACD Record with the kernel's KIA private key
+       before returning it to the resource provider.
+
+   4.  Log ALE-056 (ACD_QUERY_RECEIVED) and ALE-057 (ACD_RECORD_ISSUED)
+       in GAR for every ACD handshake.
+
+   The GEC MUST NOT:
+
+   5.  Return an unsigned ACD Record.
+
+   6.  Populate ACD Record fields from LLM-generated content.
+
+   7.  Issue an ACD Record when the kernel's CAP Profile has been
+       tampered with or when KIA attestation has failed.
+
+5.3.  Resource Provider as ACD Consumer
+
+   Resource providers consume ACD Records.  The resource provider's
+   validation procedure is specified in Section 7.3.  The resource
+   provider determines whether the ACD Record's contents are sufficient
+   for its own compliance requirements.  ACD does not specify what
+   compliance posture is sufficient -- it specifies how the posture is
+   declared and verified.
+
+   Resource providers SHOULD:
+
+   1.  Log the acd_session_id in their own compliance system for every
+       validated ACD Record.
+
+   2.  Retain the acd_session_id as a cross-reference for any
+       subsequent audit inquiry.
+
+   Resource providers MUST NOT:
+
+   3.  Accept an ACD Record with an invalid KIA signature.
+
+   4.  Cache an ACD Record beyond its acd_validity_not_after timestamp.
+
+5.4.  Relationship to RGP
+
+   ACD and the Resource Governance Protocol (RGP) [I-D.sato-soos-rgp]
+   are complementary and sequenced.  RGP governs outbound capability
+   discovery: an agent queries a resource provider's capabilities
+   before attempting access.  ACD governs inbound compliance
+   verification: a resource provider queries the agent's compliance
+   posture before granting access.
+
+   The sequencing MUST be:
+
+   1.  Agent queries resource provider capabilities via RGP.
+
+   2.  Resource provider's RGP capability declaration includes
+       acd_required: true for regulated resource classes.
+
+   3.  Before the agent can access a regulated resource class, the
+       resource provider initiates the ACD compliance handshake.
+
+   4.  ACD handshake completes successfully.
+
+   5.  AEP session accesses the regulated resource class.
+
+   An agent MUST NOT access a regulated resource class before the ACD
+   compliance handshake has completed successfully for that class within
+   the current AEP session (subject to the session caching rule in
+   Section 7.5).
+
+
+6.  ACD Record Schema
+
+   The ACD Record is a JSON object carrying three layers.  All fields
+   marked REQUIRED MUST be present.  All fields marked OPTIONAL MAY be
+   omitted.  Fields marked CONDITIONAL are required when the stated
+   condition applies.
+
+   The complete ACD Record MUST be serialized as a JSON object,
+   canonicalized per RFC 8785 [RFC8785], and signed as a JSON Web
+   Signature (JWS) [RFC7515] using the kernel's KIA private key.  The
+   signed JWS token is the ACD Record as presented to the resource
+   provider.
+
+6.1.  Layer 1 -- Legal Identity Layer
+
+   Layer 1 answers: "Who is this agent, under what law, in what
+   jurisdiction?"
+
+   acd_session_id:
+      REQUIRED.  String.  Unique identifier for this ACD handshake
+      instance.  Generated by the GEC.  Format: UUID v4 [RFC4122].
+      Cross-referenced in GAR ALEs for this handshake.
+
+   agent_xpid:
+      REQUIRED.  String.  The XPID of the SOOS kernel instance
+      producing this ACD Record.  Derived per [I-D.sato-soos-kia]
+      UUID-v5 derivation.
+
+   governing_law:
+      REQUIRED.  String.  Free-text description of the primary
+      applicable law (e.g., "Japanese Civil Code and Act on Protection
+      of Personal Information (APPI) Law No. 57 of 2003").
+
+   primary_jurisdiction:
+      REQUIRED.  String.  ISO 3166-1 alpha-2 country code of primary
+      operational jurisdiction (e.g., "JP", "DE", "US").
+
+   jurisdictions:
+      REQUIRED.  Array of jurisdiction objects.  At minimum one entry
+      corresponding to primary_jurisdiction.  Each entry carries:
+
+      jurisdiction_code:
+         REQUIRED.  String.  ISO 3166-1 alpha-2 code.
+
+      regulatory_regime:
+         REQUIRED.  Array of strings.  Legal instruments applicable in
+         this jurisdiction (e.g., ["APPI", "AI-Rincho-Item-23"]).
+
+      ptd_endpoint:
+         REQUIRED.  URI.  Endpoint for full Policy Transparency
+         Disclosure for this jurisdiction.
+
+   terms_of_use_uri:
+      REQUIRED.  URI.  Points to the operator's Terms of Use document
+      (human-readable and/or machine-readable).
+
+   liability_scope:
+      REQUIRED.  String.  One of "OPERATOR", "DEPLOYER", or
+      "PRINCIPAL_HIERARCHY".  Declares the boundary at which liability
+      for agent actions is held.
+
+   acd_validity_not_before:
+      REQUIRED.  String.  ISO 8601 datetime.  ACD Record is not valid
+      before this time.
+
+   acd_validity_not_after:
+      REQUIRED.  String.  ISO 8601 datetime.  ACD Record expires at
+      this time.  Maximum validity window: 30 days.  Default: 24 hours.
+      See Section 7.5 for session caching behavior.
+
+6.2.  Layer 2 -- Constitutional Compliance Layer
+
+   Layer 2 answers: "What prohibitions govern this agent, and are they
+   enforced?"
+
+   cap_profile_id:
+      REQUIRED.  String.  Identifier of the CAP Profile artifact active
+      in this kernel deployment.  Format: [operator-id]-[profile-name]-
+      [version] (e.g., "myauberge-k.k.-japan-v2.3.1").
+
+   cap_profile_hash:
+      REQUIRED.  String.  SHA-256 hex-encoded hash of the CAP Profile
+      JSON artifact identified by cap_profile_id.  Resource providers
+      use this to verify that the CAP Profile has not been tampered
+      with since its production.
+
+   prohibition_tier_summary:
+      REQUIRED.  Object.  Count of active Cedar policies by CAP tier:
+
+      tier_0a:
+         REQUIRED.  Integer.  Count of active Tier 0-A (absolute
+         prohibition) policies.
+
+      tier_0b:
+         REQUIRED.  Integer.  Count of active Tier 0-B (absolute unless
+         PCR) policies.
+
+      tier_1:
+         REQUIRED.  Integer.  Count of active Tier 1 (jurisdiction-
+         specific regulatory) policies.
+
+      tier_2:
+         REQUIRED.  Integer.  Count of active Tier 2 (operator-
+         configurable) policies.
+
+   gec_manifest_ref:
+      REQUIRED.  String.  Reference to the GEC manifest artifact
+      confirming the kernel configuration at the time of ACD Record
+      production.  Used in the KEE-1 four-check sequence (Section 7.4).
+
+   cedar_policy_hash:
+      REQUIRED.  String.  SHA-256 hex-encoded hash of the complete
+      Cedar policy bundle active at the time of ACD Record production.
+      Cross-verifiable against the cap_profile_hash.
+
+   cap_enforcement_attestation:
+      REQUIRED.  String.  KIA attestation URI confirming that CAP is
+      enforced at the kernel boundary in this deployment.
+
+   hem_status:
+      REQUIRED.  String.  One of "ACTIVE", "SUSPENDED", or
+      "ESCALATION_IN_PROGRESS".  Current Human Escalation Mechanism
+      status for the kernel.
+
+   ptd_endpoint:
+      REQUIRED.  URI.  Endpoint for full Policy Transparency Disclosure
+      for the primary jurisdiction.  Resource providers requiring
+      detailed policy inspection query this endpoint directly.
+
+6.3.  Layer 3 -- Principal and Redress Layer
+
+   Layer 3 answers: "Who is responsible, and how can issues be
+   escalated?"
+
+   operator_id:
+      REQUIRED.  String.  KIA identity of the operator -- the legal
+      entity responsible for this kernel deployment.
+
+   deployer_id:
+      CONDITIONAL.  String.  KIA identity of the deployer, when
+      different from the operator.  REQUIRED when deployer differs from
+      operator.
+
+   principal_hierarchy_summary:
+      REQUIRED.  String.  Description of the mandate chain depth and
+      structure (e.g., "Two-tier: Operator → User Principal").
+
+   redress_uri:
+      REQUIRED.  URI.  Contact mechanism for complaints, disputes, or
+      escalation requests.
+
+   human_escalation_path:
+      REQUIRED.  String.  One of "AVAILABLE" or "NOT_AVAILABLE".
+      Indicates whether human escalation is available and how to trigger
+      it.  When "AVAILABLE", SHOULD include the HEM escalation endpoint.
+
+   gar_audit_endpoint:
+      REQUIRED.  URI.  Endpoint through which authorized Audit
+      Principals may query GAR audit records for this kernel.
+
+   gar_sar_ref:
+      OPTIONAL.  String.  Reference to the current GAR Session Audit
+      Record (SAR) for the AEP session in progress at the time of ACD
+      Record production.
+
+   acd_timestamp:
+      REQUIRED.  String.  ISO 8601 datetime at which the ACD Record was
+      produced by the GEC.
+
+   gec_signature:
+      REQUIRED.  String.  JWS signature over the canonicalized ACD
+      Record body, using the kernel's KIA private key.  This field
+      contains the detached JWS signature; the signed payload is the
+      canonicalized JSON of all other ACD Record fields.
+
+   delegation_chain_depth:
+      REQUIRED.  Integer.  0 if this is a master agent kernel.  1 or
+      greater indicates sub-agent depth in the delegation chain.
+
+   parent_kernel_id:
+      CONDITIONAL.  String.  KIA identity of the spawning kernel.
+      REQUIRED when delegation_chain_depth is 1 or greater.  NULL when
+      delegation_chain_depth is 0.
+
+   mandate_scope_type:
+      REQUIRED.  String.  One of "FULL" or "SLICE".  "FULL" indicates
+      the agent carries the full mandate authority of the operator.
+      "SLICE" indicates the agent carries a mandate-sliced subset.
+      Sub-agents (delegation_chain_depth >= 1) MUST carry "SLICE".
+
+6.4.  Complete ACD Record Example
+
+   The following is a complete ACD Record example for a SOOS-governed
+   agent operating under Japanese law, at delegation depth 0 (master
+   agent):
+
+   {
+     "acd_session_id": "7f3a9c1e-4b22-4d88-a5f1-cd930e8b2a41",
+     "agent_xpid": "urn:soos:xpid:uuid:a3f2c1d4-9e88-5b3a-c7f1-
+                    e4d290ab1c23",
+     "governing_law": "Japanese Civil Code; Act on Protection of
+                       Personal Information (APPI) Law No. 57 of 2003;
+                       Cabinet Office AI Rincho",
+     "primary_jurisdiction": "JP",
+     "jurisdictions": [
+       {
+         "jurisdiction_code": "JP",
+         "regulatory_regime": ["APPI", "AI-Rincho-Item-23",
+                               "Basic-Act-Public-Private-Data"],
+         "ptd_endpoint": "https://kernel.myauberge.jp/ptd/jp"
+       }
+     ],
+     "terms_of_use_uri": "https://myauberge.jp/agent-terms/v2",
+     "liability_scope": "OPERATOR",
+     "acd_validity_not_before": "2026-07-09T00:00:00Z",
+     "acd_validity_not_after": "2026-07-10T00:00:00Z",
+
+     "cap_profile_id": "myauberge-k.k.-japan-v2.3.1",
+     "cap_profile_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb924
+                          27ae41e4649b934ca495991b7852b855",
+     "prohibition_tier_summary": {
+       "tier_0a": 4,
+       "tier_0b": 2,
+       "tier_1": 12,
+       "tier_2": 8
+     },
+     "gec_manifest_ref": "urn:soos:gec-manifest:myauberge:20260709",
+     "cedar_policy_hash": "sha256:a665a45920422f9d417e4867efdc4fb8
+                           a04a1f3fff1fa07e998e86f7f7a27ae3",
+     "cap_enforcement_attestation":
+       "https://kernel.myauberge.jp/kia/attestation/v3",
+     "hem_status": "ACTIVE",
+     "ptd_endpoint": "https://kernel.myauberge.jp/ptd/jp",
+
+     "operator_id": "urn:soos:kia:myauberge-k.k.:jp:v3",
+     "principal_hierarchy_summary":
+       "Two-tier: Operator (MyAuberge K.K.) -> User Principal",
+     "redress_uri": "https://myauberge.jp/agent-redress",
+     "human_escalation_path": "AVAILABLE",
+     "gar_audit_endpoint": "https://kernel.myauberge.jp/gar/audit",
+     "acd_timestamp": "2026-07-09T09:14:33Z",
+     "gec_signature": "<JWS detached signature>",
+     "delegation_chain_depth": 0,
+     "parent_kernel_id": null,
+     "mandate_scope_type": "FULL"
+   }
+
+
+7.  ACD Presentation Protocol
+
+   This section specifies how the ACD compliance handshake is
+   initiated, executed, and validated between a resource provider and
+   a SOOS-governed agent.
+
+7.1.  ACD Endpoint Discovery
+
+   A SOOS-governed agent MUST expose its ACD endpoint at the well-known
+   URI:
+
+      /.well-known/soos-acd
+
+   The endpoint MUST be served over HTTPS (TLS 1.3 [RFC8446]).
+   Plain-text ACD transport is not permitted.
+
+   A resource provider discovers the ACD endpoint by appending
+   /.well-known/soos-acd to the agent's base URI as declared in its
+   RGP capability declaration [I-D.sato-soos-rgp].  The RGP capability
+   declaration for a regulated resource class MUST include the field:
+
+      acd_required: true
+
+   When acd_required is true, the resource provider MUST initiate the
+   ACD compliance handshake before permitting the agent to access that
+   resource class.
+
+7.2.  Compliance Handshake Sequence
+
+   The ACD compliance handshake proceeds as follows:
+
+   1.  The resource provider sends an HTTP GET request to the agent's
+       /.well-known/soos-acd endpoint.  The request MUST include an
+       Accept header: application/soos-acd+json.
+
+   2.  The GEC receives the request and executes the four-check
+       sequence (Section 7.4) before generating the ACD Record.
+
+   3.  If all four checks pass, the GEC generates the ACD Record,
+       canonicalizes it per RFC 8785 [RFC8785], signs it as JWS per
+       RFC 7515 [RFC7515] using the kernel's KIA private key, and
+       returns it in the HTTP response body with Content-Type:
+       application/soos-acd+json and HTTP status 200.
+
+   4.  If any of the four checks fails, the GEC returns HTTP 403 with
+       a JSON error body carrying:
+
+         {
+           "error": "ACD_CHECK_FAILED",
+           "failed_check": <integer 1-4>,
+           "acd_session_id": "<uuid>",
+           "timestamp": "<ISO 8601>"
+         }
+
+       and logs ALE-059 (ACD_VALIDATION_FAILED) in GAR.
+
+   5.  The resource provider validates the returned ACD Record per
+       Section 7.3.
+
+   6.  The resource provider grants or denies access and logs the
+       outcome bilaterally.
+
+   The GEC MUST log ALE-056 (ACD_QUERY_RECEIVED) when the request
+   arrives and ALE-057 (ACD_RECORD_ISSUED) when the signed record is
+   returned.  Both ALEs carry the acd_session_id.
+
+7.3.  Validation Procedure
+
+   Upon receiving an ACD Record, the resource provider MUST perform
+   the following validation steps in order.  A failure at any step
+   MUST cause the resource provider to reject the ACD Record and deny
+   access.
+
+   Step 1 -- Signature Verification:
+      The resource provider MUST verify the gec_signature JWS against
+      the agent's KIA public key as published in the KIA Party Registry
+      [I-D.sato-soos-kia].  Verification against any other key source
+      is not permitted.  The signed payload MUST be the RFC 8785
+      canonicalization of the ACD Record body (all fields except
+      gec_signature).
+
+   Step 2 -- XPID Consistency:
+      The resource provider MUST verify that the agent_xpid in the ACD
+      Record matches the XPID of the kernel it queried.  A mismatch
+      indicates record substitution and MUST cause rejection.
+
+   Step 3 -- Validity Window:
+      The resource provider MUST verify that the current time is after
+      acd_validity_not_before and before acd_validity_not_after.  An
+      expired or not-yet-valid ACD Record MUST be rejected.
+
+   Step 4 -- Layer 1 Content Inspection:
+      The resource provider MUST verify that the jurisdictions array
+      contains an entry for the resource provider's jurisdiction.  A
+      resource provider MUST NOT grant access based on an ACD Record
+      that does not cover its jurisdiction.
+
+   Step 5 -- Layer 2 Content Inspection:
+      The resource provider MUST inspect the cap_profile_id and
+      prohibition_tier_summary against its own compliance requirements.
+      A resource provider that requires a specific CAP tier coverage
+      (e.g., at least one Tier 0-B control covering a specific
+      prohibition class) MUST verify this from the
+      prohibition_tier_summary counts.  The resource provider MAY
+      query the ptd_endpoint for full prohibition detail.
+
+   Step 6 -- Layer 3 Content Inspection:
+      The resource provider MUST verify that operator_id is non-null.
+      For regulated resource classes requiring known-operator access,
+      the resource provider MAY verify operator_id against an approved
+      operator registry.
+
+   Following successful validation, the resource provider MUST log the
+   acd_session_id in its own compliance system.  The resource provider
+   MUST NOT grant access before logging.
+
+7.4.  Four-Check Sequence (KEE-1 Integration)
+
+   Before generating an ACD Record, the GEC MUST execute the four-check
+   sequence specified in [I-D.sato-soos-kee] Section 4.3.  The four
+   checks are reproduced here for reference; [I-D.sato-soos-kee]
+   Section 4.3 is normative.
+
+   Check 1 -- Manifest Validity:
+      The gec_manifest_ref to be included in the ACD Record MUST
+      reference a current, unrevoked GEC Manifest per
+      [I-D.sato-soos-kia] Section 5.4.  A revoked GEC Manifest MUST
+      NOT be referenced.
+
+   Check 2 -- Policy Currency:
+      The cedar_policy_hash to be included in the ACD Record MUST be
+      computed as the SHA-256 hash of the Cedar Policy Set currently
+      active at the time of ACD Record generation.  A precomputed or
+      stale hash MUST NOT be used.
+
+   Check 3 -- KIA Attestation:
+      The GEC's KIA signing key MUST NOT appear in the Revocation
+      Registry per [I-D.sato-soos-kia] Section 8.
+
+   Check 4 -- Revocation Status:
+      The agent XPID for the current AEP session MUST NOT appear in
+      the Revocation Registry or have received a CAEP revocation signal
+      per [I-D.sato-soos-kia] Section 6.5.
+
+   All four checks MUST pass before the GEC proceeds to sign the ACD
+   Record.  A failure at any check MUST cause the GEC to return HTTP
+   403 and log ALE-059 with failed_check: <1|2|3|4>.
+
+7.5.  Session Caching Rule
+
+   Once an ACD compliance handshake succeeds for a regulated resource
+   class within an AEP session, the resource provider MAY cache the
+   validated ACD Record for subsequent requests from the same agent
+   within the same AEP session, subject to the following constraints:
+
+   1.  The cached ACD Record MUST NOT be used after its
+       acd_validity_not_after timestamp.
+
+   2.  The cached ACD Record is bound to the specific AEP session
+       identified by the acd_session_id.  A new AEP session MUST
+       trigger a new ACD compliance handshake regardless of whether
+       a valid cached record exists for the same agent.
+
+   3.  If the resource provider's compliance system requires a shorter
+       freshness window than the ACD Record's validity period (e.g.,
+       a maximum 1-hour freshness for a high-risk financial resource
+       class), the resource provider MUST re-initiate the ACD handshake
+       when its freshness threshold elapses, regardless of the ACD
+       Record's validity window.
+
+   4.  A resource provider MUST NOT serve a cached ACD Record to any
+       third party.  The cached record is for the resource provider's
+       own validation use only.
+
+   The session caching rule is structurally analogous to TLS session
+   resumption: the expensive handshake is performed once per session,
+   and subsequent requests within the session use the cached result.
+
+
+8.  ACD Trust Hierarchy
+
+   The ACD Trust Hierarchy specifies the three levels of trust that
+   may be declared in an ACD Record and the credentials associated
+   with each level.  The Trust Hierarchy is not a replacement for
+   resource provider validation -- it is additional metadata that
+   resource providers and regulators use to determine the scope of
+   access and audit rights appropriate for an agent.
+
+8.1.  Operator-Declared Trust Level
+
+   The operator declares the agent deployment's trust level through
+   the GEC Manifest and the ACD Record's Layer 3 fields.  Three trust
+   levels are defined:
+
+   STANDARD:
+      The default trust level for SOOS-governed agent deployments.
+      KEE-1 L1 or L2 conformance.  ACD Records declare conformance
+      level in the gec_manifest_ref.  Resource providers may grant
+      access to standard resource classes.
+
+   ELEVATED:
+      KEE-1 L2 conformance with FROST threshold signing.  The GEC
+      Manifest declares "frost:t-of-n:2-3" or higher.  The ACD Record's
+      cap_enforcement_attestation URI resolves to a TEE-backed
+      attestation endpoint.  Resource providers may grant access to
+      elevated resource classes (financial data, personal data
+      under APPI/GDPR).
+
+   GOVERNMENT:
+      KEE-1 L3 conformance with Japan Deployment Profile or equivalent
+      national profile.  Hardware attestation chain to deployment
+      authority.  2-of-3 publisher key (e.g., デジタル庁 + IPA +
+      operator) verified in GEC Manifest.  Resource providers may
+      grant access to government-tier resource classes (government
+      APIs, classified infrastructure data, FIEA-regulated financial
+      infrastructure).
+
+   The trust level is not carried as an explicit field in the ACD
+   Record.  Resource providers determine the trust level by inspecting
+   the conformance_level in the referenced GEC Manifest and the
+   cap_enforcement_attestation endpoint.
+
+8.2.  Audit Principal Credential
+
+   An Audit Principal is an entity authorized to inspect GAR audit
+   records for a SOOS-governed agent.  The Audit Principal credential
+   grants read access to the agent's GAR via the gar_audit_endpoint
+   declared in ACD Record Layer 3.
+
+   Audit Principal credentials are issued by the operator via a
+   credential exchange not specified by this protocol (the mechanism
+   is operator-defined).  Resource providers that require audit access
+   as a condition of granting access to regulated resources SHOULD
+   verify that the agent's gar_audit_endpoint is reachable and
+   responsive to authenticated Audit Principal requests before
+   granting access.
+
+   The following entities are typical Audit Principal credential
+   holders:
+
+   -  The resource provider itself (for its own compliance audit).
+   -  The deploying organization's internal audit team.
+   -  A regulator with statutory authority to inspect AI audit records
+      (e.g., FSA under FIEA Article 2, Cabinet Office under AI Rincho).
+
+   An Audit Principal MUST authenticate to the gar_audit_endpoint
+   using a credential accepted by the operator.  The GEC logs every
+   Audit Principal access as ALE-061 (ACD_HUMAN_QUERY) in GAR.
+
+8.3.  Verified External Auditor Credential
+
+   A Verified External Auditor (VEA) is a third-party auditor
+   accredited by the operator or a regulatory authority to conduct
+   independent compliance audits of a SOOS-governed agent deployment.
+   VEA credentials grant full Audit Package access beyond the standard
+   Audit Principal scope.
+
+   The VEA credential scope includes:
+
+   -  Full GAR event stream for any requested time period (not just
+      the session-level access available to standard Audit Principals).
+
+   -  Access to the PTD (Policy Transparency Disclosure) endpoint for
+      all jurisdictions declared in the ACD Record.
+
+   -  Access to the signed CAP Profile artifact identified by
+      cap_profile_id, for hash verification against cap_profile_hash.
+
+   -  Access to Session Block Merkle proofs for any individual ALE
+      record, enabling verification that specific events have not been
+      tampered with since their Session Block was signed.
+
+   VEA credential issuance and accreditation procedure is outside the
+   scope of this document.  The gar_audit_endpoint field in ACD Record
+   Layer 3 MUST be configured to accept VEA credentials with the full
+   Audit Package scope when a VEA program applies to the deployment.
+
+
+9.  ACD-to-MJWT Binding
+
+   The ACD Record MUST reference the JSON Web Token ID (jti) claim of
+   the Mandate JWT (MJWT) [I-D.sato-soos-mjwt] governing the AEP
+   session in progress at the time of ACD Record generation.
+
+9.1.  Binding Requirement
+
+   1.  The ACD Record MUST carry a field mjwt_jti whose value is the
+       jti claim of the session MJWT.  This field is a REQUIRED
+       addition to the Layer 3 fields specified in Section 6.3.
+
+       mjwt_jti:
+          REQUIRED.  String.  The jti claim of the MJWT governing the
+          current AEP session.  Format: UUID v4 or opaque string as
+          produced by the MJWT issuer per [I-D.sato-soos-mjwt]
+          Section 4.
+
+   2.  The GEC MUST populate mjwt_jti from the active session MJWT at
+       the time of ACD Record generation.  The GEC MUST NOT use a
+       cached or previously-issued MJWT jti value.
+
+   3.  The GEC MUST verify that the session MJWT is not revoked (jti
+       not present in the local Revocation Registry per
+       [I-D.sato-soos-kia] Section 8) before populating mjwt_jti.
+       If the session MJWT jti is revoked, the GEC MUST NOT issue the
+       ACD Record and MUST log ALE-059 with failed_check: 4.
+
+9.2.  Resource Provider Validation of MJWT Binding
+
+   Resource providers that validate both the ACD Record and the session
+   MJWT gain a stronger compliance assurance: not only is the agent
+   governed by the declared CAP Profile, but the specific mandate under
+   which it is operating in this session is also verifiable.
+
+   Resource providers that hold the agent's MJWT (received via a
+   separate MJWT presentation mechanism) MUST:
+
+   1.  Verify that the mjwt_jti in the ACD Record matches the jti
+       claim in the MJWT they hold.  A mismatch indicates that the
+       ACD Record was produced under a different mandate than the one
+       the agent is currently presenting.
+
+   2.  Verify that the MJWT's mandate_scope is consistent with the
+       action the agent is requesting.  An agent presenting a FULL-
+       scope MJWT whose ACD Record declares mandate_scope_type: "SLICE"
+       (or vice versa) MUST be treated as a binding inconsistency and
+       access MUST be denied.
+
+   Resource providers that do not hold the agent's MJWT independently
+   (i.e., that rely solely on the ACD Record) MAY accept the mjwt_jti
+   field as a reference for future audit correlation without
+   independently validating the MJWT.
+
+9.3.  Sub-Agent MJWT Binding
+
+   Sub-agents (delegation_chain_depth >= 1) carry a mandate-sliced
+   MJWT issued by the parent agent per [I-D.sato-soos-mjwt] Section 6.
+   The sub-agent's ACD Record MUST carry the jti of the sub-agent's
+   own MJWT (the mandate slice), not the jti of the master agent's
+   MJWT.
+
+   This creates a verifiable MJWT chain: the sub-agent's MJWT carries
+   a parent_jti reference to the master agent's MJWT jti.  A resource
+   provider can trace the full mandate delegation chain by following
+   parent_jti references from the sub-agent's MJWT back to the master
+   agent's MJWT.
+
+
+10.  GAR Integration
+
+   All ACD compliance handshake events MUST be logged in the Governance
+   Audit Record (GAR) [I-D.sato-soos-gar] as Authority Lifecycle
+   Events (ALEs).  This section specifies the normative ALE definitions,
+   the GAR logging schema for ACD events, and the data minimization
+   requirements for ACD entries in GAR.
+
+10.1.  ACD Authority Lifecycle Events
+
+   ACD defines eight ALE types (ALE-056 through ALE-063).  All eight
+   are defined in the IANA Considerations (Section 14.2).  The
+   normative trigger conditions, mandatory fields, and logging
+   requirements for each ALE are:
+
+   ALE-056: ACD_QUERY_RECEIVED
+      Trigger: Resource provider initiated an ACD compliance handshake
+      by sending a GET request to /.well-known/soos-acd.
+      Logged by: GEC, on receipt of the request.
+      Mandatory fields: resource_provider_id (derived from TLS client
+      certificate or IP), acd_session_id (generated by GEC for this
+      handshake), request_timestamp, agent_xpid.
+      Timing: MUST be logged before the four-check sequence begins.
+
+   ALE-057: ACD_RECORD_ISSUED
+      Trigger: GEC completed the four-check sequence, generated the
+      ACD Record, and returned it to the resource provider.
+      Logged by: GEC, on successful record issuance.
+      Mandatory fields: SHA-256(ACD Record body), kia_key_id (the
+      signing key identifier), acd_validity_not_after, acd_session_id,
+      mjwt_jti.
+      Data minimization note: the full ACD Record body MUST NOT be
+      stored in GAR.  Only the SHA-256 hash is stored, satisfying
+      APPI Article 19 and GDPR Article 5(1)(c) while preserving
+      tamper-evident audit verifiability.
+
+   ALE-058: ACD_VALIDATION_PASSED
+      Trigger: Resource provider successfully validated the ACD Record
+      and granted access.
+      Logged by: GEC, on receipt of a validation-passed notification
+      from the resource provider (if the resource provider supports
+      notification), OR inferred from the absence of ALE-059 within
+      the session's access window.
+      Mandatory fields: acd_session_id, resource_provider_id,
+      validation_timestamp.
+
+   ALE-059: ACD_VALIDATION_FAILED
+      Trigger: GEC four-check sequence failed (before record issuance),
+      or resource provider rejected the ACD Record after issuance.
+      Logged by: GEC.
+      Mandatory fields: acd_session_id, failed_check (integer 1-4 for
+      GEC-side failures), failed_layer (1|2|3 for resource-provider-
+      side rejections), failed_field (the specific field that failed
+      inspection), resource_provider_id, failure_timestamp.
+
+   ALE-060: ACD_RECORD_EXPIRED
+      Trigger: An ACD Record's acd_validity_not_after timestamp elapsed
+      without a completed session.
+      Logged by: GEC, on expiry detection.
+      Mandatory fields: acd_session_id, expiry_timestamp.
+
+   ALE-061: ACD_HUMAN_QUERY
+      Trigger: A human (Audit Principal, regulator, or VEA) initiated
+      a direct ACD compliance query outside the normal agent-resource-
+      provider handshake flow.
+      Logged by: GEC.
+      Mandatory fields: acd_session_id, requester_credential_type
+      (AUDIT_PRINCIPAL | VERIFIED_EXTERNAL_AUDITOR | REGULATOR),
+      requester_id, query_timestamp.
+
+   ALE-062: ACD_ACCESS_DENIED
+      Trigger: Resource access was denied following ACD validation
+      failure (either GEC four-check failure or resource-provider
+      content inspection failure).
+      Logged by: GEC.
+      Mandatory fields: acd_session_id, resource_provider_id,
+      denial_reason (FOUR_CHECK_FAILED | LAYER_INSPECTION_FAILED |
+      EXPIRED | XPID_MISMATCH), denial_timestamp.
+
+   ALE-063: ACD_ESCALATION_TRIGGERED
+      Trigger: ACD validation failure was escalated to human review
+      via the HEM [I-D.sato-soos-hem] escalation channel.
+      Logged by: GEC.
+      Mandatory fields: acd_session_id, escalation_trigger,
+      hem_ref (the HEM escalation identifier), escalation_timestamp.
+
+10.2.  GAR Logging Schema for ACD ALEs
+
+   All ACD ALEs are logged as GAR event records per [I-D.sato-soos-gar]
+   Section 7.  Each ALE record carries:
+
+   -  ale_type: one of ALE-056 through ALE-063 (string).
+   -  ale_seq: the causal sequence number within the session (integer).
+   -  session_id: the AEP session identifier (string).
+   -  acd_session_id: the ACD handshake identifier (string, UUID v4).
+   -  timestamp: kernel clock timestamp (ISO 8601, MUST use kernel
+      clock per KEE-1 P7).
+   -  prev_span_hash: SHA-256 of the preceding ALE record in the
+      session sequence (string, per KEE-1 P7 WAL tamper evidence).
+   -  ale_specific_fields: the mandatory fields for the specific ALE
+      type as specified in Section 10.1.
+
+10.3.  Data Minimization Requirements
+
+   ACD-related GAR records are subject to data minimization
+   requirements applicable in any jurisdiction where an ACD Record
+   carries personal data.
+
+   1.  ALE-057 (ACD_RECORD_ISSUED): the GAR record MUST store only the
+       SHA-256 hash of the ACD Record body, not the full record.  The
+       full ACD Record body is retained by the resource provider and
+       the GEC locally but MUST NOT be written to GAR.
+
+   2.  ALE-056 (ACD_QUERY_RECEIVED): the resource_provider_id in the
+       GAR record MUST NOT carry personal data beyond the minimum
+       identifier necessary to identify the resource provider for audit
+       purposes (e.g., a registered KIA Party Registry identifier or
+       registered domain).
+
+   3.  ALE-061 (ACD_HUMAN_QUERY): the requester_id field MUST carry
+       only the credential identifier of the querying entity, not
+       personal name or contact information.  Personal identity, if
+       required for the audit record, is resolved from the credential
+       identifier by the Audit Principal's identity provider, not
+       stored in GAR.
+
+
+11.  Open Issues
+
+   OQ-ACD-DRAFT-02:
+      The ACD Record media type IANA registration name is
+      "application/soos-acd+json".  Pending IANA assignment.
+
+   OQ-ACD-DRAFT-03:
+      The mjwt_jti field (Section 9.1) is a REQUIRED addition to
+      Layer 3 fields specified in Section 6.3 and the complete example
+      in Section 6.4.  The Section 6.4 example MUST be updated before
+      Datatracker submission to include "mjwt_jti": "<uuid>" in the
+      Layer 3 block.  This is a pre-submission editorial action.
+
+
+12.  Security Considerations
+
+   This section documents the primary attack vectors against the ACD
+   protocol, the normative defenses, and residual risks.
+
+12.1.  Incomplete Disclosure Attack
+
+   Attack:
+      A resource provider queries the ACD endpoint of a SOOS-governed
+      agent.  The GEC returns an ACD Record that omits or minimizes
+      Layer 2 fields -- for example, reporting all tier counts as zero
+      or omitting the cap_profile_hash -- in order to satisfy the
+      handshake while concealing the agent's actual (deficient)
+      compliance posture.  The resource provider validates the KIA
+      signature (which is valid) and grants access, never inspecting
+      the compliance content.
+
+   Mechanism:
+      The attack exploits the separation between signature validity and
+      content adequacy.  A resource provider that validates only the
+      KIA signature without inspecting Layer 2 content is vulnerable
+      to a kernel that produces technically-valid but substantively
+      empty disclosure records.
+
+   Normative defense:
+      1.  The GEC MUST NOT produce an ACD Record where any REQUIRED
+          Layer 2 field is absent.
+
+      2.  The GEC MUST NOT produce an ACD Record where cap_profile_hash
+          does not correspond to the hash of an actual, GEC-enforced
+          CAP Profile at the time of production.
+
+      3.  Resource providers MUST inspect Layer 2 content against their
+          compliance requirements -- not only validate the KIA signature.
+          The prohibition_tier_summary counts MUST be consistent with
+          the referenced CAP Profile's actual Cedar policy count.
+
+   Residual risk:
+      A resource provider that validates signature only without
+      inspecting Layer 2 content remains vulnerable.  This is a
+      resource-provider-side implementation risk, not an ACD protocol
+      deficiency.  Guidance for resource provider validation is in
+      Section 7.3.
+
+12.2.  Spoofed ACD Record
+
+   Attack:
+      An adversary intercepts the ACD compliance handshake and
+      substitutes a spoofed ACD Record with a valid-looking but
+      unverifiable KIA signature, false cap_profile_id, or fabricated
+      jurisdiction declarations.  The resource provider, if it does not
+      rigorously verify the KIA signature chain, accepts the spoofed
+      record and grants access to an agent that does not carry the
+      declared compliance posture.
+
+   Mechanism:
+      The attack requires either (a) network interception of the ACD
+      query/response exchange, or (b) a resource provider implementation
+      that validates the signature against an untrusted key rather than
+      the agent's published KIA attestation chain.
+
+   Normative defense:
+      1.  All ACD Records MUST be returned over TLS [RFC8446].  Plain-
+          text ACD transport is not permitted.
+
+      2.  Resource providers MUST verify the gec_signature against the
+          agent's KIA attestation chain as published in the KIA Party
+          Registry [I-D.sato-soos-kia].  Verification against any other
+          key source is not permitted.
+
+      3.  The agent_xpid in the ACD Record MUST match the XPID of the
+          kernel the resource provider queried.  A mismatch indicates
+          record substitution.
+
+      4.  The ACD Record MUST be signed over a canonicalized payload
+          per RFC 8785 [RFC8785].  Non-canonicalized signing is not
+          permitted.
+
+   Residual risk:
+      A compromised KIA private key (key exfiltration from the GEC)
+      would allow an adversary to produce valid signatures over spoofed
+      content.  KIA key protection requirements are specified in
+      [I-D.sato-soos-kia] Section 4.
+
+12.3.  acd_session_id Collision
+
+   Attack:
+      An adversary crafts ACD queries that cause the GEC to generate
+      duplicate acd_session_id values for distinct handshake instances.
+      If the resource provider or GAR implementation uses the
+      acd_session_id as a primary key for compliance event records, a
+      collision allows the adversary to overwrite a legitimate
+      compliance record with a fabricated one, or to merge distinct
+      handshake records.
+
+   Mechanism:
+      The attack exploits weak UUID generation -- specifically, a
+      non-random UUID v4 generator seeded with a predictable value (e.g.,
+      system clock without additional entropy).  In high-throughput
+      deployments where many ACD handshakes are executed concurrently,
+      a weak generator increases collision probability.
+
+   Normative defense:
+      1.  The GEC MUST generate acd_session_id values as UUID v4
+          [RFC4122] using a cryptographically secure random number
+          generator (CSPRNG).
+
+      2.  The GEC MUST verify that the generated acd_session_id has not
+          been used in any GAR ALE-056 record within the ACD Record
+          validity window before issuing the record.
+
+      3.  GAR implementations MUST treat acd_session_id as non-unique
+          until the generating GEC's UUID generation quality has been
+          confirmed, and MUST log a GAR alert if two ALE-056 records
+          with the same acd_session_id are received.
+
+   Residual risk:
+      In deployments with compliant CSPRNG-based UUID generation, the
+      collision probability for UUID v4 is negligible at any realistic
+      ACD throughput.  Non-compliant implementations that use weak
+      generators face meaningful collision risk at scale.
+
+12.4.  ACD Record Replay
+
+   Attack:
+      An adversary captures a legitimate ACD Record from a past
+      compliance handshake and replays it to a resource provider at a
+      later time.  If the resource provider does not validate the
+      acd_validity_not_after timestamp, or if the adversary replays
+      within the validity window of a record that remains technically
+      valid but no longer reflects the agent's current compliance
+      posture, the resource provider may grant access based on stale
+      compliance information.
+
+   Mechanism:
+      ACD Records have defined validity windows (default 24 hours,
+      maximum 30 days).  An adversary who captures a valid ACD Record
+      can replay it within that window to any resource provider that
+      does not check for session-specific binding or does not enforce
+      freshness beyond the validity window.
+
+   Normative defense:
+      1.  Resource providers MUST reject ACD Records where the current
+          time is after acd_validity_not_after.
+
+      2.  Resource providers MUST reject ACD Records where the current
+          time is before acd_validity_not_before.
+
+      3.  Resource providers SHOULD correlate the ACD Record's
+          acd_session_id with the specific AEP session in progress.
+          An ACD Record presented outside the context of the AEP session
+          for which it was produced SHOULD be rejected.
+
+      4.  For regulated resource classes with high compliance risk,
+          resource providers SHOULD require a freshness window
+          shorter than the maximum ACD validity window, by querying
+          for a new ACD Record if the existing session-cached record
+          is older than the provider's freshness threshold.
+
+      5.  The GEC MUST log ALE-060 (ACD_RECORD_EXPIRED) when an ACD
+          Record validity window elapses without a successful handshake.
+
+   Residual risk:
+      Within a valid ACD Record's validity window, if the agent's
+      compliance posture changes (e.g., a CAP Profile update or mandate
+      revocation), the outstanding ACD Record will not reflect the new
+      posture until it expires.  Deployments with high compliance
+      sensitivity SHOULD use short validity windows (24 hours or less).
+
+
+13.  Privacy Considerations
+
+   The ACD Record carries jurisdiction declarations, governing law,
+   operator identity, and regulatory regime information.  In high-
+   throughput deployments, per-transaction logging of this information
+   could create a detailed operational profile of the agent's
+   activities across resource providers.
+
+   GAR MUST log only the SHA-256 hash of the ACD Record for ALE-056
+   and ALE-057, not the full Record.  The full ACD Record is retained
+   by the resource provider in its compliance system and by the GEC in
+   its local record, but is not stored in GAR.  This design satisfies
+   data minimization requirements under APPI Article 19 and GDPR
+   Article 5(1)(c) while preserving audit verifiability through hash
+   commitment.
+
+   Resource providers MUST handle ACD Records they receive in
+   accordance with applicable data protection law.  The jurisdictions
+   array in Layer 1 carries information about the agent operator that
+   may constitute personal data under applicable law.
+
+
+14.  IANA Considerations
+
+14.1.  ACD Record Media Type
+
+   This document requests IANA to register the following media type:
+
+   Type name: application
+   Subtype name: soos-acd+json
+   Required parameters: none
+   Optional parameters: none
+   Encoding considerations: UTF-8
+   Security considerations: See Section 12 of this document.
+   Interoperability considerations: none
+   Published specification: This document.
+   Applications that use this media type: SOOS-governed AI agent
+      kernels and resource providers implementing the ACD compliance
+      handshake.
+   Fragment identifier considerations: none
+   Additional information: none
+   Contact: Tom Sato <tomsato@myauberge.jp>
+   Intended usage: COMMON
+   Restrictions on usage: none
+   Author: Tom Sato
+   Change controller: IETF
+
+14.2.  ACD Authority Lifecycle Event Types
+
+   This document requests IANA to register the following Authority
+   Lifecycle Event types in the SOOS GAR ALE Type Registry established
+   by [I-D.sato-soos-gar]:
+
+   ALE-056: ACD_QUERY_RECEIVED
+      Trigger: Resource provider initiated ACD compliance handshake.
+      Fields: resource_provider_id, timestamp, agent_session_id,
+              acd_session_id.
+
+   ALE-057: ACD_RECORD_ISSUED
+      Trigger: GEC generated and KIA-signed ACD Record.
+      Fields: SHA-256(ACD Record), KIA signing key ID,
+              validity_not_after, acd_session_id.
+
+   ALE-058: ACD_VALIDATION_PASSED
+      Trigger: Resource provider validated ACD Record successfully.
+      Fields: acd_session_id, resource_provider_id, timestamp.
+
+   ALE-059: ACD_VALIDATION_FAILED
+      Trigger: Resource provider rejected ACD Record.
+      Fields: acd_session_id, failed_layer (1|2|3), failed_field,
+              resource_provider_id.
+
+   ALE-060: ACD_RECORD_EXPIRED
+      Trigger: ACD Record validity window elapsed.
+      Fields: acd_session_id, expiry_timestamp.
+
+   ALE-061: ACD_HUMAN_QUERY
+      Trigger: Human-initiated ACD compliance query.
+      Fields: acd_session_id, requester_id, query_timestamp.
+
+   ALE-062: ACD_ACCESS_DENIED
+      Trigger: Resource access denied following ACD validation failure.
+      Fields: acd_session_id, resource_provider_id, denial_reason.
+
+   ALE-063: ACD_ESCALATION_TRIGGERED
+      Trigger: ACD validation result escalated to human review.
+      Fields: acd_session_id, escalation_trigger, hem_ref.
+
+
+15.  References
+
+15.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC4122]  Leach, P., Mealling, M., and R. Salz, "A Universally
+              Unique IDentifier (UUID) URN Namespace", RFC 4122,
+              DOI 10.17487/RFC4122, July 2005,
+              <https://www.rfc-editor.org/rfc/rfc4122>.
+
+   [RFC7515]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515,
+              May 2015, <https://www.rfc-editor.org/rfc/rfc7515>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017,
+              <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8446]  Rescorla, E., "The Transport Layer Security (TLS)
+              Protocol Version 1.3", RFC 8446,
+              DOI 10.17487/RFC8446, August 2018,
+              <https://www.rfc-editor.org/rfc/rfc8446>.
+
+   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
+              Canonicalization Scheme (JCS)", RFC 8785,
+              DOI 10.17487/RFC8785, June 2020,
+              <https://www.rfc-editor.org/rfc/rfc8785>.
+
+   [I-D.sato-soos-aep]
+              Sato, T., "The Agent Execution Protocol (AEP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-aep-02, July 2026.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "The Constitutional AI Protocol (CAP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-cap-04, June 2026.
+
+   [I-D.sato-soos-cap-rrs]
+              Sato, T., "The CAP Rule Registry and Synchronization
+              Protocol (CAP-RRS)", Internet-Draft
+              draft-sato-soos-cap-rrs-02, June 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "The Governance Audit Record (GAR) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-gar-03, June 2026.
+
+   [I-D.sato-soos-hem]
+              Sato, T., "The Human Escalation Mechanism (HEM) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-hem-05, July 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Attestation (KIA) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-kia-03, July 2026.
+
+   [I-D.sato-soos-kee]
+              Sato, T., "The Kernel Execution Environment (KEE-1) for
+              the Sovereign Object OS", Internet-Draft
+              draft-sato-soos-kee-00, July 2026.
+
+   [I-D.sato-soos-mjwt]
+              Sato, T., "The Mandate JWT (MJWT) for Agentic AI
+              Systems", Internet-Draft draft-sato-soos-mjwt-02,
+              July 2026.
+
+   [I-D.sato-soos-rgp]
+              Sato, T., "The Resource Governance Protocol (RGP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-rgp-00, 2026.
+
+   [I-D.sato-soos-sov]
+              Sato, T., "The Sovereign Object (SOV) for Agentic AI
+              Systems", Internet-Draft draft-sato-soos-sov-02, 2026.
+
+15.2.  Informative References
+
+   [EU-AI-ACT]
+              European Parliament, "Regulation (EU) 2024/1689 of the
+              European Parliament and of the Council on Artificial
+              Intelligence", Official Journal of the European Union,
+              July 2024.
+
+   [APPI]     Government of Japan, "Act on Protection of Personal
+              Information (APPI)", Law No. 57 of 2003, as amended.
+
+   [FSA-AI-GUIDELINES]
+              Financial Services Agency of Japan, "Guidelines for
+              AI Utilization in Financial Institutions", 2024.
+
+   [NIST-AI-RMF]
+              NIST, "Artificial Intelligence Risk Management Framework
+              (AI RMF 1.0)", NIST AI 100-1, January 2023.
+
+   [I-D.sato-soos-kee]
+              Sato, T., "The Kernel Execution Environment (KEE-1) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-kee-00, 2026.
+
+   [I-D.ietf-scitt-architecture]
+              Birkholz, H. et al., "An Architecture for Trustworthy
+              and Transparent Digital Supply Chains (SCITT)",
+              Internet-Draft draft-ietf-scitt-architecture, 2024.
+
+
+Appendix A.  Worked Example: Japan FSA Inspection
+
+   This appendix traces the complete bilateral audit record for a Japan
+   FSA (Financial Services Agency) inspection of a SOOS-governed AI
+   agent deployment executing securities-adjacent operations under FIEA
+   (Financial Instruments and Exchange Act) Article 2.
+
+A.1.  Scenario Setup
+
+   Operator: MyAuberge K.K. (urn:soos:kia:myauberge-k.k.:jp:v3)
+   Agent: Autonomous procurement agent, delegation_chain_depth: 0
+   Deployment: KEE-1 L2, FROST (2,3), Japan Deployment Profile
+   CAP Profile: "myauberge-k.k.-japan-v2.3.1"
+   Inspection period: January 1 -- June 30, 2026
+   Trigger: FSA routine inspection under FIEA Article 2
+
+A.2.  Resource Provider Compliance Gate (January 3, 2026)
+
+   On January 3, the agent connects to a financial institution API
+   (resource provider: "Sumitomo Financial API Gateway").
+
+   1.  Resource provider RGP capability declaration includes
+       acd_required: true for the "securities-data" resource class.
+
+   2.  Resource provider queries /.well-known/soos-acd.
+       GEC receives request; generates acd_session_id:
+       "f4a8-0012-..."; logs ALE-056.
+
+   3.  GEC executes four-check sequence (KEE-1 §4.3):
+       Check 1: GEC Manifest urn:soos:gec-manifest:myauberge:20260101
+       issued 2026-01-01T09:00:00Z — within staleness window. PASS.
+       Check 2: cedar_policy_hash computed over active Cedar Policy
+       Set "myauberge-k.k.-japan-v2.3.1" — matches cap_profile_hash
+       stored in CAP Profile. PASS.
+       Check 3: operator KIA identity not revoked. PASS.
+       Check 4: agent XPID "urn:soos:xpid:uuid:a3f2c1d4-..." not
+       revoked; no CAEP signal received. PASS.
+
+   4.  ACD Record generated and KIA-signed. Layer 1 JP jurisdiction
+       entry carries regulatory_regime: ["FIEA-Art2", "APPI",
+       "AI-Rincho-Item-23"]. Layer 2 prohibition_tier_summary:
+       {tier_0b: 2 (including market manipulation prohibition),
+       tier_1: 12}. Layer 3 gar_audit_endpoint:
+       "https://kernel.myauberge.jp/gar/audit". mjwt_jti:
+       "3c9f-0445-...". ALE-057 logged (SHA-256 of ACD Record body).
+
+   5.  Resource provider validates: signature PASS; JP FIEA in
+       regulatory_regime PASS; tier_0b >= 1 (market manipulation
+       covered) PASS; operator_id non-null PASS. Access granted.
+       ALE-058 logged. acd_session_id bilaterally recorded.
+
+A.3.  FSA Inspection Request (July 8, 2026)
+
+   6.  FSA inspector contacts MyAuberge K.K. under FIEA Article 2,
+       requesting compliance disclosure for January-June 2026.
+
+   7.  Operator's GEC generates inspection ACD Record under
+       ALE-061 (ACD_HUMAN_QUERY):
+       requester_credential_type: "REGULATOR"
+       requester_id: "fsa-inspector-credential-0044"
+       query_timestamp: "2026-07-08T14:22:00Z"
+
+   8.  Inspection ACD Record carries: cap_profile_id matching the
+       profile active January-June 2026; cap_profile_hash committing
+       to that profile's content; ptd_endpoint for full policy
+       transparency for JP jurisdiction; gar_audit_endpoint for
+       direct GAR audit package access.
+
+A.4.  FSA Verifies the Compliance Chain
+
+   9.  FSA inspector retrieves the PTD from ptd_endpoint.  The PTD
+       returns the Cedar policy "tier0b-market-manipulation" with
+       authority_source: FIEA Article 159 (manipulation prohibition).
+       The policy has been active since 2026-01-01T00:00:00Z, with
+       no gap during the inspection period.
+
+   10. FSA inspector queries the gar_audit_endpoint using the Audit
+       Principal credential.  The GAR Processor returns the Audit
+       Package for the inspection period: 847 Session Blocks covering
+       January-June 2026.
+
+   11. The inspector selects the Session Block for January 3 (the
+       first trading session).  The GAR Processor returns the Session
+       Block with Merkle root and KIA signature.  The inspector
+       requests a Merkle inclusion proof for ALE-056 (ACD_QUERY_
+       RECEIVED, acd_session_id "f4a8-0012-...").  The proof verifies:
+       the ALE record has not been tampered with since the Session
+       Block was signed.
+
+   12. The inspector traces the full compliance chain:
+       FIEA Art.159 → Cedar policy "tier0b-market-manipulation"
+       → cap_profile_hash in ACD Record (ALE-057 hash commitment)
+       → ALE-058 (ACD_VALIDATION_PASSED at Sumitomo API gateway)
+       → bilateral acd_session_id record in gateway compliance log
+       → Session Block Merkle proof (tamper-evident).
+
+   The FSA inspection is complete.  The inspector can confirm: (a)
+   the market manipulation prohibition was enforced at the kernel
+   boundary, not stated as a policy intention; (b) the prohibition
+   was active without gap throughout the inspection period; (c) every
+   API access during the period was preceded by a validated ACD
+   compliance handshake; (d) the audit trail for every access is
+   Merkle-protected and KIA-signed.
+
+
+Appendix B.  Related Work
+
+B.1.  Existing Frameworks
+
+   Verifiable Credentials (VC) [W3C-VC] define a mechanism for
+   issuing and presenting cryptographically verifiable claims about a
+   subject.  ACD shares the goal of machine-verifiable attestation but
+   differs in scope and binding: ACD Records are produced by the
+   enforcement kernel (not by an issuer external to the agent), are
+   specifically structured for compliance handshake use cases, and are
+   directly bound to the kernel's operating CAP Profile and MJWT
+   mandate.  ACD is a domain-specific compliance disclosure protocol,
+   not a general credential format.
+
+   OAuth 2.0 [RFC6749] and OpenID Connect [OIDC] govern identity and
+   authorization for API access.  ACD complements these protocols: an
+   ACD compliance handshake may occur within or alongside an OAuth
+   authorization flow, but addresses a different layer.  OAuth confirms
+   that an agent has been granted permission by the resource owner.
+   ACD confirms that the agent operates under constitutional
+   prohibitions, governed law, and auditable mandate -- the compliance
+   posture that the resource provider must verify independent of
+   authorization grants.
+
+B.2.  Regulatory Instruments
+
+   EU AI Act Article 13 (Transparency and provision of information to
+   deployers) establishes obligations for high-risk AI systems to
+   provide deployers with information sufficient to enable appropriate
+   use.  ACD provides the machine-readable, kernel-signed
+   implementation of Article 13's transparency obligations.
+
+   APPI Articles 17-27 (Purpose limitation, data minimization, and
+   third-party provision restrictions) create obligations for AI
+   systems processing personal data.  ACD Layer 2 CAP Profile
+   references carry the APPI control mappings that resource providers
+   need to validate before granting data access to AI agents.
+
+   FIEA Article 2 (Securities and Exchange Act, Japan) creates
+   obligations for AI systems operating in financial markets.  ACD
+   Layer 1 regulatory_regime declarations for jurisdiction JP carry
+   FIEA mapping, enabling FSA-compliant AI agent access to financial
+   institution APIs.
+
+B.3.  SOOS Companion Drafts
+
+   KIA [I-D.sato-soos-kia] -- provides the cryptographic kernel
+   identity and signing key that makes ACD Records verifiable.  ACD
+   depends on KIA for agent_xpid derivation and gec_signature
+   production.  KIA does not depend on ACD.
+
+   CAP [I-D.sato-soos-cap] and CAP-RRS [I-D.sato-soos-cap-rrs] --
+   produce and govern the CAP Profiles referenced in ACD Layer 2.
+   ACD depends on CAP and CAP-RRS for cap_profile_id and
+   cap_profile_hash.  CAP and CAP-RRS do not depend on ACD.
+
+   AEP [I-D.sato-soos-aep] -- defines the agent execution session
+   within which ACD compliance handshakes occur.  ACD is sequenced
+   within the AEP session lifecycle.  AEP's XPID binding (GEC binds
+   XPID from KIA-verified Party Registry) is the mechanism by which
+   agent_xpid in the ACD Record is grounded.
+
+   GAR [I-D.sato-soos-gar] -- records all ACD Authority Lifecycle
+   Events (ALE-056 through ALE-063).  ACD depends on GAR for audit
+   logging.  GAR-03 carries the XPID mirror field on ACD session ALEs.
+
+   MJWT [I-D.sato-soos-mjwt] -- provides the session mandate JWT
+   whose jti the ACD Record must reference.  ACD-to-MJWT binding
+   (Section 9) ensures the compliance disclosure is bound to the
+   mandate scope.
+
+   RGP [I-D.sato-soos-rgp] -- governs outbound capability discovery.
+   RGP's acd_required field in capability declarations triggers the
+   ACD compliance handshake.  ACD and RGP together define the complete
+   resource access governance flow.
+
+   HEM [I-D.sato-soos-hem] -- invoked by ACD when ACD_ESCALATION_
+   TRIGGERED (ALE-063) fires following an ACD validation failure.
+
+   KEE-1 [I-D.sato-soos-kee] -- defines the four-check sequence
+   (manifest validity, policy currency, KIA attestation, revocation
+   status) that underlies the ACD Presentation Protocol validation
+   procedure in Section 7.4.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI: https://soosproject.ai

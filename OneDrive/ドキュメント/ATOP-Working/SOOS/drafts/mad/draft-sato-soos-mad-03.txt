@@ -1,0 +1,1625 @@
+Internet Engineering Task Force                              T. Sato
+Internet-Draft                                       MyAuberge K.K.
+Intended Status: Standards Track                         5 July 2026
+Expires: 5 January 2027
+
+           Multi-Agent Delegation in Sovereign Object Systems
+                       draft-sato-soos-mad-03
+
+Abstract
+
+   When a consequential task requires multiple AI agents -- one to
+   coordinate, others to execute, each operating on different objects
+   in a shared workflow -- who is responsible for the outcome?  Which
+   agent caused which state change?  Under whose authority?  If the
+   coordinating agent's authorization is revoked, does the authority
+   of every sub-agent it delegated to immediately expire?  If one
+   agent in a parallel workflow exceeds its scope, can that excess
+   propagate to others?
+
+   This document defines the Multi-Agent Delegation (MAD) protocol,
+   extended in version -03 with four new normative mechanisms: the
+   Sub-Agent Composition Record (SACR) for kernel-governed sub-agent
+   spawning; the hub-only constraint for sub-agent communication
+   topology; XPID cross-cluster integration derived from KIA-03; and
+   full normative specifications for the R-1 through R-7 revocation
+   trigger classes with completion states and cascade behavior.
+
+   MAD provides a single recoverable property: the accountability
+   chain is always reconstructable from the GEC-signed audit record
+   alone.  Cascade revocation means one decision stops the entire
+   tree.  SACR means the spawning of that tree is itself governed.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference material or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 5 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with
+   respect to this document.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Terminology  [UPDATED in -03]
+   3.  Multi-Agent Mandate Model
+       3.1.  The Narrowing Property
+       3.2.  Mandate Issuance Tree
+       3.3.  SO-Type-Bound Creation Mandates
+       3.4.  Creation Principal Classes
+       3.5.  Cross-Mandate Revocation Cascade
+       3.6.  Agent Session Revocation
+   4.  Sub-Agent Composition Record (SACR)  [NEW in -03]
+       4.1.  Purpose and Design
+       4.2.  SACR Schema
+       4.3.  SACR Issuance Procedure
+       4.4.  SACR Kernel Events
+   5.  Hub-Only Constraint  [NEW in -03]
+       5.1.  Normative Requirement
+       5.2.  Hub-Only Override
+       5.3.  Hub-Only Enforcement
+   6.  XPID Cross-Cluster Integration  [NEW in -03]
+       6.1.  Sub-Agent XPID Derivation
+       6.2.  Cross-Cluster XPID Verification
+       6.3.  XPID in Delegation Audit Records
+   7.  Revocation Trigger Classes R-1 through R-7 [UPDATED in -03]
+       7.1.  R-1: CAP Tier 0-A Violation
+       7.2.  R-2: Scope Boundary
+       7.3.  R-3: Non-Response
+       7.4.  R-4: Irreversible Threshold
+       7.5.  R-5: Scheduled Rotation
+       7.6.  R-6: Operator Override
+       7.7.  R-7: DEADLOCK
+       7.8.  Completion State Matrix
+       7.9.  Cascade Behavior by Trigger
+   8.  SO Instance Topology Types
+   9.  SO Cluster Coordination
+  10.  Orchestrator-Specialist Model
+  11.  Kernel Events  [UPDATED in -03]
+  12.  Cedar Actions  [UPDATED in -03]
+  13.  Conformance  [UPDATED in -03]
+  14.  Open Issues
+  15.  Security Considerations  [UPDATED in -03]
+  16.  IANA Considerations  [UPDATED in -03]
+  17.  Normative References  [UPDATED in -03]
+  18.  Informative References
+  Appendix B.  Related Work
+  Appendix C.  Vibe Coding Assets  [UPDATED in -03]
+  Author's Address
+
+
+1.  Introduction
+
+   [Section 1 carried forward from draft-sato-soos-mad-02 in full,
+   with the following addition:]
+
+   Version -03 adds four new normative mechanisms:
+
+   (1)  Sub-Agent Composition Record (SACR, Section 4): the kernel-
+        governed primitive for sub-agent spawning.  DR-SPAWN-01
+        identified the gap -- MAD governed what a sub-agent was
+        authorized to do once it existed, but specified no mechanism
+        for how it came into existence.  SACR closes this gap:
+        the kernel witnesses every sub-agent composition event,
+        issues an ephemeral KIA reference, and records the
+        tool-subset invariant at spawn time.
+
+   (2)  Hub-Only Constraint (Section 5): a normative requirement
+        derived from DR-SPAWN-01 OQ-SPAWN-06 resolution.  Sub-agents
+        spawned from a hub MUST NOT communicate with each other
+        directly; all coordination routes through the hub.  This
+        closes the audit-trail and re-planning-authority gaps
+        that direct sub-agent messaging would create.
+
+   (3)  XPID Cross-Cluster Integration (Section 6): integration of
+        the Cross-Principal Identifier from KIA-03 [I-D.sato-soos-
+        kia] into MAD's delegation audit model.  Sub-agent XPIDs
+        are derived from parent XPID + session nonce, providing
+        stable cross-cluster correlation without a trusted third
+        party.
+
+   (4)  Full normative specifications for the R-1 through R-7
+        revocation trigger classes (Section 7), including complete
+        completion state matrices and cascade behavior per trigger.
+        The R-1 through R-7 taxonomy was introduced in MAD-02 but
+        lacked per-trigger normative depth.
+
+   Further information: https://soosproject.ai/drafts/mad
+
+
+2.  Terminology  [UPDATED in -03]
+
+   [Section 2 carried forward from draft-sato-soos-mad-02 in full,
+   with the following additions:]
+
+   SACR (Sub-Agent Composition Record):
+      The kernel-issued record that governs the spawning of a new
+      sub-agent under Mechanism B (runtime instantiation, as
+      defined in DR-SPAWN-01 Section 2.2).  The SACR captures the
+      composition event: the ephemeral identity issued, the tool
+      subset granted, the parent mandate reference, and the scope
+      constraints applied.  Distinct from Assignment (which governs
+      what the sub-agent may do once it exists): SACR governs how
+      the sub-agent comes to exist.  See Section 4.
+
+   Ephemeral KIA Reference (ephemeral_kia_ref):
+      A session-scoped identity issued by the GEC at SACR issuance
+      for a sub-agent instantiated under Mechanism B.  The ephemeral
+      KIA reference is valid only for the duration of the spawned
+      sub-agent's session and is retired when that session closes.
+      It is not a persistent Party Registry entry.
+
+   Hub-Only Mode:
+      The normative default communication model for sub-agents
+      spawned from a hub orchestrator.  In hub-only mode, all
+      cross-sub-agent coordination MUST route through the hub;
+      direct sub-agent to sub-agent communication is prohibited.
+      See Section 5.
+
+   XPID (Cross-Principal Identifier):
+      Defined in [I-D.sato-soos-kia] Section 6.  In MAD-03, XPIDs
+      are used for sub-agent identity correlation across cluster
+      boundaries.  Sub-agent XPIDs are derived from the parent
+      XPID + session nonce per Section 6.1.
+
+   max_spawn_depth:
+      An integer field in the SACR that strictly decrements at each
+      recursive sub-agent spawn.  A sub-agent with max_spawn_depth:
+      0 is a leaf and MUST NOT spawn further sub-agents.  A parent
+      MUST NOT issue a SACR granting max_spawn_depth greater than
+      (parent's own max_spawn_depth - 1).  See Section 4.2.
+
+   can_decompose:
+      A boolean field in the SACR indicating whether the spawned
+      sub-agent may itself decompose its sub-goal and spawn further
+      children.  Default: false.  max_spawn_depth: 0 implies
+      can_decompose: false regardless of the field value.
+
+   Mechanism A / Mechanism B:
+      Two sub-agent spawning mechanisms identified in DR-SPAWN-01.
+      Mechanism A: delegation to an already-existing, independently-
+      deployed agent.  Mechanism B: runtime instantiation of a wholly
+      new agent via SACR.  Both mechanisms produce Assignment records
+      per DR-PLAN-01; only Mechanism B produces a SACR.
+
+
+3.  Multi-Agent Mandate Model
+
+   [Sections 3.1 through 3.9 carried forward from
+   draft-sato-soos-mad-02 in full, including all sub-sections on
+   the Narrowing Property, Mandate Issuance Tree, SO-Type-Bound
+   Creation Mandates, Creation Principal Classes, Cross-Mandate
+   Revocation Cascade, Agent Session Revocation (including 3.6.1
+   through 3.6.6), Cluster Invariants, Cluster Resource Governance,
+   and Multi-Agent Topology Events.
+
+   Section 3.6.4 (Session Revocation Trigger Taxonomy R-1 through
+   R-7) remains as defined in MAD-02 for the high-level taxonomy.
+   Full normative per-trigger specifications are expanded in
+   Section 7 of this document.]
+
+
+4.  Sub-Agent Composition Record (SACR)  [NEW in -03]
+
+4.1.  Purpose and Design
+
+   The SACR is the kernel-governed record of a sub-agent spawning
+   event under Mechanism B (runtime instantiation).  Its design
+   derives from DR-SPAWN-01 (June 19, 2026), which identified the
+   following gap in MAD-02:
+
+      MAD-02 fully specifies what a sub-agent may do once it exists
+      (Assignment, INV-4 Narrowing Property, DEADLOCK detection,
+      cascade revocation).  It does not specify how the sub-agent
+      comes into existence.  Assignment assumes assigned_agent_id
+      resolves to a known, attested identity.  For Mechanism B
+      sub-agents (runtime instantiation), no such identity exists
+      before the spawn event.
+
+   The SACR fills this gap by providing a kernel-witnessed record of:
+
+   (a)  The composition event itself (spawning principal, spawned
+        identity, scope constraints applied).
+   (b)  The tool-subset invariant check at spawn time: the spawned
+        sub-agent's tool access MUST be a subset of the spawning
+        agent's own tool access at composition time.
+   (c)  The ephemeral KIA reference scoped to the sub-agent's session.
+   (d)  The spawn-depth governance: max_spawn_depth strictly
+        decrements per recursion level.
+
+   The kernel-mediated spawn model is the normative approach: SACR
+   issuance is a GEC operation, not an agent-to-agent call.  This is
+   the only model consistent with the SOOS OS/application boundary
+   (DEC-PLAN-13) and the only one where SACR issuance has an
+   unambiguous issuer.
+
+   SACR and Assignment are sequential, not redundant:
+   - SACR governs how the sub-agent comes to exist.
+   - Assignment governs what the now-existing sub-agent may do.
+
+   Assignment's assigned_agent_id normatively resolves to either:
+   (a)  A persistent Party Registry identity (Mechanism A), or
+   (b)  A SACR-issued ephemeral_kia_ref (Mechanism B).
+
+4.2.  SACR Schema
+
+   {\n
+     \"sacr_id\":               string,   ; REQUIRED. UUID v4. Primary key
+                                         ;   for this composition record.
+
+     \"parent_assignment_id\":  string,   ; REQUIRED. The Assignment record
+                                         ;   ID that authorized this spawn.
+                                         ;   Cross-references DR-PLAN-01
+                                         ;   §5.4 schema.
+
+     \"parent_session_id\":     string,   ; REQUIRED. The spawning agent's
+                                         ;   session_id.
+
+     \"parent_mandate_id\":     string,   ; REQUIRED. MJWT jti of the
+                                         ;   spawning agent's mandate.
+
+     \"parent_xpid\":           string,   ; REQUIRED. The spawning agent's
+                                         ;   XPID (see Section 6.1).
+                                         ;   Used for ephemeral XPID
+                                         ;   derivation.
+
+     \"ephemeral_kia_ref\":     string,   ; REQUIRED. The ephemeral identity
+                                         ;   issued by the GEC for this
+                                         ;   sub-agent session.  Format:
+                                         ;   UUID v4, GEC-generated.
+                                         ;   Valid only for this session's
+                                         ;   duration.  Not a persistent
+                                         ;   Party Registry entry.
+
+     \"scope_constraints\": {             ; REQUIRED.
+       \"cedar_action_subset\":  [string], ; REQUIRED. The Cedar actions
+                                         ;   granted to the spawned sub-
+                                         ;   agent.  MUST be a strict subset
+                                         ;   of the spawning agent's own
+                                         ;   action set at spawn time.
+                                         ;   Verified by the GEC at issuance.
+       \"so_type_scope\":        [string], ; REQUIRED. SO Types the sub-agent
+                                         ;   may act on.  MUST be a subset
+                                         ;   of the parent's SO type scope.
+       \"resource_envelope\":    object,  ; REQUIRED. Compute/memory/time
+                                         ;   budget allocated.  MUST NOT
+                                         ;   exceed the parent's remaining
+                                         ;   resource envelope.
+       \"tool_subset\":          [string], ; REQUIRED. Tools accessible to
+                                         ;   the sub-agent.  MUST be a
+                                         ;   subset of the parent's tool
+                                         ;   access at composition time
+                                         ;   (DR-SPAWN-01 §5.1 tool-subset
+                                         ;   invariant).
+       \"temporal_scope\":       object   ; OPTIONAL. not_before /
+                                         ;   not_after bounds for this
+                                         ;   sub-agent session.
+     },
+
+     \"can_decompose\":          boolean, ; REQUIRED. May this sub-agent
+                                         ;   spawn further sub-agents?
+                                         ;   Default: false (most
+                                         ;   restrictive).  MUST be false
+                                         ;   when max_spawn_depth is 0.
+
+     \"max_spawn_depth\":        integer, ; REQUIRED. Strictly decrements
+                                         ;   at each recursive spawn.
+                                         ;   Parent MUST NOT grant a value
+                                         ;   greater than (parent's own
+                                         ;   max_spawn_depth - 1).
+                                         ;   Value 0: leaf agent, cannot
+                                         ;   spawn.  MUST be >= 0.
+
+     \"hub_only\":               boolean, ; REQUIRED. Whether this sub-agent
+                                         ;   is restricted to hub-only mode
+                                         ;   (Section 5).  Default: true.
+                                         ;   Direct sub-agent communication
+                                         ;   is only permitted when
+                                         ;   hub_only: false AND an explicit
+                                         ;   Cedar PERMIT on
+                                         ;   Action::\"DirectSubAgentComm\"
+                                         ;   exists.
+
+     \"replan_authority\":       string,  ; REQUIRED. Values:
+                                         ;   NONE: execute assigned plan
+                                         ;     exactly; no deviation.
+                                         ;   BOUNDED: may deviate within
+                                         ;     declared bounds; must
+                                         ;     surface deviations via
+                                         ;     HEM-DIV-1.
+                                         ;   AUTONOMOUS: may replan
+                                         ;     independently; must record
+                                         ;     replan rationale in GAR.
+                                         ;   Default: NONE.
+
+     \"composition_timestamp\":  string,  ; REQUIRED. ISO 8601 UTC.
+
+     \"sacr_signature\":         string   ; REQUIRED. GEC Ed25519 signature
+                                         ;   over canonical JSON of all
+                                         ;   preceding fields (excluding
+                                         ;   sacr_signature itself).
+   }
+
+4.3.  SACR Issuance Procedure
+
+   The SACR issuance procedure is kernel-mediated.  No agent may
+   directly call a SACR issuance operation; the request MUST flow
+   through the GEC.
+
+   Step 1 -- Spawn request validation.
+      The GEC receives a spawn request from the spawning agent
+      (via the gec.spawnSubAgent() call).  The request MUST include
+      the proposed scope_constraints, tool_subset, can_decompose,
+      max_spawn_depth, and replan_authority values.
+
+   Step 2 -- Tool-subset invariant check.
+      The GEC MUST verify that the requested tool_subset is a strict
+      subset of the spawning agent's currently authorized tool access.
+      A tool_subset that is not a subset of the parent's access MUST
+      cause the GEC to REJECT the spawn request and emit
+      ALE-SPAWN-03 (TOOL_SUBSET_VIOLATION).
+
+   Step 3 -- Spawn-depth invariant check.
+      The GEC MUST verify that the requested max_spawn_depth is not
+      greater than (spawning agent's own max_spawn_depth - 1).  A
+      request that would result in a negative max_spawn_depth MUST
+      be REJECTED and ALE-SPAWN-02 (SPAWN_DEPTH_EXCEEDED) emitted.
+
+   Step 4 -- Cedar action subset check.
+      The GEC MUST verify that the requested cedar_action_subset is
+      a strict subset of the spawning agent's own Cedar action set
+      (INV-4 Narrowing Property).  A violation MUST cause REJECTION
+      with MANDATE_NARROWING_VIOLATION.
+
+   Step 5 -- Ephemeral identity issuance.
+      On all checks passing, the GEC issues the ephemeral_kia_ref
+      (a UUID v4 scoped to this session's lifetime) and derives the
+      sub-agent's XPID per Section 6.1.
+
+   Step 6 -- SACR signing and recording.
+      The GEC constructs the SACR, signs it with the GEC keypair
+      (INV-9), and commits ALE-SPAWN-01 (SUB_AGENT_COMPOSED) to GAR.
+
+   Step 7 -- Assignment linkage.
+      The GEC notifies the spawning agent that the sub-agent is
+      ready, providing the sacr_id and ephemeral_kia_ref.  The
+      spawning agent then issues an Assignment per DR-PLAN-01 §5.4,
+      using ephemeral_kia_ref as the assigned_agent_id.
+
+   CONF-MAD-SACR-01: The GEC MUST complete all five validation
+   steps before issuing the ephemeral_kia_ref.  Partial validation
+   followed by SACR issuance is a conformance violation.
+
+   CONF-MAD-SACR-02: A SACR MUST be committed to GAR (ALE-SPAWN-01)
+   before the sub-agent begins execution.  Sub-agent execution without
+   a prior committed SACR is a conformance violation detectable via
+   GAR audit.
+
+   CONF-MAD-SACR-03: The tool_subset in the SACR MUST be enforced
+   at runtime.  The sub-agent MUST NOT access tools not listed in
+   its sacr.scope_constraints.tool_subset.  The GEC MUST enforce
+   this at each gec.transition() call for the sub-agent session.
+
+4.4.  SACR Kernel Events
+
+   The following kernel events are introduced for SACR lifecycle
+   management.  All events MUST be signed by the KIA keypair (INV-9).
+
+   ALE-SPAWN-01: SUB_AGENT_COMPOSED
+      Emitted by the GEC when a SACR is issued and the ephemeral
+      sub-agent identity is created.  Required fields:
+      sacr_id, parent_assignment_id, parent_session_id,
+      parent_mandate_id, ephemeral_kia_ref, can_decompose,
+      max_spawn_depth, hub_only, replan_authority,
+      composition_timestamp, gec_signature.
+
+   ALE-SPAWN-02: SPAWN_DEPTH_EXCEEDED
+      Emitted when a spawn request is rejected because the requested
+      max_spawn_depth would exceed the parent's own max_spawn_depth
+      minus 1.  Required fields: requesting_session_id,
+      requesting_mandate_id, requested_depth, parent_max_depth,
+      rejection_reason, gec_signature.
+
+   ALE-SPAWN-03: TOOL_SUBSET_VIOLATION
+      Emitted when a spawn request is rejected because the requested
+      tool_subset is not a subset of the parent's tool access.
+      Required fields: requesting_session_id, requesting_mandate_id,
+      requested_tools (array), parent_tools (array),
+      violating_tools (array -- tools requested but not held by
+      parent), rejection_reason, gec_signature.
+
+   ALE-SPAWN-04: EPHEMERAL_IDENTITY_EXPIRED
+      Emitted when the spawned sub-agent's session closes and the
+      ephemeral_kia_ref is retired.  Required fields: sacr_id,
+      ephemeral_kia_ref, session_id, completion_state, expired_at,
+      gec_signature.
+
+
+5.  Hub-Only Constraint  [NEW in -03]
+
+5.1.  Normative Requirement
+
+   Sub-agents spawned from a hub orchestrator MUST operate in hub-
+   only mode by default.  Hub-only mode means:
+
+   CONF-MAD-HUB-01: A sub-agent with hub_only: true in its SACR
+   MUST NOT send messages, state updates, or coordination signals
+   directly to any sibling sub-agent.  All cross-sub-agent
+   coordination MUST route through the hub orchestrator.
+
+   CONF-MAD-HUB-02: The GEC MUST enforce hub-only mode at the
+   Cedar layer.  A gec.transition() call from a hub_only: true
+   sub-agent session that would write to a Zone A Sovereign Object
+   controlled by a sibling session MUST be evaluated against the
+   INV-17 horizontal non-contamination Cedar policy (MAD-02
+   Section 3.7.1).
+
+   CONF-MAD-HUB-03: The GEC MUST NOT accept a direct sub-agent
+   to sub-agent communication call (Action::\"DirectSubAgentComm\")
+   from a session with hub_only: true.  The GEC MUST return
+   HUB_ONLY_VIOLATION and emit the violation to GAR.
+
+   Design rationale (from DR-SPAWN-01 OQ-SPAWN-06 resolution):
+   Hub-only is the only communication model consistent with:
+   (a) DEC-PLAN-13 (the kernel governs state, traversal, and
+       enforcement -- a direct, ungoverned sub-agent link bypasses
+       this);
+   (b) DEC-PLAN-11 (Mission Status SO as kernel-maintained live
+       state -- direct sub-agent communication would produce state
+       changes invisible to the Mission Status SO);
+   (c) Horizontal non-contamination (INV-17) -- the existing DAG
+       dependency types (SEQUENTIAL, CONDITIONAL, MERGE) already
+       model required data flow between sub-goals without requiring
+       direct sub-agent messaging.
+
+   The hub-only constraint does not prevent high-bandwidth
+   coordination within a hub-orchestrated cluster.  It requires
+   that coordination route through the kernel-governed hub, where
+   it can be Cedar-evaluated, GAR-recorded, and INV-17-enforced.
+
+5.2.  Hub-Only Override
+
+   The hub_only constraint MAY be overridden in a SACR when
+   all of the following conditions are met:
+
+   (a)  The SACR carries hub_only: false.
+
+   (b)  The spawning agent's own SACR (or initial mandate) also
+        carried hub_only: false, or the spawning agent is the
+        cluster coordinator.
+
+   (c)  An explicit Cedar PERMIT exists for
+        Action::\"DirectSubAgentComm\" in the active policy set,
+        scoped to the specific sub-agent pair and the specific
+        communication content type.
+
+   (d)  The communication is recorded in GAR with a
+        DIRECT_COMM_PERMITTED event before the first direct
+        message is sent.
+
+   CONF-MAD-HUB-04: hub_only: false in a SACR issued by a
+   hub_only: true parent is a conformance violation.  The GEC
+   MUST reject SACR issuance in this case with
+   HUB_OVERRIDE_NOT_PERMITTED.
+
+5.3.  Hub-Only Enforcement
+
+   The GEC enforces hub-only mode through two mechanisms:
+
+   (a)  Cedar policy evaluation: INV-17 (horizontal non-
+        contamination) prevents cross-session Zone A access.
+        The hub_only: true flag in the SACR is injected as a
+        Cedar context attribute (context.hub_only_active) on
+        every gec.transition() call for the sub-agent session.
+
+   (b)  SACR registry: the GEC maintains a SACR Registry (a
+        kernel-internal lookup of active SACRs by session_id)
+        to enforce hub_only at direct-communication call time
+        without requiring Cedar evaluation for every communication
+        attempt.
+
+   Recursive hub-only: when can_decompose: true and the spawned
+   sub-agent itself spawns children, the hub_only constraint of
+   the grandchild MUST NOT be less restrictive than the child's
+   own hub_only value.  A hub_only: true child MUST NOT spawn
+   hub_only: false grandchildren.
+
+   GAR events for hub-only violations:
+
+   HUB_ONLY_VIOLATION
+      Emitted when a hub_only: true sub-agent attempts direct
+      communication with a sibling.  Required fields: session_id,
+      sacr_id, target_session_id, attempted_action, gec_signature.
+
+
+6.  XPID Cross-Cluster Integration  [NEW in -03]
+
+6.1.  Sub-Agent XPID Derivation
+
+   Every sub-agent session instantiated under Mechanism B MUST
+   be assigned an XPID derived from the parent agent's XPID and
+   the sub-agent's session nonce.
+
+   Derivation procedure:
+
+   sub_agent_xpid = UUID5(KIA_XPID_NAMESPACE,
+                          parent_xpid + ":" + sacr_id)
+
+   where:
+
+   KIA_XPID_NAMESPACE is the KIA XPID namespace UUID defined in
+   [I-D.sato-soos-kia] Section 6.2:
+   "6ba7b814-9dad-11d1-80b4-00c04fd430c8"
+
+   parent_xpid is the XPID of the spawning agent session, as
+   recorded in the parent agent's Party Registry entry or SACR.
+
+   sacr_id is the UUID v4 of the SACR issued for this sub-agent
+   (Section 4.2), which is unique per spawning event.
+
+   Properties of this derivation:
+
+   (a)  Deterministic: any party with the parent XPID and sacr_id
+        can compute the sub-agent XPID.
+
+   (b)  Traceable: the sub-agent XPID encodes its lineage -- it
+        can be traced back to the root XPID by following the SACR
+        chain.
+
+   (c)  Non-forgeable without SACR chain: an attacker cannot
+        claim a specific sub-agent XPID without knowledge of
+        the full SACR chain from the root.
+
+   CONF-MAD-XPID-01: The GEC MUST derive and record the sub-agent
+   XPID at SACR issuance time.  The sub-agent XPID MUST appear in
+   ALE-SPAWN-01 and in every subsequent GAR governance span for
+   the sub-agent session, as the soos.governance.xpid attribute.
+
+6.2.  Cross-Cluster XPID Verification
+
+   When a receiving GEC instance encounters a sub-agent XPID from
+   a delegation tree originating in a different GEC instance:
+
+   (a)  The receiving GEC MUST obtain the SACR for the sub-agent
+        session from the presenting GEC's SACR Registry via the
+        federation channel.
+
+   (b)  The receiving GEC MUST obtain the parent agent's XPID from
+        the SACR's parent_xpid field.
+
+   (c)  The receiving GEC MUST recompute the sub-agent XPID using
+        the derivation in Section 6.1 and verify it matches the
+        received XPID.
+
+   (d)  A XPID that does not verify MUST cause the receiving GEC
+        to emit XPID_VERIFICATION_FAILED (as defined in
+        [I-D.sato-soos-kia] Section 16) and to treat the cross-
+        cluster event as invalid.
+
+   CONF-MAD-XPID-02: Cross-cluster sub-agent XPID verification
+   MUST complete before the receiving GEC accepts any governance
+   events from the sub-agent session.
+
+6.3.  XPID in Delegation Audit Records
+
+   The sub-agent XPID MUST appear in:
+
+   (a)  ALE-SPAWN-01 (SUB_AGENT_COMPOSED): the sacr_xpid field
+        records the derived sub-agent XPID at composition time.
+
+   (b)  ALE-013 (DELEGATION_INITIATED): the sub_agent_xpid field
+        for the sub-agent session.
+
+   (c)  ALE-014 (DELEGATION_COMPLETED) and ALE-015
+        (DELEGATION_FAILED): the sub_agent_xpid field.
+
+   (d)  Every GAR governance span for the sub-agent session, as
+        the soos.governance.xpid OTel attribute per [I-D.sato-
+        soos-gar] Section 5.
+
+   The XPID chain from root to leaf sub-agent is the audit
+   correlation primitive for reconstructing the full delegation
+   tree across GEC instance boundaries.
+
+
+7.  Revocation Trigger Classes R-1 through R-7  [UPDATED in -03]
+
+   The revocation trigger taxonomy introduced in MAD-02 Section
+   3.6.4 is carried forward.  This section adds full normative
+   per-trigger specifications that were deferred in MAD-02.
+
+7.1.  R-1: CAP Tier 0-A Violation
+
+   Trigger condition: A CAP constitutional prohibition (Tier 0-A
+   per [I-D.sato-soos-cap] Section 7.2) has been violated or
+   imminently threatened by the agent session.
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST immediately halt the session without
+        completing any in-progress transition.  No CLEAN exit
+        is available for R-1.
+
+   (b)  The GEC MUST add the mandate JWT jti to the Revocation
+        Registry atomically with halting.
+
+   (c)  The GEC MUST emit a CONSTITUTIONAL_VIOLATION event to GAR
+        with violation_class and tier fields populated.
+
+   (d)  The GEC MUST cascade revocation to all descendant mandates
+        in the issuance tree (CASCADE_TO_DESCENDANTS, Section 3.5).
+
+   (e)  The GEC MUST route to HEM_TIER0_OBSERVED escalation
+        (HEM Class 6) for the highest-authority principal.
+
+   Completion state:
+      PARTIAL always.  INV-15: UNKNOWN is treated as PARTIAL.
+      R-1 never produces CLEAN completion.
+
+   Continuation mandate authority:
+      Human principal MUST reauthorize.  The operator MUST NOT
+      issue a continuation mandate for R-1 without explicit human
+      principal approval.  GAR MUST record CONTINUATION_AWAITING_
+      PRINCIPAL until the principal issues the continuation mandate.
+
+   Cascade behavior:
+      Full CASCADE_TO_DESCENDANTS.  All descendant sessions are
+      simultaneously terminated.  The cascade is atomic at the
+      Revocation Registry layer.
+
+   SACR implications for R-1:
+      All SACRs issued by the revoked session (and by its
+      descendants) are voided at the same time.  All ephemeral
+      KIA references issued under those SACRs MUST be retired
+      immediately.  The GEC MUST emit ALE-SPAWN-04 (EPHEMERAL_
+      IDENTITY_EXPIRED) for each retired ephemeral identity with
+      completion_state: PARTIAL.
+
+7.2.  R-2: Scope Boundary
+
+   Trigger condition: The agent has attempted or is imminently
+   about to attempt an action outside its mandate scope.  This
+   includes INV-4 violations detected at execution time (the
+   action is not in the agent's Cedar action set) and mandate
+   scope violations detected by Cedar DENY on
+   Action::\"MandateScopeCheck\".
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST halt the session at the point of the
+        attempted out-of-scope action.
+
+   (b)  The GEC MUST record the Cedar DENY result with the
+        out-of-scope action identifier in the SCOPE_BOUNDARY_
+        VIOLATION event in GAR.
+
+   (c)  The GEC MUST cascade revocation to all descendant mandates.
+
+   (d)  The GEC MUST route to HEM Class 1 (HEM_CEDAR_ROUTED)
+        escalation.
+
+   Completion state:
+      CLEAN if the out-of-scope action was detected before
+      execution (Cedar DENY at Step 1).  PARTIAL if the
+      detection occurred during execution or after an irreversible
+      action had already been taken.  UNKNOWN if the GEC cannot
+      determine execution state at detection time.
+
+   Continuation mandate authority:
+      Human principal MUST reauthorize.
+
+   Cascade behavior:
+      Full CASCADE_TO_DESCENDANTS.
+
+7.3.  R-3: Non-Response
+
+   Trigger condition: The agent session has failed to respond to a
+   governance signal (revocation propagation, HEM escalation, or
+   cascade timeout) within the required window.  The cascade_timeout
+   period (Section 3.6.2) has elapsed without receipt of a
+   revocation acknowledgment or HEM response.
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST emit CASCADE_TIMEOUT_REVOCATION for the
+        non-responsive session.
+
+   (b)  The GEC MUST record completion_state: UNKNOWN for the
+        session, as the GEC cannot determine the session's
+        actual state.
+
+   (c)  The GEC MUST NOT cascade to descendant sessions solely
+        on R-3 grounds: descendant sessions that ARE responsive
+        MUST be individually evaluated and revoked only if their
+        parent session's revocation makes them without authority.
+
+   Completion state:
+      UNKNOWN always for the non-responsive session.
+      UNKNOWN is treated as PARTIAL per INV-15.
+
+   Continuation mandate authority:
+      Operator MAY issue continuation mandate.  Operator MUST
+      notify the human principal within principal_notification_
+      timeout (default 300 seconds).  The principal MAY revoke
+      the continuation mandate within that window.
+
+   Cascade behavior:
+      Selective.  Responsive descendant sessions continue until
+      their own mandate authority chain is evaluated.
+
+7.4.  R-4: Irreversible Threshold
+
+   Trigger condition: The agent has reached or is about to exceed
+   an irreversible action threshold declared in the mandate or SO
+   Type.  This may fire before (anticipatory detection via
+   IDP declared intent) or at the moment of an irreversible
+   action.
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST fire HEM Class 4 (HEM_CEDAR_ROUTED with
+        irreversibility context) before the irreversible action
+        executes, where anticipatory detection has occurred.
+
+   (b)  Where detection occurs at execution time (not
+        anticipatory), the GEC MUST halt immediately without
+        completing the action.
+
+   (c)  The GEC MUST emit IRREVERSIBLE_THRESHOLD_REACHED in GAR
+        with the action identifier, the mandate's declared
+        threshold value, and the current count.
+
+   Completion state:
+      CLEAN if halted before the irreversible action.
+      PARTIAL if halted after one or more irreversible actions
+      have been taken but mission is incomplete.
+
+   Continuation mandate authority:
+      Human principal MUST reauthorize.
+
+   Cascade behavior:
+      Full CASCADE_TO_DESCENDANTS.
+
+7.5.  R-5: Scheduled Rotation
+
+   Trigger condition: The agent session is being revoked as part
+   of a planned rotation or maintenance operation declared in
+   the cluster MJWT or operator configuration.
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST wait for the next natural breakpoint before
+        revoking the session, where feasible and where the
+        rotation schedule permits.  CONF-MAD-R5-01: A GEC MUST
+        NOT revoke an R-5 session mid-transition.
+
+   (b)  The GEC MUST emit SCHEDULED_ROTATION_INITIATED in GAR
+        with the rotation_schedule_id.
+
+   Completion state:
+      CLEAN when natural breakpoint is reached before revocation.
+      PARTIAL when the rotation schedule does not permit waiting.
+
+   Continuation mandate authority:
+      Operator MAY issue continuation mandate (new session with
+      rotated identity).  Human principal notification is
+      RECOMMENDED but not REQUIRED for R-5.
+
+   Cascade behavior:
+      None.  R-5 applies to the specified session only.
+      Descendant sessions continue under their own mandates
+      unless separately revoked.
+
+7.6.  R-6: Operator Override
+
+   Trigger condition: An operator has explicitly revoked the
+   agent session via an operator-issued MANDATE_REVOCATION_ISSUED
+   event.
+
+   GEC behavior on detection:
+
+   (a)  The GEC MUST halt the session on receipt of the
+        revocation signal, completing any atomic operation
+        already in progress.
+
+   (b)  The GEC MUST emit SESSION_REVOKED_BY_OPERATOR in GAR.
+
+   (c)  Cascade to descendants is operator-specified:
+        CASCADE_TO_DESCENDANTS or THIS_MANDATE_ONLY per the
+        revocation scope in MANDATE_REVOCATION_ISSUED.
+
+   Completion state:
+      CLEAN if halted at a natural breakpoint.
+      PARTIAL if halted mid-mission with irreversible actions
+      taken.
+
+   Continuation mandate authority:
+      Operator MAY issue continuation mandate.  Human principal
+      notification is REQUIRED within principal_notification_
+      timeout.
+
+   Cascade behavior:
+      As specified in revocation_scope field.
+
+7.7.  R-7: DEADLOCK
+
+   Trigger condition: The cluster coordinator has detected a
+   DEADLOCK condition per Section 3.6.5.  Two or more agent
+   sessions hold exclusive resource locks such that no session
+   can make progress without acquiring a lock held by another
+   session in the same cluster.
+
+   GEC behavior on detection:
+
+   (a)  The cluster coordinator MUST simultaneously suspend all
+        participating sessions.
+
+   (b)  The GEC MUST emit HEM_MULTI_PRINCIPAL_REQUIRED.
+
+   (c)  The GEC MUST route to a human arbitrator.
+
+   (d)  The GEC MUST record DEADLOCK_DETECTED in GAR citing
+        all participating session_id values, contested so_id
+        values, and mandate_id values.
+
+   (e)  On deadlock_timeout expiry, all DEADLOCK-suspended
+        sessions MUST be auto-revoked under R-3 with
+        DEADLOCK_TIMEOUT_REVOCATION per session.
+
+   Completion state:
+      UNKNOWN always for DEADLOCK-suspended sessions.
+
+   Continuation mandate authority:
+      Human principal MUST reauthorize.  On successful human
+      resolution, GAR MUST record DEADLOCK_RESOLVED.
+
+   Cascade behavior:
+      All participating sessions simultaneously.  Non-participating
+      sessions in the same cluster that depend on DEADLOCK-
+      suspended sessions enter CLUSTER_BLOCKED state.
+
+   SACR implications for R-7:
+      SACR-spawned sub-agents participating in the DEADLOCK
+      are treated identically to directly-mandated agents.
+      Their ephemeral KIA references are retained while
+      DEADLOCK resolution is pending and retired only when
+      R-7 timeout or resolution is confirmed.
+
+7.8.  Completion State Matrix
+
+   The following matrix summarizes completion state per trigger:
+
+   +--------+----------+----------------------------+------------------+
+   | Trigger| CLEAN    | PARTIAL                    | UNKNOWN          |
+   +--------+----------+----------------------------+------------------+
+   | R-1    | Never    | Always                     | Treated as       |
+   |        |          |                            | PARTIAL (INV-15) |
+   +--------+----------+----------------------------+------------------+
+   | R-2    | If Cedar | If irreversible action     | If execution     |
+   |        | DENY at  | taken before detection     | state unknown    |
+   |        | Step 1   |                            | at detection     |
+   +--------+----------+----------------------------+------------------+
+   | R-3    | Never    | N/A                        | Always           |
+   +--------+----------+----------------------------+------------------+
+   | R-4    | If halted| If halted after 1+ irrever-| N/A              |
+   |        | before   | sible actions, mission     |                  |
+   |        | action   | incomplete                 |                  |
+   +--------+----------+----------------------------+------------------+
+   | R-5    | If nat.  | If rotation does not permit| N/A              |
+   |        | breakpt. | natural breakpoint wait    |                  |
+   +--------+----------+----------------------------+------------------+
+   | R-6    | If halted| If mid-mission with irrev. | N/A              |
+   |        | at nat.  | actions taken              |                  |
+   |        | breakpt. |                            |                  |
+   +--------+----------+----------------------------+------------------+
+   | R-7    | Never    | N/A                        | Always           |
+   +--------+----------+----------------------------+------------------+
+
+   Table 1: Completion State Matrix by Revocation Trigger
+
+7.9.  Cascade Behavior by Trigger
+
+   The following matrix summarizes cascade behavior per trigger:
+
+   +--------+-----------------------------+------------------------------+
+   | Trigger| Cascade scope               | SACR implication             |
+   +--------+-----------------------------+------------------------------+
+   | R-1    | Full CASCADE_TO_DESCENDANTS | All SACRs voided;            |
+   |        | always                      | ephemeral refs retired       |
+   +--------+-----------------------------+------------------------------+
+   | R-2    | Full CASCADE_TO_DESCENDANTS | All SACRs voided;            |
+   |        | always                      | ephemeral refs retired       |
+   +--------+-----------------------------+------------------------------+
+   | R-3    | Selective; responsive       | SACRs of responsive          |
+   |        | descendants continue        | descendants survive          |
+   +--------+-----------------------------+------------------------------+
+   | R-4    | Full CASCADE_TO_DESCENDANTS | All SACRs voided             |
+   +--------+-----------------------------+------------------------------+
+   | R-5    | None (session-specific)     | SACRs of session only        |
+   +--------+-----------------------------+------------------------------+
+   | R-6    | Operator-specified scope    | Per revocation_scope field   |
+   +--------+-----------------------------+------------------------------+
+   | R-7    | All participating sessions  | Ephemeral refs retained      |
+   |        | simultaneously              | pending resolution; retired  |
+   |        |                             | on timeout or resolution     |
+   +--------+-----------------------------+------------------------------+
+
+   Table 2: Cascade Behavior by Revocation Trigger
+
+
+8.  SO Instance Topology Types
+
+   [Section 8 carried forward from draft-sato-soos-mad-02 Section 4
+   without modification.  Renumbered from §4.]
+
+
+9.  SO Cluster Coordination
+
+   [Section 9 carried forward from draft-sato-soos-mad-02 Section 5
+   without modification.  Renumbered from §5.
+
+   Addition:  The SACR Registry is a new kernel-internal structure
+   introduced in MAD-03 Section 4.3, distinct from but related to the
+   Cluster Registry.  The SACR Registry maps active sub-agent session_ids
+   to their SACRs for hub-only enforcement (Section 5.3).  The SACR
+   Registry MUST be rebuilt from committed ALE-SPAWN-01 events in the
+   GAR on kernel restart, before any sub-agent session may execute.]
+
+
+10.  Orchestrator-Specialist Model
+
+   [Section 10 carried forward from draft-sato-soos-mad-02 Section 6
+   without modification.  Renumbered from §6.
+
+   Addition:  When the Orchestrator-Specialist model employs Mechanism B
+   spawning (Section 4), the SACR MUST be issued and committed to GAR
+   before the orchestrator issues the Assignment for that specialist.
+   The Assignment's assigned_agent_id MUST equal the SACR's
+   ephemeral_kia_ref for Mechanism B specialists.
+
+   hub_only default: Specialist agents spawned from an orchestrator
+   via SACR carry hub_only: true by default (Section 4.2).  Overriding
+   this to hub_only: false requires the conditions in Section 5.2 to
+   be satisfied and MUST be declared explicitly in the SACR.]
+
+
+11.  Kernel Events  [UPDATED in -03]
+
+   [Section 11 carries forward all events from draft-sato-soos-mad-02
+   Section 7 without modification.]
+
+   The following events are added in MAD-03:
+
+   Events from SACR lifecycle are specified in Section 4.4:
+      ALE-SPAWN-01: SUB_AGENT_COMPOSED
+      ALE-SPAWN-02: SPAWN_DEPTH_EXCEEDED
+      ALE-SPAWN-03: TOOL_SUBSET_VIOLATION
+      ALE-SPAWN-04: EPHEMERAL_IDENTITY_EXPIRED
+
+   Additional events added in MAD-03:
+
+   HUB_ONLY_VIOLATION
+      Emitted when a hub_only: true sub-agent session attempts
+      direct communication with a sibling sub-agent session.
+      Required fields: session_id, sacr_id, target_session_id,
+      attempted_action, detected_at, gec_signature.
+
+   DIRECT_COMM_PERMITTED
+      Emitted when a hub_only: false override has been validated
+      and the first direct communication between sub-agent sessions
+      is authorized.  Required fields: initiating_session_id,
+      receiving_session_id, cedar_permit_ref, authorized_comm_types
+      (array), authorized_at, gec_signature.
+
+   IRREVERSIBLE_THRESHOLD_REACHED
+      Emitted when R-4 trigger fires.  Required fields: session_id,
+      mandate_id, action_id, threshold_value, current_count,
+      anticipatory (boolean -- true if detected before action,
+      false if at execution time), gec_signature.
+
+   SCHEDULED_ROTATION_INITIATED
+      Emitted when R-5 trigger fires.  Required fields: session_id,
+      mandate_id, rotation_schedule_id, next_natural_breakpoint_id,
+      initiated_at, gec_signature.
+
+   SESSION_REVOKED_BY_OPERATOR
+      Emitted when R-6 trigger fires.  Required fields: session_id,
+      mandate_id, revoking_operator_principal_id, revocation_scope,
+      revoked_at, gec_signature.
+
+   SACR_REGISTRY_REBUILT
+      Emitted on kernel restart when the SACR Registry rebuild
+      from GAR is complete.  Required fields: sacr_count,
+      active_sacr_ids (array), rebuilt_at, gec_signature.
+
+
+12.  Cedar Actions  [UPDATED in -03]
+
+   [All Cedar actions from draft-sato-soos-mad-02 Section 8 are
+   carried forward without modification.]
+
+   The following Cedar actions are added in MAD-03:
+
+   SOOS::Action::SpawnSubAgent
+      Requested by a spawning agent to initiate SACR issuance.
+      Evaluated by the GEC before SACR issuance proceeds.
+      Cedar context includes: proposed scope_constraints,
+      requested_max_spawn_depth, requested_hub_only,
+      parent_mandate_id.
+
+   SOOS::Action::DirectSubAgentComm
+      Requested for direct sub-agent to sub-agent communication.
+      MUST NOT be permitted for sessions with hub_only: true
+      in their SACR.  Cedar context includes: initiating_session_id,
+      target_session_id, comm_content_type.
+
+
+13.  Conformance  [UPDATED in -03]
+
+   [All conformance requirements from draft-sato-soos-mad-02
+   Section 9 (CONF-MAD-01 through CONF-MAD-18, CONF-MAD-GEC-01
+   through CONF-MAD-GEC-03, CONF-MAD-INV4-01, CONF-MAD-BT-01) are
+   carried forward without modification.]
+
+   The following conformance requirements are added in MAD-03:
+
+   CONF-MAD-SACR-01: The GEC MUST complete all validation steps
+   (Section 4.3, Steps 1-4) before issuing the ephemeral_kia_ref.
+
+   CONF-MAD-SACR-02: A SACR MUST be committed to GAR (ALE-SPAWN-01)
+   before the sub-agent begins execution.
+
+   CONF-MAD-SACR-03: The tool_subset in the SACR MUST be enforced
+   at runtime at each gec.transition() call for the sub-agent session.
+
+   CONF-MAD-HUB-01: A sub-agent with hub_only: true MUST NOT send
+   messages, state updates, or coordination signals directly to any
+   sibling sub-agent.
+
+   CONF-MAD-HUB-02: The GEC MUST enforce hub-only mode at the Cedar
+   layer using context.hub_only_active on every gec.transition() call
+   for hub_only: true sub-agent sessions.
+
+   CONF-MAD-HUB-03: The GEC MUST NOT accept
+   Action::\"DirectSubAgentComm\" from a hub_only: true session.
+
+   CONF-MAD-HUB-04: hub_only: false MUST NOT be issued in a SACR
+   by a hub_only: true parent.
+
+   CONF-MAD-XPID-01: The GEC MUST derive and record the sub-agent
+   XPID at SACR issuance time and in every subsequent GAR governance
+   span for the sub-agent session.
+
+   CONF-MAD-XPID-02: Cross-cluster sub-agent XPID verification MUST
+   complete before the receiving GEC accepts any governance events
+   from the sub-agent session.
+
+   CONF-MAD-R5-01: A GEC MUST NOT revoke an R-5 session mid-transition.
+
+   CONF-MAD-19: max_spawn_depth MUST strictly decrement at each
+   recursive spawn.  Parent MUST NOT issue a SACR with max_spawn_depth
+   greater than (parent's own max_spawn_depth - 1).
+
+   CONF-MAD-20: A sub-agent with can_decompose: false MUST NOT call
+   gec.spawnSubAgent().  The GEC MUST reject such calls with
+   CAN_DECOMPOSE_FALSE_VIOLATION.
+
+   CONF-MAD-21: A sub-agent with max_spawn_depth: 0 MUST NOT call
+   gec.spawnSubAgent().  The GEC MUST reject such calls with
+   SPAWN_DEPTH_ZERO_VIOLATION.
+
+   CONF-MAD-22: The SACR Registry MUST be rebuilt from committed
+   ALE-SPAWN-01 events on kernel restart before any sub-agent
+   session may execute.
+
+
+14.  Open Issues
+
+   [Open Issues from draft-sato-soos-mad-02 Section 10 are carried
+   forward without modification.]
+
+   The following open issues are added in MAD-03:
+
+14.4.  OQ-SPAWN-01: Spawn Authority Propagation to AOP
+
+   The SACR mechanism specified in Section 4 covers the kernel-
+   mediated spawning primitive for Mechanism B sub-agents.  How
+   the spawning authority itself flows through the AOP (Agentic
+   Orchestration Protocol) layer -- specifically, whether AOP's
+   Mission Plan SO issuance implicitly grants spawning authority
+   or whether an explicit spawning mandate is required -- is
+   deferred to the AOP specification (draft-sato-soos-aop).
+
+   OQ-SPAWN-01 is tracked as HIGH priority.  Resolution in AOP-00
+   is expected before Vienna.
+
+14.5.  OQ-SPAWN-06: Bounded Direct Channel for KEE Performance
+
+   DR-SPAWN-01 OQ-SPAWN-06 identified a potential need for a
+   bounded direct channel between sub-agents for latency-sensitive
+   use cases (relevant to KEE performance).  The hub-only constraint
+   (Section 5) is the default normative position.  Whether a bounded
+   direct channel (scoped to declared DAG edge content types, not
+   general messaging) should be normatively specified as an override
+   is deferred.
+
+   OQ-SPAWN-06 is tracked as MEDIUM priority.  Post-Vienna.
+
+14.6.  OQ-MAD-XPID-01: SACR Chain Depth Limit for XPID Derivation
+
+   The XPID derivation for sub-agents (Section 6.1) chains from
+   parent XPID + sacr_id.  In deeply recursive delegation trees
+   (max_spawn_depth > 10), the XPID chain may become unwieldy for
+   cross-cluster verification.  Whether a normative depth limit on
+   XPID chaining is required, or whether the max_spawn_depth limit
+   itself provides sufficient bound, is an open question.
+
+   OQ-MAD-XPID-01 is tracked as LOW priority.  Post-Vienna.
+
+
+15.  Security Considerations  [UPDATED in -03]
+
+   [All Security Considerations from draft-sato-soos-mad-02
+   Section 11 are carried forward without modification.]
+
+   The following considerations are added in MAD-03:
+
+15.8.  Cascade Revocation Timing Attack  [NEW in -03]
+
+   An adversary who can observe the timing of mandate revocation
+   events may exploit the window between CASCADE_TO_DESCENDANTS
+   authority revocation (atomic at the Revocation Registry) and
+   session termination signal delivery (bounded by cascade_timeout)
+   to execute actions during the propagation window under a
+   technically valid mandate.
+
+   The attack vector: the adversary controls a specialist agent
+   deep in a delegation tree.  When the orchestrator mandate is
+   revoked, the adversary's agent continues executing for up to
+   cascade_timeout seconds before receiving the termination signal.
+   If the agent is engaged in an irreversible action, it may
+   complete that action under a revoked authority.
+
+   Defense requirements:
+
+   CONF-MAD-SEC-CASCADE-01: Implementations MUST ensure that the
+   cascade_timeout period does not exceed 30 seconds for single-
+   region clusters, and MUST be declared in the GEC Manifest for
+   any higher value.
+
+   CONF-MAD-SEC-CASCADE-02: Irreversible actions MUST require
+   a pre-execution Revocation Registry check via HEM-PRE-2
+   (Section 7.2.2 of [I-D.sato-soos-hem]) when the action is
+   classified IRREVERSIBLE in the IDP.  This check occurs within
+   the cascade window and prevents completion of irreversible
+   actions after the Revocation Registry is updated.
+
+   CONF-MAD-SEC-CASCADE-03: Sessions executing irreversible
+   actions MUST subscribe to the revocation notification stream.
+   A session that proceeds with an irreversible action while the
+   revocation stream subscription is inactive is non-conforming.
+
+15.9.  Sub-Agent Scope Inflation  [NEW in -03]
+
+   A malicious spawning agent may attempt to issue a SACR that
+   grants the spawned sub-agent a tool_subset or cedar_action_subset
+   that exceeds the spawning agent's own authorized access -- either
+   by misrepresenting its own scope at spawn time, or by exploiting
+   a TOCTOU (time-of-check/time-of-use) race between the GEC's
+   scope validation and SACR issuance.
+
+   Defense requirements:
+
+   CONF-MAD-SACR-04: The GEC MUST perform the tool-subset and Cedar
+   action-subset validation (Section 4.3, Steps 2-4) atomically
+   with SACR issuance.  The spawning agent's authorized scope MUST
+   be locked at the time of validation and MUST NOT be updatable
+   between validation and issuance.
+
+   CONF-MAD-SACR-05: The GEC MUST verify the spawning agent's
+   current Cedar action set from the Revocation Registry and the
+   active mandate JWT at validation time, not from an agent-supplied
+   claim.  An agent-supplied scope claim MUST be treated as
+   untrusted.
+
+   CONF-MAD-SACR-06: All SACR issuances MUST be recorded in GAR
+   (ALE-SPAWN-01) with the full scope_constraints object, enabling
+   post-hoc audit of whether the granted scope was valid.  The
+   GAR entry MUST carry the gec_signature over the scope_constraints
+   to make the grant tamper-evident.
+
+15.10.  XPID Cross-Cluster Spoofing  [NEW in -03]
+
+   A malicious agent or compromised GEC instance may attempt to
+   present fabricated sub-agent XPIDs to a receiving cluster to
+   gain unauthorized access to cross-cluster resources or to
+   insert fraudulent audit records.
+
+   The attack vector: an attacker with knowledge of a legitimate
+   parent XPID constructs a fabricated sacr_id and derives a
+   plausible-looking sub-agent XPID.  If the receiving GEC does
+   not verify the full SACR chain, the fabricated XPID may be
+   accepted.
+
+   Defense requirements:
+
+   CONF-MAD-XPID-03: Receiving GEC instances MUST obtain the
+   SACR from the originating GEC instance via the authenticated
+   federation channel (Section 6.2, Step (a)) before accepting
+   any cross-cluster sub-agent events.  The SACR MUST be signed
+   by the originating GEC's keypair (INV-9) and verified before
+   XPID computation.
+
+   CONF-MAD-XPID-04: A XPID presented without a verifiable SACR
+   chain to the root XPID MUST be rejected.  The receiving GEC
+   MUST emit XPID_VERIFICATION_FAILED and route to the operator
+   notification channel.
+
+   CONF-MAD-XPID-05: The SACR Registry maintained by the
+   originating GEC constitutes the authoritative record for SACR
+   existence verification.  Receiving kernels MUST verify SACR
+   authenticity against the originating GEC's signed SACR
+   Registry, not against a copy supplied by the presenting agent.
+
+15.11.  Partial Completion Race Condition  [NEW in -03]
+
+   When a session revocation signal arrives while an irreversible
+   action is in progress, a race condition can occur between the
+   action completing (CLEAN) and the revocation halting it
+   (PARTIAL).  Implementations that resolve this race incorrectly
+   may permit an irreversible action to complete under a revoked
+   mandate or classify a completed irreversible action as CLEAN
+   when the action's outcome is actually uncertain.
+
+   Defense requirements:
+
+   CONF-MAD-SEC-RACE-01: The GEC MUST implement an atomic
+   check-halt for irreversible actions: before any irreversible
+   action is committed to the SO Event Stream, the GEC MUST
+   check the Revocation Registry.  If the mandate jti appears
+   in the Revocation Registry at the time of this check, the
+   action MUST NOT be committed.
+
+   CONF-MAD-SEC-RACE-02: The check-halt MUST be atomic with
+   the commitment.  A two-phase implementation that separates
+   the Revocation Registry check from the commitment (with a
+   window between them) is non-conforming.
+
+   CONF-MAD-SEC-RACE-03: completion_state MUST be determined
+   at the instant of halt.  A GEC that determines completion
+   state after the halt (from log reconstruction) MUST document
+   this as an implementation constraint and MUST classify the
+   state as UNKNOWN if the log reconstruction is incomplete.
+
+   INV-15 applies: UNKNOWN MUST be treated as PARTIAL.
+
+
+16.  IANA Considerations  [UPDATED in -03]
+
+   [IANA Considerations from draft-sato-soos-mad-02 Section 12
+   are updated as follows:]
+
+   This document requests the creation of the following IANA
+   registries:
+
+16.1.  SACR Media Type Registry (New)
+
+   Registry Name:
+      SOOS Sub-Agent Composition Record (SACR) Media Type
+
+   Registration Procedure:
+      Standards Action [RFC8126]
+
+   Registered Media Type:
+      application/soos-sacr+json
+
+   Description:
+      The SOOS Sub-Agent Composition Record as defined in Section 4.2
+      of this document.  A SACR is a GEC-signed JSON object recording
+      the spawning of a Mechanism B sub-agent, including the ephemeral
+      identity issued, the tool subset granted, the scope constraints
+      applied, and the spawn-depth and hub-only governance parameters.
+
+   Required fields: sacr_id, parent_assignment_id, parent_session_id,
+   parent_mandate_id, parent_xpid, ephemeral_kia_ref,
+   scope_constraints, can_decompose, max_spawn_depth, hub_only,
+   replan_authority, composition_timestamp, sacr_signature.
+
+16.2.  Revocation Trigger Class Registry (New)
+
+   Registry Name:
+      SOOS Agent Session Revocation Trigger Classes
+
+   Registration Procedure:
+      Specification Required [RFC8126]
+
+   Initial Values:
+
+   +--------+-----------------------------+-----------------------------+
+   | Code   | Name                        | Description                 |
+   +--------+-----------------------------+-----------------------------+
+   | R-1    | CAP_TIER_0A_VIOLATION       | CAP constitutional          |
+   |        |                             | prohibition violated;       |
+   |        |                             | human reauth required       |
+   +--------+-----------------------------+-----------------------------+
+   | R-2    | SCOPE_BOUNDARY              | Out-of-scope action         |
+   |        |                             | detected; human reauth      |
+   |        |                             | required                    |
+   +--------+-----------------------------+-----------------------------+
+   | R-3    | NON_RESPONSE                | Governance signal not       |
+   |        |                             | acknowledged within         |
+   |        |                             | cascade_timeout;            |
+   |        |                             | operator may reauth         |
+   +--------+-----------------------------+-----------------------------+
+   | R-4    | IRREVERSIBLE_THRESHOLD      | Irreversible action         |
+   |        |                             | threshold reached; human    |
+   |        |                             | reauth required             |
+   +--------+-----------------------------+-----------------------------+
+   | R-5    | SCHEDULED_ROTATION          | Planned rotation;           |
+   |        |                             | operator may reauth         |
+   +--------+-----------------------------+-----------------------------+
+   | R-6    | OPERATOR_OVERRIDE           | Explicit operator           |
+   |        |                             | revocation; operator        |
+   |        |                             | may reauth                  |
+   +--------+-----------------------------+-----------------------------+
+   | R-7    | DEADLOCK                    | Circular resource lock      |
+   |        |                             | across cluster sessions;    |
+   |        |                             | human reauth required       |
+   +--------+-----------------------------+-----------------------------+
+
+   Table 3: Revocation Trigger Class Registry Initial Values
+
+16.3.  SACR Kernel Event Types in GAR ALE Registry
+
+   This document requests registration of the following ALE types in
+   the GAR ALE Type Registry defined in [I-D.sato-soos-gar]:
+
+   +----------------+--------------------------------------------------+
+   | ALE Name       | Description                                      |
+   +----------------+--------------------------------------------------+
+   | ALE-SPAWN-01   | SUB_AGENT_COMPOSED: SACR issued; ephemeral       |
+   | (SUB_AGENT_    | identity created.  Section 4.4.                  |
+   | COMPOSED)      |                                                  |
+   +----------------+--------------------------------------------------+
+   | ALE-SPAWN-02   | SPAWN_DEPTH_EXCEEDED: spawn request rejected due |
+   | (SPAWN_DEPTH_  | to max_spawn_depth constraint.  Section 4.4.     |
+   | EXCEEDED)      |                                                  |
+   +----------------+--------------------------------------------------+
+   | ALE-SPAWN-03   | TOOL_SUBSET_VIOLATION: spawn request rejected    |
+   | (TOOL_SUBSET_  | due to tool_subset not being a subset of the     |
+   | VIOLATION)     | parent's access.  Section 4.4.                   |
+   +----------------+--------------------------------------------------+
+   | ALE-SPAWN-04   | EPHEMERAL_IDENTITY_EXPIRED: sub-agent session    |
+   | (EPHEMERAL_    | closed; ephemeral_kia_ref retired.               |
+   | IDENTITY_      | Section 4.4.                                     |
+   | EXPIRED)       |                                                  |
+   +----------------+--------------------------------------------------+
+
+
+17.  Normative References  [UPDATED in -03]
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Token (JWT)", RFC 7519, May 2015,
+              <https://www.rfc-editor.org/rfc/rfc7519>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017,
+              <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [CAEP]     Tulshibagwale, A. et al., "Continuous Access Evaluation
+              Protocol (CAEP)", OpenID Foundation, 2024.
+
+   [SSF]      Tulshibagwale, A. et al., "OpenID Shared Signals
+              Framework", OpenID Foundation, 2024.
+
+   [SOOS-AEP]  Sato, T., "Agent Execution Protocol",
+               draft-sato-soos-aep-02, Work in Progress, June 2026.
+               [UPDATED version ref]
+
+   [SOOS-HEM]  Sato, T., "Human Escalation Mechanism",
+               draft-sato-soos-hem-05, Work in Progress, July 2026.
+               [UPDATED version ref]
+
+   [SOOS-KIA]  Sato, T., "Kernel Identity and Attestation",
+               draft-sato-soos-kia-03, Work in Progress, July 2026.
+               [UPDATED version ref]
+
+   [SOOS-MJWT] Sato, T., "Mandate JWT",
+               draft-sato-soos-mjwt-02, July 2026.
+               [UPDATED version ref]
+
+   [SOOS-SOV]  Sato, T., "Sovereign Object",
+               draft-sato-soos-sov-02, June 2026.
+
+   [SOOS-GAR]  Sato, T., "Governance Audit Record",
+               draft-sato-soos-gar-03, Work in Progress, June 2026.
+               [UPDATED version ref]
+
+   [SOOS-CAP]  Sato, T., "The Constitutional AI Protocol (CAP)",
+               draft-sato-soos-cap-04, Work in Progress, June 2026.
+               [UPDATED version ref]
+
+   [SOOS-IDP]  Sato, T., "Intent Declaration Primitive",
+               draft-sato-soos-idp-05, Work in Progress, June 2026.
+
+
+18.  Informative References
+
+   [OIF-REVOC] OpenID Foundation, "Agentic AI Authorization
+               Challenges: Revocation Across Attenuated Delegation
+               Chains", arXiv:2604.23280, April 2026.
+
+   [SPICE-ACTOR-CHAIN]
+               Looker, T. et al., "SPICE Actor Chain",
+               draft-mw-spice-actor-chain-05, Work in Progress, 2026.
+
+   [OAUTH-ATTENUATING]
+               Niyikiza, J. et al., "Attenuating Agent Tokens",
+               draft-niyikiza-oauth-attenuating-agent-tokens-00,
+               Work in Progress, 2026.
+
+   [ICON-PS]   Nair, et al., "Observability, Intervention and Control
+               of Network Management Agents -- Problem Statement",
+               draft-nair-icon-problem-statement, 2026.
+
+   [AUDIT-BOF] Kuehlewind, M. and Birkholz, H., "Agent Use of
+               Delegation and Interaction Traceability (AUDIT)",
+               draft-kuehlewind-audit-architecture-00, May 2026.
+
+   [DR-SPAWN-01] Sato, T., "Sub-Agent Composition and Spawning
+               Architecture", SOOS Discussion Record DR-SPAWN-01,
+               June 19, 2026.  Internal working document.
+
+   [DR-MAD-REC-01] Sato, T., "Agent Session Revocation and Recovery
+               Lifecycle", SOOS Discussion Record DR-MAD-REC-01,
+               June 4, 2026.  Internal working document.
+
+
+Appendix B.  Related Work
+
+   [Appendix B sections B.1 through B.10 carried forward from
+   draft-sato-soos-mad-02 without modification.]
+
+B.7.  SOOS Companion Drafts  [UPDATED in -03]
+
+   References updated to current versions:
+
+   draft-sato-soos-idp-05   Intent Declaration Primitive.
+   draft-sato-soos-hem-05   Human Escalation Mechanism.
+   draft-sato-soos-gar-03   Governance Audit Record.
+   draft-sato-soos-cap-04   The Constitutional AI Protocol (CAP).
+   draft-sato-soos-sov-02   Sovereign Object.
+   draft-sato-soos-mjwt-02  Mandate JWT.
+   draft-sato-soos-aep-02   Agent Execution Protocol.
+   draft-sato-soos-kia-03   Kernel Identity and Attestation.
+   draft-sato-soos-pt-02    Progressive Trust.
+   draft-sato-soos-faip-01  Federated Agent Intelligence Protocol.
+   draft-sato-soos-cap-rrs-02  CAP Regulation Record Schema.
+
+B.11.  OpenID Foundation: Revocation Across Attenuated Delegation
+       Chains  [unchanged from MAD-02]
+
+
+Appendix C.  Vibe Coding Assets  [UPDATED in -03]
+
+C.1.  Protocol Summary
+
+   Protocol: Multi-Agent Delegation (MAD)
+   Version:  draft-sato-soos-mad-03
+   Family:   SOOS protocol suite
+   Role:     Coordination governance layer for multi-agent workflows --
+             authority narrowing (INV-4), cascade revocation with full
+             R-1 through R-7 trigger taxonomy, SACR sub-agent spawning,
+             hub-only communication constraint, XPID cross-cluster
+             integration
+   Stack position: Coordinates across AEP, SOV, MJWT, HEM, GAR, CAP,
+                   and KIA (for XPID derivation and ephemeral KIA refs).
+
+C.2.  Key Identifiers
+
+   Core invariants (unchanged from MAD-02):
+     INV-4 (Narrowing Property), INV-15 (UNKNOWN ≠ CLEAN),
+     INV-16 (completion_state REQUIRED in GAR on revocation)
+
+   New in MAD-03:
+     SACR schema: sacr_id, parent_assignment_id, ephemeral_kia_ref,
+       scope_constraints, can_decompose, max_spawn_depth, hub_only,
+       replan_authority, sacr_signature
+     Sub-agent XPID: UUID5(KIA_NS, parent_xpid + ":" + sacr_id)
+     Hub-only constraint: hub_only: true default; CONF-MAD-HUB-01–04
+     SACR events: ALE-SPAWN-01 through ALE-SPAWN-04
+     Hub events: HUB_ONLY_VIOLATION, DIRECT_COMM_PERMITTED
+     R-1 through R-7: full normative specs in Section 7
+     Completion state matrix: Table 1
+     Cascade behavior matrix: Table 2
+
+   Revocation triggers: R-1 (CAP Tier 0-A), R-2 (Scope Boundary),
+     R-3 (Non-Response), R-4 (Irreversible Threshold), R-5 (Rotation),
+     R-6 (Operator Override), R-7 (DEADLOCK)
+
+   Topology ALE events (unchanged): ALE-013 through ALE-016
+   Cluster Cedar actions (unchanged + new):
+     ResolveDeadlock, ApproveBudgetTransfer, ApproveDelegation,
+     RetryDelegation, ReleasePooledSession,
+     SpawnSubAgent (new), DirectSubAgentComm (new)
+
+   Conformance (new in MAD-03):
+     CONF-MAD-SACR-01 through CONF-MAD-SACR-06
+     CONF-MAD-HUB-01 through CONF-MAD-HUB-04
+     CONF-MAD-XPID-01 through CONF-MAD-XPID-05
+     CONF-MAD-R5-01, CONF-MAD-19 through CONF-MAD-22
+     CONF-MAD-SEC-CASCADE-01 through -03
+     CONF-MAD-SEC-RACE-01 through -03
+
+C.3.  Canonical Reference
+
+   Specification:  https://soosproject.ai/drafts/mad
+   Datatracker:    https://datatracker.ietf.org/doc/draft-sato-soos-mad/
+   Stack overview: https://soosproject.ai/stack
+
+
+Acknowledgements
+
+   Sections 1 through 11 of this document build on
+   draft-sato-soos-mad-02, whose full acknowledgments are incorporated
+   by reference.
+
+   The SACR (Section 4) and hub-only constraint (Section 5) were
+   designed in DR-SPAWN-01 (June 19, 2026), which identified the gap
+   in MAD-02's spawning model.  The hub-only direction was adopted
+   from DR-SPAWN-01 OQ-SPAWN-06 resolution: hub-only is the only
+   model consistent with DEC-PLAN-13 and the horizontal non-
+   contamination property.
+
+   The full normative per-trigger specifications for R-1 through R-7
+   (Section 7) were developed from DR-MAD-REC-01 (June 4, 2026) which
+   identified the revocation taxonomy gap.  The completion state matrix
+   (Table 1) and cascade behavior matrix (Table 2) formalize the
+   per-trigger behavior that was described only at the taxonomy level
+   in MAD-02.
+
+   XPID cross-cluster integration (Section 6) follows directly from
+   the XPID design in KIA-03 [I-D.sato-soos-kia].  The sub-agent
+   XPID derivation using parent_xpid + sacr_id extends the KIA-03
+   derivation to the delegation tree case.
+
+   The four new Security Considerations (Sections 15.8 through 15.11)
+   were developed as part of the SOOS UpgradeSprint Day 7 security
+   pass (June 30, 2026), as recorded in SOOS_UpgradeSprint_v12.md
+   ORDER 7.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI:   https://soosproject.ai/drafts/mad
+
