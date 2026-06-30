@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                         14 July 2026
-Expires: 14 January 2027
+Intended status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
 
       The Governed Remediation Protocol (GRP) for Agentic AI Systems
@@ -43,7 +43,7 @@ Status of This Memo
    as reference material or to cite them other than as "work in
    progress."
 
-   This Internet-Draft will expire on 14 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 

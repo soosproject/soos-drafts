@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                         13 July 2026
-Expires: 13 January 2027
+Intended status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
 
     The Kernel Execution Environment (KEE-1) for the Sovereign Object OS
@@ -60,7 +60,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 13 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -1589,7 +1589,7 @@ Table of Contents
    | OTel SDK                | opentelemetry-rust crate           |
    | Exporter                | OTLP/gRPC to OTel Collector        |
    | Sampling                | 100% (no sampling for gov. spans)  |
-   | Namespace               | soos.governance.* (GAR-03 §13)     |
+   | Namespace               | soos.governance.* (GAR-03 S.13)     |
    | Span attributes         | Per Section 4.6 emission points    |
    | GAR Processor           | soos-gar-processor sidecar         |
    |                         | (derives SAR from OTel spans)      |
@@ -2182,7 +2182,7 @@ Table of Contents
 
    [DISASTER-ACT]
               Government of Japan, "Disaster Countermeasures Basic Act
-              (災害対策基本法)", Law No. 223 of 1961, as amended.
+              (Saigai Taisaku Kihon Ho)", Law No. 223 of 1961, as amended.
 
    [E-GOV]    Government of Japan, "e-Gov Law Search URI Scheme",
               Digital Agency, 2021,
@@ -2192,7 +2192,7 @@ Table of Contents
               Utilization in Financial Institutions", 2024.
 
    [FIEA]     Government of Japan, "Financial Instruments and Exchange
-              Act (金融商品取引法)", Law No. 25 of 1948, as amended.
+              Act (Kinyu Shohin Torihiki Ho)", Law No. 25 of 1948, as amended.
 
    [IPA]      Information-technology Promotion Agency, Japan,
               <https://www.ipa.go.jp/>.
@@ -2256,7 +2256,7 @@ A.2.  Kernel Initialization
 
    2.  Four-check sequence executes at startup per P3:
        Check 1: GEC Manifest validated -- issued within staleness
-                 window per KIA-03 §5.4.  PASS.
+                 window per KIA-03 S.5.4.  PASS.
        Check 2: cedar_policy_hash computed -- SHA-256 of active Cedar
                  Policy Set matches cap_profile_hash in CAP Profile
                  "disaster-response-gov-v1.0".  PASS.
@@ -2363,9 +2363,9 @@ A.6.  e-Gov URI Verification
    18. The compliance system confirms: the Cedar policy enforcing
        APPI data minimization on this kernel deployment traces
        directly to the e-Gov canonical text of APPI Article 19.
-       The audit trail is: statutory text (e-Gov) → CAP-RRS Tier 1
-       control (authority_source URI) → Cedar policy (cap_profile_hash)
-       → ACD Record (ALE-057 hash commitment) → API access decision
+       The audit trail is: statutory text (e-Gov) -> CAP-RRS Tier 1
+       control (authority_source URI) -> Cedar policy (cap_profile_hash)
+       -> ACD Record (ALE-057 hash commitment) -> API access decision
        (ALE-058).
 
 A.7.  Session Block Close
@@ -2420,10 +2420,10 @@ B.2.  Regulatory Instruments
    Government Deployment Profile (Section 8) specify the
    APPI-conformant GAR record configuration.
 
-   災害対策基本法 (Disaster Countermeasures Basic Act, Japan) governs
+   The Disaster Countermeasures Basic Act (Saigai Taisaku Kihon Ho) governs
    emergency response operations in Japan government disaster response
    AI deployments.  CAP-RRS Tier 1 controls in Government Deployment
-   Profile CAP Profiles reference specific provisions of 災害対策基本法
+   Profile CAP Profiles reference specific provisions of the Disaster Countermeasures Basic Act
    via machine-verifiable statute URIs per Section 8.3.
 
    FIEA (Financial Instruments and Exchange Act, Japan) Article 2
@@ -2466,7 +2466,7 @@ B.3.  SOOS Companion Drafts
    that KEE-1 P3 (ACD Four-Check Sequence) enables.  The four checks --
    manifest validity, policy currency, KIA attestation, revocation
    status -- are the execution-layer validation properties that make
-   ACD Record integrity verifiable.  ACD Session 2 (§7.4) references
+   ACD Record integrity verifiable.  ACD Session 2 (S.7.4) references
    this document for the normative four-check sequence specification.
 
    HEM (draft-sato-soos-hem-05) -- specifies human escalation.  KEE-1

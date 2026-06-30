@@ -166,12 +166,12 @@ Section 6.2 SAR Schema: four new mandatory header fields added --
 cap_profile_id, cap_profile_hash, acd_session_id,
 soos.gar.block_id (see Section 6.2 below).
 
-Section 8: two new subsections added -- §8.6 (Mandatory Provenance
-Fields) and §8.7 (XPID Mirror Field).
+Section 8: two new subsections added -- S.8.6 (Mandatory Provenance
+Fields) and S.8.7 (XPID Mirror Field).
 
-Section 12: four new ALE schemas added -- §12.5 through §12.8.
+Section 12: four new ALE schemas added -- S.12.5 through S.12.8.
 
-Full text of §1 through §12.4 and §12 (ALE-001 through ALE-020) is
+Full text of S.1 through S.12.4 and S.12 (ALE-001 through ALE-020) is
 carried forward from draft-sato-soos-gar-02 and is not reproduced here
 to conserve space.  See draft-sato-soos-gar-02 for base text.]
 
@@ -229,7 +229,7 @@ additions:]
 
    cap_profile_id (string, REQUIRED):   [NEW in -03]
       Identifier of the CAP profile active during this session.
-      Derived from [I-D.sato-soos-cap] §12a PTD active_prohibitions
+      Derived from [I-D.sato-soos-cap] S.12a PTD active_prohibitions
       set.
 
    cap_profile_hash (string, REQUIRED):   [NEW in -03]
@@ -311,7 +311,7 @@ additions:]
    (2) Assign cedar_policy_id = "{catalog_id}:{control_id}-v
        {catalog_version}" to the compiled Cedar policy.
 
-   (3) Store the mapping cedar_policy_id → cap_rrs_control_id →
+   (3) Store the mapping cedar_policy_id -> cap_rrs_control_id ->
        authority_source_uri in kernel memory.
 
    (4) Use this mapping to populate provenance fields in every
@@ -807,7 +807,7 @@ additions:]
 [Sections 13.1 through 13.x from draft-sato-soos-gar-02 are carried
 forward without change.  The following additions are made in -03:]
 
-   WAL tamper-evidence (§15.a):   [NEW in -03]
+   WAL tamper-evidence (S.15.a):   [NEW in -03]
       The GAR Write-Ahead Log (WAL) MUST carry the prev_span_hash
       field (equal to soos.gar.prev_span_hash) on every entry.
       Each entry's prev_span_hash MUST be computed by the kernel
@@ -817,7 +817,7 @@ forward without change.  The following additions are made in -03:]
       or corrupted.  Implementations MUST detect and alert on both
       conditions.
 
-   OTel semantic layer integrity (§15.b):   [NEW in -03]
+   OTel semantic layer integrity (S.15.b):   [NEW in -03]
       Three attack surfaces exist for the soos.governance.* OTel
       attribute namespace:
 
@@ -843,7 +843,7 @@ forward without change.  The following additions are made in -03:]
           session.  The Session Block Merkle root detects content
           tampering.
 
-   CVE-2026-50141 class defense (§15.c):   [NEW in -03]
+   CVE-2026-50141 class defense (S.15.c):   [NEW in -03]
       CVE-2026-50141 class refers to attacks in which an agent
       fabricates a verified identity in the audit record -- claiming
       a KIA-verified identity without possessing the corresponding
@@ -864,16 +864,16 @@ forward and renumbered as 16.1 through 16.3.  The ALE Types registry
 
 16.1.  GAR Audit Alert Triggers Registry
 
-   Carried forward from draft-sato-soos-gar-02 §14.1 with the
+   Carried forward from draft-sato-soos-gar-02 S.14.1 with the
    following additions:
 
    +------------------------------------------+-----------+---------+
    | Trigger Identifier                        | Severity  | Ref.    |
    +------------------------------------------+-----------+---------+
-   | CATALOG_VERSION_CONFLICT_ACTIVE           | HIGH      | §12.7   |
-   | INTERPRETATION_SUPERSEDED_ACTIVE          | HIGH      | §12.8   |
-   | OTEL_SPAN_CHAIN_GAP                       | CRITICAL  | §15.b   |
-   | OTEL_NAMESPACE_COLLISION                  | HIGH      | §15.b   |
+   | CATALOG_VERSION_CONFLICT_ACTIVE           | HIGH      | S.12.7   |
+   | INTERPRETATION_SUPERSEDED_ACTIVE          | HIGH      | S.12.8   |
+   | OTEL_SPAN_CHAIN_GAP                       | CRITICAL  | S.15.b   |
+   | OTEL_NAMESPACE_COLLISION                  | HIGH      | S.15.b   |
    +------------------------------------------+-----------+---------+
 
    Table 10: New Audit Alert Triggers for GAR-03
@@ -1007,19 +1007,19 @@ C.1.  Protocol Summary
    Protocol: Governance Audit Record (GAR)
    Version:  draft-sato-soos-gar-03
    Family:   SOOS protocol suite
-   Role:     Audit architecture — non-suppressible, causally-ordered,
+   Role:     Audit architecture -- non-suppressible, causally-ordered,
              SCITT-anchored, OTel-observable governance record
 
    New in -03:
-   - soos.governance.* OTel attribute namespace (§13) — 35+
+   - soos.governance.* OTel attribute namespace (S.13) -- 35+
      attributes across 6 sub-namespaces; MUST on governance spans
-   - SOOS GAR Processor (§14) — OTel-to-SAR pipeline; Session Block
+   - SOOS GAR Processor (S.14) -- OTel-to-SAR pipeline; Session Block
      Merkle integrity; KIA signature per block; Merkle DAG anchor
-   - ALE-NEW-01 through ALE-NEW-04 (§12.5-12.8)
-   - Mandatory provenance fields on Cedar eval records (§8.6)
-   - XPID mirror on ACD session ALEs (§8.7)
+   - ALE-NEW-01 through ALE-NEW-04 (S.12.5-12.8)
+   - Mandatory provenance fields on Cedar eval records (S.8.6)
+   - XPID mirror on ACD session ALEs (S.8.7)
    - WAL tamper-evidence, OTel namespace integrity, CVE-2026-50141
-     class defense (§15)
+     class defense (S.15)
 
 C.2.  Key Identifiers
 
@@ -1064,7 +1064,7 @@ D.1.  Changes from draft-sato-soos-gar-02
 
    o  Section 8.7 (new): XPID mirror field on ACD session ALEs.
 
-   o  Section 12: ALE-NEW-01 through ALE-NEW-04 added (§12.5-12.8).
+   o  Section 12: ALE-NEW-01 through ALE-NEW-04 added (S.12.5-12.8).
 
    o  Section 13 (new): SOOS Governance Semantic Convention.
       Six OTel attribute namespaces.  OTel pipeline trust model.

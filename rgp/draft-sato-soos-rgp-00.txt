@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                         13 July 2026
-Expires: 13 January 2027
+Intended status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
 
    The Resource Governance Protocol (RGP) for Agentic AI Systems
@@ -57,7 +57,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 13 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -1443,7 +1443,7 @@ Author's Address
       RGP-Physical bindings but do not provide normative field
       mappings.  The full normative binding tables for AAS v3.0,
       W3C WoT, OPC UA, and DTDL v3 require the research sweep
-      (DR-RGP-01 §8.2) as preparation and are deferred.
+      (DR-RGP-01 S.8.2) as preparation and are deferred.
 
    OQ-RGP-10:  DNS-SD Stage 1 extension profile for local
       network deployments.  Section 5.2 notes that DNS-SD

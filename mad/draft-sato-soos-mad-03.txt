@@ -1,7 +1,7 @@
 Internet Engineering Task Force                              T. Sato
 Internet-Draft                                       MyAuberge K.K.
-Intended Status: Standards Track                         5 July 2026
-Expires: 5 January 2027
+Intended Status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
            Multi-Agent Delegation in Sovereign Object Systems
                        draft-sato-soos-mad-03
@@ -46,7 +46,7 @@ Status of This Memo
    as reference material or to cite them other than as "work in
    progress."
 
-   This Internet-Draft will expire on 5 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -272,7 +272,7 @@ Table of Contents
      \"parent_assignment_id\":  string,   ; REQUIRED. The Assignment record
                                          ;   ID that authorized this spawn.
                                          ;   Cross-references DR-PLAN-01
-                                         ;   §5.4 schema.
+                                         ;   S.5.4 schema.
 
      \"parent_session_id\":     string,   ; REQUIRED. The spawning agent's
                                          ;   session_id.
@@ -311,7 +311,7 @@ Table of Contents
                                          ;   the sub-agent.  MUST be a
                                          ;   subset of the parent's tool
                                          ;   access at composition time
-                                         ;   (DR-SPAWN-01 §5.1 tool-subset
+                                         ;   (DR-SPAWN-01 S.5.1 tool-subset
                                          ;   invariant).
        \"temporal_scope\":       object   ; OPTIONAL. not_before /
                                          ;   not_after bounds for this
@@ -405,7 +405,7 @@ Table of Contents
    Step 7 -- Assignment linkage.
       The GEC notifies the spawning agent that the sub-agent is
       ready, providing the sacr_id and ephemeral_kia_ref.  The
-      spawning agent then issues an Assignment per DR-PLAN-01 §5.4,
+      spawning agent then issues an Assignment per DR-PLAN-01 S.5.4,
       using ephemeral_kia_ref as the assigned_agent_id.
 
    CONF-MAD-SACR-01: The GEC MUST complete all five validation
@@ -972,13 +972,13 @@ Table of Contents
 8.  SO Instance Topology Types
 
    [Section 8 carried forward from draft-sato-soos-mad-02 Section 4
-   without modification.  Renumbered from §4.]
+   without modification.  Renumbered from S.4.]
 
 
 9.  SO Cluster Coordination
 
    [Section 9 carried forward from draft-sato-soos-mad-02 Section 5
-   without modification.  Renumbered from §5.
+   without modification.  Renumbered from S.5.
 
    Addition:  The SACR Registry is a new kernel-internal structure
    introduced in MAD-03 Section 4.3, distinct from but related to the
@@ -991,7 +991,7 @@ Table of Contents
 10.  Orchestrator-Specialist Model
 
    [Section 10 carried forward from draft-sato-soos-mad-02 Section 6
-   without modification.  Renumbered from §6.
+   without modification.  Renumbered from S.6.
 
    Addition:  When the Orchestrator-Specialist model employs Mechanism B
    spawning (Section 4), the SACR MUST be issued and committed to GAR
@@ -1544,7 +1544,7 @@ C.1.  Protocol Summary
 C.2.  Key Identifiers
 
    Core invariants (unchanged from MAD-02):
-     INV-4 (Narrowing Property), INV-15 (UNKNOWN ≠ CLEAN),
+     INV-4 (Narrowing Property), INV-15 (UNKNOWN != CLEAN),
      INV-16 (completion_state REQUIRED in GAR on revocation)
 
    New in MAD-03:
@@ -1552,7 +1552,7 @@ C.2.  Key Identifiers
        scope_constraints, can_decompose, max_spawn_depth, hub_only,
        replan_authority, sacr_signature
      Sub-agent XPID: UUID5(KIA_NS, parent_xpid + ":" + sacr_id)
-     Hub-only constraint: hub_only: true default; CONF-MAD-HUB-01–04
+     Hub-only constraint: hub_only: true default; CONF-MAD-HUB-01-04
      SACR events: ALE-SPAWN-01 through ALE-SPAWN-04
      Hub events: HUB_ONLY_VIOLATION, DIRECT_COMM_PERMITTED
      R-1 through R-7: full normative specs in Section 7

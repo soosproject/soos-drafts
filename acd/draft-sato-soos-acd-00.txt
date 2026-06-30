@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                         13 July 2026
-Expires: 13 January 2027
+Intended status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
 
       The Agent Compliance Disclosure (ACD) Protocol for Agentic AI
@@ -56,7 +56,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 9 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -76,7 +76,7 @@ Table of Contents
    1.  Introduction
      1.1.  Use Case: Enterprise Procurement Platform
      1.2.  Use Case: Regulatory Inspection of High-Risk AI Deployment
-     1.3.  Use Case: Japan Government API (デジタル庁)
+     1.3.  Use Case: Japan Government API (Digital Agency)
      1.4.  Relationship to AEP and GAR
    2.  What ACD Is and Is Not
      2.1.  What ACD Does
@@ -235,9 +235,9 @@ Table of Contents
    referenced in the ACD Record, and that the audit trail for the
    inspection period is complete and tamper-evident.
 
-1.3.  Use Case: Japan Government API (デジタル庁)
+1.3.  Use Case: Japan Government API (Digital Agency)
 
-   The Digital Agency of Japan (デジタル庁) is deploying an API for AI
+   The Digital Agency of Japan (Digital Agency, or Dejitaru-cho) is deploying an API for AI
    agent access to government service data as part of the Japan AX
    (administrative transformation) program.  The API must comply with
    the Act on Protection of Personal Information (APPI), the Basic Act
@@ -251,7 +251,7 @@ Table of Contents
    enforced at the kernel boundary; and that the agent's governing law
    and primary jurisdiction are consistent with Japanese law.
 
-   The デジタル庁 API gateway is configured to require ACD validation
+   The Digital Agency API gateway is configured to require ACD validation
    for all AI agent connections.  When a SOOS-governed agent connects,
    the gateway queries the agent's /.well-known/soos-acd endpoint.  The
    ACD Record returned carries a jurisdictions array entry for ISO
@@ -259,7 +259,7 @@ Table of Contents
    applicable AI governance guidelines (AI_AGENT_OPERATION Purpose Code
    from the MJWT Purpose Code Registry).  The CAP Profile referenced in
    Layer 2 includes Tier 1 controls mapped to APPI Articles 17-27.  The
-   デジタル庁 gateway validates the KIA signature, confirms APPI
+   Digital Agency gateway validates the KIA signature, confirms APPI
    coverage in the CAP Profile, and grants access.  The transaction is
    logged under ALE-056 through ALE-058.
 
@@ -837,7 +837,7 @@ Table of Contents
 
    principal_hierarchy_summary:
       REQUIRED.  String.  Description of the mandate chain depth and
-      structure (e.g., "Two-tier: Operator → User Principal").
+      structure (e.g., "Two-tier: Operator -> User Principal").
 
    redress_uri:
       REQUIRED.  URI.  Contact mechanism for complaints, disputes, or
@@ -1152,7 +1152,7 @@ Table of Contents
    GOVERNMENT:
       KEE-1 L3 conformance with Japan Deployment Profile or equivalent
       national profile.  Hardware attestation chain to deployment
-      authority.  2-of-3 publisher key (e.g., デジタル庁 + IPA +
+      authority.  2-of-3 publisher key (e.g., Digital Agency + IPA +
       operator) verified in GEC Manifest.  Resource providers may
       grant access to government-tier resource classes (government
       APIs, classified infrastructure data, FIEA-regulated financial
@@ -1829,11 +1829,11 @@ A.2.  Resource Provider Compliance Gate (January 3, 2026)
        GEC receives request; generates acd_session_id:
        "f4a8-0012-..."; logs ALE-056.
 
-   3.  GEC executes four-check sequence (KEE-1 §4.3):
+   3.  GEC executes four-check sequence (KEE-1 S.4.3):
        Check 1: GEC Manifest urn:soos:gec-manifest:myauberge:20260101
-       issued 2026-01-01T09:00:00Z — within staleness window. PASS.
+       issued 2026-01-01T09:00:00Z -- within staleness window. PASS.
        Check 2: cedar_policy_hash computed over active Cedar Policy
-       Set "myauberge-k.k.-japan-v2.3.1" — matches cap_profile_hash
+       Set "myauberge-k.k.-japan-v2.3.1" -- matches cap_profile_hash
        stored in CAP Profile. PASS.
        Check 3: operator KIA identity not revoked. PASS.
        Check 4: agent XPID "urn:soos:xpid:uuid:a3f2c1d4-..." not
@@ -1891,11 +1891,11 @@ A.4.  FSA Verifies the Compliance Chain
        Block was signed.
 
    12. The inspector traces the full compliance chain:
-       FIEA Art.159 → Cedar policy "tier0b-market-manipulation"
-       → cap_profile_hash in ACD Record (ALE-057 hash commitment)
-       → ALE-058 (ACD_VALIDATION_PASSED at Sumitomo API gateway)
-       → bilateral acd_session_id record in gateway compliance log
-       → Session Block Merkle proof (tamper-evident).
+       FIEA Art.159 -> Cedar policy "tier0b-market-manipulation"
+       -> cap_profile_hash in ACD Record (ALE-057 hash commitment)
+       -> ALE-058 (ACD_VALIDATION_PASSED at Sumitomo API gateway)
+       -> bilateral acd_session_id record in gateway compliance log
+       -> Session Block Merkle proof (tamper-evident).
 
    The FSA inspection is complete.  The inspector can confirm: (a)
    the market manipulation prohibition was enforced at the kernel

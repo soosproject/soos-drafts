@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                          11 July 2026
-Expires: 11 January 2027
+Intended status: Standards Track                          30 June 2026
+Expires: 30 December 2026
 
 
         The Agent Execution Protocol (AEP) for Agentic AI Systems
@@ -72,7 +72,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 11 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -1214,7 +1214,7 @@ Table of Contents
      "delivered_at":   string,        ; REQUIRED. ISO 8601 timestamp.
      "trigger":        string,        ; REQUIRED. See Section 7.2.
      "session_xpid":   string,        ; REQUIRED. [NEW in -02] GEC-bound
-                                      ; XPID for this session. See §5.1.
+                                      ; XPID for this session. See S.5.1.
      "eod_id":         string | null, ; REQUIRED. [NEW in -02] UUID v7
                                       ; of committed EOD, or null if
                                       ; absent (Class 1 agents).
@@ -2253,7 +2253,7 @@ Table of Contents
      "agent_recommends_replan":  boolean,  ; Signal to GEE to replan.
      "replan_reason":            string,   ; Replan explanation.
      "reasoning_mode":           string    ; [NEW in -02] reasoning_mode
-                                            ; per IDP §4.3.1. OPTIONAL.
+                                            ; per IDP S.4.3.1. OPTIONAL.
                                             ; GEE includes in IDP when
                                             ; present and non-ROUTINE.
    }

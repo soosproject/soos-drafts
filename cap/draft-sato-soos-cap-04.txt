@@ -71,7 +71,7 @@ Copyright Notice
    (https://trustee.ietf.org/license-info) in effect on the date of
    publication of this document.  Please review these documents
    carefully, as they describe your rights and restrictions with
-   obligations with respect to this document.
+   respect to this document.
 
 
 Table of Contents
@@ -456,7 +456,7 @@ Table of Contents
 3.3.  Use Case 3 -- A Government Agency Deploys SOOS
 
    A Japanese government agency deploys a SOOS kernel for a
-   disaster response coordination system (防災AX).  The agency
+   disaster response coordination system.  The agency
    declares jurisdiction: JP, with secondary EU (for cross-border
    GDPR compliance).
 
@@ -466,8 +466,8 @@ Table of Contents
    conflicts.  The OTel span attributes (Section 13.5) begin
    emitting on every CEE evaluation.
 
-   When the system is amended -- for example, a Cabinet Office
-   ordinance amends the APPI personal data handling provisions -- the
+   When the system is amended -- for example, a regulatory ordinance
+   amends the applicable personal data handling provisions -- the
    detection endpoint fires (Section 8.9).  The affected Cedar policy
    enters SUSPENDED state.  In-flight sessions receive
    GOVERNANCE_SUSPENDED.  The agency's designated authority re-endorses
@@ -475,9 +475,9 @@ Table of Contents
    re-activates the policy.  The full suspension, re-publication, and
    re-activation trace is in GAR.
 
-   The Cabinet Office can inspect the PTD at any time to confirm which
-   regulations are actively enforced, at what tier, and under whose
-   authority.
+   The designated regulatory authority can inspect the PTD at any time
+   to confirm which regulations are actively enforced, at what tier,
+   and under whose authority.
 
 3.4.  Use Case 4 -- Two Jurisdictions Conflict
 
@@ -1394,8 +1394,8 @@ Table of Contents
    |                                    | Session remains open.         |
    | In progress, action already        | Action may complete.  No      |
    | PERMIT                             | rollback.  Prior PERMIT        |
-   |                                    | protected by 信頼保護 safe     |
-   |                                    | harbor.  GAR carries          |
+   |                                    | protected by safe harbor.     |
+   |                                    | GAR carries                   |
    |                                    | endorsed_at at time of        |
    |                                    | evaluation.                   |
    | In progress, action already DENY   | Unaffected -- denial stands.  |
@@ -1415,8 +1415,8 @@ Table of Contents
    |                               | profile endorser table            |
    | interpretive_ruling           | Same authority + updated          |
    |                               | resolution_instrument_id          |
-   | internal_conflict_resolution  | 内閣法制局 or equivalent --        |
-   |                               | elevated authority required       |
+   | internal_conflict_resolution  | Elevated legal authority or       |
+   |                               | equivalent -- elevated authority  |
    | cross_statute_coordination    | All co-endorsers must re-endorse  |
    +-------------------------------+-----------------------------------+
 
@@ -2217,11 +2217,11 @@ Table of Contents
    | CSAM                      | TIER0A | UN CRC 1989 + Optional       |
    |                           |        | Protocol                     |
    | GENOCIDE_FACILITATION     | TIER0A | UN Genocide Convention 1948  |
-   | MANIPULATION              | TIER0A | Effect-based test, §7.2      |
+   | MANIPULATION              | TIER0A | Effect-based test, S.7.2      |
    |                           |        | [NEW in -04]                 |
-   | PERFORMED_EMOTION         | TIER0A | Effect-based test, §7.2      |
+   | PERFORMED_EMOTION         | TIER0A | Effect-based test, S.7.2      |
    |                           |        | [NEW in -04]                 |
-   | BIOMETRIC_SIGNAL_         | TIER0A | Effect-based test, §7.2      |
+   | BIOMETRIC_SIGNAL_         | TIER0A | Effect-based test, S.7.2      |
    |   INFERENCE               |        | [NEW in -04]                 |
    | HUMAN_TRAFFICKING         | TIER0B | UN Trafficking Protocol 2000 |
    | WMD_ASSISTANCE            | TIER0B | CWC/BWC/NPT                  |
@@ -2492,14 +2492,14 @@ C.1.  Protocol Summary
 
    New in -04:
    - Three new Tier 0-A prohibitions: MANIPULATION, PERFORMED_EMOTION,
-     BIOMETRIC_SIGNAL_INFERENCE (§7.2)
-   - SUSPENDED CEE output: catalog-driven evaluative suspension (§6.3)
-   - GOVERNANCE_SUSPENDED error code (§6.3)
-   - catalog_version schema for law amendment tracking (§8.9.3)
-   - ALE-NEW-02: CAP_CATALOG_CONFLICT_DETECTED (§8.8.1)
-   - consent_scope Cedar context population from MJWT (§5.4)
-   - Tier 0 OSCAL reference catalog at soosproject.ai (§12a.7)
-   - OTel soos.cap.* span attributes (§13.5)
+     BIOMETRIC_SIGNAL_INFERENCE (S.7.2)
+   - SUSPENDED CEE output: catalog-driven evaluative suspension (S.6.3)
+   - GOVERNANCE_SUSPENDED error code (S.6.3)
+   - catalog_version schema for law amendment tracking (S.8.9.3)
+   - ALE-NEW-02: CAP_CATALOG_CONFLICT_DETECTED (S.8.8.1)
+   - consent_scope Cedar context population from MJWT (S.5.4)
+   - Tier 0 OSCAL reference catalog at soosproject.ai (S.12a.7)
+   - OTel soos.cap.* span attributes (S.13.5)
 
 C.2.  Key Identifiers
 

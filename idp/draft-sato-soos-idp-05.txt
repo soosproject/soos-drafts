@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                          11 July 2026
-Expires: 11 January 2027
+Intended status: Standards Track                          30 June 2026
+Expires: 30 December 2026
 
 
          The Intent Declaration Primitive (IDP) for Agentic AI Systems
@@ -57,7 +57,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 11 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -729,7 +729,7 @@ Table of Contents
    The intake_endorsement request MUST include:
 
    {
-     "eod":              object,   ; REQUIRED. Full EOD per AEP-02 §6.2.
+     "eod":              object,   ; REQUIRED. Full EOD per AEP-02 S.6.2.
      "mandate_jwt":      string,   ; REQUIRED. Root Mandate JWT for the
                                    ; session for which the EOD applies.
      "principal_credential": string, ; REQUIRED. Credential of the human
@@ -1726,8 +1726,8 @@ Table of Contents
    Commitment Verification provide the governance decision, and the
    Outcome Event Log entries provide the post-action record.
 
-   The full audit chain -- Endorsed EOD → IDP_SUBMITTED → Cedar result
-   → STATE_TRANSITIONED or CEDAR_DENY_RECORDED → IDP_COMMITMENT_VERIFIED
+   The full audit chain -- Endorsed EOD -> IDP_SUBMITTED -> Cedar result
+   -> STATE_TRANSITIONED or CEDAR_DENY_RECORDED -> IDP_COMMITMENT_VERIFIED
    -- is the Article 12 record for a single governed transition.  The
    pre-action/post-action pair is GEC-signed and non-suppressible at
    the conformance level appropriate to the Article 9 risk class.

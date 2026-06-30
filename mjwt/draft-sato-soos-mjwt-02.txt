@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                           1 July 2026
-Expires: 1 January 2027
+Intended status: Standards Track                           30 June 2026
+Expires: 30 December 2026
 
 
          The Mandate JWT (MJWT) for Agentic AI Systems
@@ -46,7 +46,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 1 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 

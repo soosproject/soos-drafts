@@ -1,7 +1,7 @@
 Network Working Group                                            T. Sato
 Internet-Draft                                           MyAuberge K.K.
-Intended status: Standards Track                         11 July 2026
-Expires: 11 January 2027
+Intended status: Standards Track                         30 June 2026
+Expires: 30 December 2026
 
 
          The Data Artifact Management (DAM) Protocol for
@@ -46,7 +46,7 @@ Status of This Memo
    at any time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 11 January 2027.
+   This Internet-Draft will expire on 30 December 2026.
 
 Copyright Notice
 
@@ -72,9 +72,9 @@ Table of Contents
      3.3.  Artifact Lifecycle States
      3.4.  GAR Provenance Integration
    4.  Artifact Classes (Stub)
-     4.1.  KGA — Kernel-Generated Artifacts
-     4.2.  AGA — Agent-Generated Artifacts
-     4.3.  EIA — Externally Ingested Artifacts
+     4.1.  KGA -- Kernel-Generated Artifacts
+     4.2.  AGA -- Agent-Generated Artifacts
+     4.3.  EIA -- Externally Ingested Artifacts
    5.  Graph Write Authority Model (Stub)
    6.  Governance Envelope (Stub)
    7.  Open Issues
@@ -262,7 +262,7 @@ Table of Contents
 
 3.3.  Artifact Lifecycle States
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    Anticipated states: PENDING | DRAFT | COMMITTED | VALID |
    EXPIRED | SUPERSEDED | REVOKED.
@@ -296,9 +296,9 @@ Table of Contents
 
 4.  Artifact Classes (Stub)
 
-4.1.  KGA — Kernel-Generated Artifacts
+4.1.  KGA -- Kernel-Generated Artifacts
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    KGA artifacts are the authoritative governance record of the SOOS
    kernel.  They include all records produced by the GEC in the
@@ -313,9 +313,9 @@ Table of Contents
    - Tamper evidence: each KGA is covered by the Session Block Merkle
      root per [I-D.sato-soos-gar] Section 14.4
 
-4.2.  AGA — Agent-Generated Artifacts
+4.2.  AGA -- Agent-Generated Artifacts
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    AGA artifacts are the operational outputs of agent execution: the
    documents, decisions, recommendations, itineraries, and other
@@ -332,9 +332,9 @@ Table of Contents
      to target_state SO Type)
    - AGA sub-type registry: to be defined in DAM-01
 
-4.3.  EIA — Externally Ingested Artifacts
+4.3.  EIA -- Externally Ingested Artifacts
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    EIA artifacts are data made available to the agent by external
    resources: API responses, database query results, file contents,
@@ -355,24 +355,24 @@ Table of Contents
 
 5.  Graph Write Authority Model (Stub)
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    The three-tier write authority model governs who may create, modify,
    or delete each class of Data Artifact:
 
-   Tier 1 — Kernel-only write (KGA):
+   Tier 1 -- Kernel-only write (KGA):
       Only the GEC kernel may write KGA artifacts.  No agent, operator,
       or external resource is granted Cedar Action::WriteKGA.  KGA
       write operations are enforced at the TEE boundary per
       [I-D.sato-soos-kee] KEE-1 property P1.
 
-   Tier 2 — Agent-write with kernel audit (AGA):
+   Tier 2 -- Agent-write with kernel audit (AGA):
       The agent may produce AGA artifacts as outputs of authorized
       actions.  Each AGA production event is logged to GAR by the
       kernel immediately upon production.  The agent cannot suppress
       or modify the GAR log entry for an AGA it produced.
 
-   Tier 3 — External-write with kernel validation (EIA):
+   Tier 3 -- External-write with kernel validation (EIA):
       External resources produce EIA artifacts and make them available
       to the agent.  The kernel validates each EIA against the active
       RGP Resource Envelope before permitting agent ingestion.
@@ -385,7 +385,7 @@ Table of Contents
 
 6.  Governance Envelope (Stub)
 
-   [STUB — to be specified in DAM-01]
+   [STUB -- to be specified in DAM-01]
 
    Each Data Artifact carries a Governance Envelope specifying:
 
@@ -437,7 +437,7 @@ Table of Contents
 
 8.  Security Considerations
 
-   [PLACEHOLDER — to be completed in DAM-01]
+   [PLACEHOLDER -- to be completed in DAM-01]
 
    The primary security properties of DAM, to be specified normatively
    in DAM-01:
@@ -467,7 +467,7 @@ Table of Contents
 
 9.  IANA Considerations
 
-   [PLACEHOLDER — to be completed in DAM-01]
+   [PLACEHOLDER -- to be completed in DAM-01]
 
    DAM-01 will request the following IANA registrations:
 

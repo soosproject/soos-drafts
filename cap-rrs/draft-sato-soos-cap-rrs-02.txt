@@ -141,7 +141,7 @@ Table of Contents
        10.1. Normative Rule Text
        10.2. CATALOG_VERSION_CONFLICT Event
        10.3. INTERPRETATION_SUPERSEDED Event
-       10.4. 信頼保護 Safe Harbor Clause
+       10.4. Safe Harbor Clause
        10.5. catalog_version Object Schema
    11. Operational Requirements               [NEW in -02]
        11.1. Amendment Detection Cadence
@@ -558,7 +558,7 @@ CAP-RRS catalog updates.]
           "endorsed_at":              string,  ; REQUIRED -- ISO8601
           "endorsement_scope":        string,  ; REQUIRED -- controlled
                                                ;   vocab
-          "resolution_basis":         string,  ; REQUIRED -- see §9.4
+          "resolution_basis":         string,  ; REQUIRED -- see S.9.4
           "resolution_instrument_id": string,  ; CONDITIONAL -- required
                                                ;   when resolution_basis
                                                ;   is interpretive_ruling
@@ -583,7 +583,7 @@ CAP-RRS catalog updates.]
 
    LRI-1: How law_id uniquely identifies a law within the
           jurisdiction.  Example (Japan): law_id maps to the e-LAWS
-          法令ID (e.g., "325AC0000000089").
+          law identifier (horei-ID) (e.g., "325AC0000000089").
 
    LRI-2: How article_ref addresses a specific provision within
           that law.  The article_ref MUST be resolvable against the
@@ -632,7 +632,7 @@ CAP-RRS catalog updates.]
    +-----------------------------+------------------------------------+
    | internal_conflict_          | Two provisions of the same law     |
    | resolution                  | conflict; one is chosen.  Elevated |
-   |                             | authority required (内閣法制局 or    |
+   |                             | authority required (Cabinet Legal    |
    |                             | equivalent for Japan; equivalent   |
    |                             | legislative counsel body for       |
    |                             | other jurisdictions).              |
@@ -762,7 +762,7 @@ CAP-RRS catalog updates.]
    statute_clear: Designated authority per the LRI Profile endorser
    table.  interpretive_ruling: Same authority plus updated
    resolution_instrument_id.  internal_conflict_resolution: Elevated
-   authority (内閣法制局 or equivalent).  cross_statute_coordination:
+   authority (Cabinet Legal Affairs Bureau or equivalent).  cross_statute_coordination:
    All co-endorsers must re-endorse.
 
 10.2. CATALOG_VERSION_CONFLICT Event Schema
@@ -837,14 +837,14 @@ CAP-RRS catalog updates.]
         },
         "suspension_effective_at":  string, ; ISO8601 timestamp
         "hem_escalation_id":        string,
-        "resolution":               null    ; same schema as §10.2
+        "resolution":               null    ; same schema as S.10.2
       }
 
-10.4. 信頼保護 Safe Harbor Clause
+10.4. Safe Harbor Clause
 
    Agent actions taken under a valid, non-superseded endorsement
    at the time of action are shielded from retroactive liability.
-   The GAR audit record of the action is the machine-native 信頼保護
+   The GAR audit record of the action is the machine-native safe-harbor
    instrument.
 
    The GAR record of any agent action governed by a Regulation
@@ -1015,7 +1015,8 @@ Section 9.1-9.4.]
 13.3.  Japan Interpretation Registry (JP-OQ-03, JP-OQ-04)
 
    The Japan profile requires a machine-queryable interpretation
-   registry for Cabinet Orders, 解釈指針, and 内閣法制局意見.  The
+   registry for Cabinet Orders, interpretive guidelines (kaisyaku-shishin),
+   and Cabinet Legal Affairs Bureau opinions (CLB-iken).  The
    current e-LAWS API v2 does not expose interpretive instruments.
    A provisional SOOS-operated registry has been scoped.  The
    Digital Agency has been identified as the target for a native
@@ -1024,9 +1025,10 @@ Section 9.1-9.4.]
 
 13.4.  Co-Endorsement Authority for Cross-Prefectural Rules (JP-OQ-01)
 
-   For Japan cross-statute coordination rules spanning 都道府県知事
-   authority, the question of whether individual governors or 全国知事会
-   provides the standing endorsement is unresolved.  Deferred to
+   For Japan cross-statute coordination rules spanning prefectural
+   governor (todofuken-chiji) authority, the question of whether
+   individual governors or the National Governors' Association
+   (Zenkoku Chiji-kai) provides the standing endorsement is unresolved.  Deferred to
    the Japan LRI profile document.
 
 
@@ -1224,11 +1226,10 @@ Acknowledgments
    KernelSpec V3 development sessions in May 2026.  The Law
    Reference Interface generic model, Statute-Primacy Rule, and
    Operational Requirements (Sections 9-11) emerged from sessions
-   in June 2026 analyzing real 防災 statutory conflicts in the
+   in June 2026 analyzing real disaster-response (bousai) statutory conflicts in the
    e-LAWS corpus and the interpretive authority question identified
-   in the AI臨調 ディスカッションペーパー (Themes 21 and 22).  The
-   positioning: "法令のAXが作るのは読める法律です。SOOSが作るのは守られる
-   法律です" (Law AX creates laws that can be read; SOOS creates
+   in the AI Regulatory Reform Council Discussion Paper (Themes 21 and 22).  The
+   positioning (Law AX creates laws that can be read; SOOS creates
    laws that are enforced) derives from those sessions.
    CAP-RRS is a companion document to CAP [I-D.sato-soos-cap];
    it does not revise or supersede it.
@@ -1243,7 +1244,7 @@ Appendix A.  Japan e-LAWS LRI Profile Notes
 
 A.1.  law_id Binding
 
-   law_id maps to the e-LAWS 法令ID (e.g., "325AC0000000089" for
+   law_id maps to the e-LAWS law identifier (horei-ID) (e.g., "325AC0000000089" for
    APPI).
 
 A.2.  article_ref Binding
@@ -1270,13 +1271,14 @@ A.5.  Endorsement Authority Table (Informative)
    +-------------------+--------------+------------------------------+
    | Law tier          | LawType      | Designated endorser          |
    +-------------------+--------------+------------------------------+
-   | Constitution      | Constitution | 内閣法制局                    |
-   | Act (法律)         | Act          | 内閣法制局                    |
-   | Cabinet Order     | CabinetOrder | 内閣法制局                    |
-   | Ministerial       | Ministerial  | 所管省庁法令担当部局           |
-   | Ordinance (省令)   | Ordinance    |                              |
-   | Prefecture        | Misc         | 都道府県法務・法制担当部局     |
-   | Ordinance (条例)   |              |                              |
+   | Constitution      | Constitution | Cabinet Legal Affairs Bureau  |
+   | Act (horitsu)     | Act          | Cabinet Legal Affairs Bureau  |
+   | Cabinet Order     | CabinetOrder | Cabinet Legal Affairs Bureau  |
+   | Ministerial       | Ministerial  | Responsible ministry legal    |
+   |                   |              | affairs division              |
+   | Ordinance (shourei)| Ordinance    |                              |
+   | Prefecture        | Misc         | Prefectural legal affairs     |
+   | Ordinance (jourei)|              |                              |
    +-------------------+--------------+------------------------------+
 
    Table A.1: Japan Endorsement Authority Table (Informative)
