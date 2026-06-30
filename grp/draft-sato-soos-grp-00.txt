@@ -1922,10 +1922,11 @@ B.2.  Regulatory Instruments
    (ALE-064 through ALE-069) provides the machine-readable
    incident record supporting Article 17 requirements.
 
-   Japan AI Rincho Item 23 identifies human oversight of
-   autonomous AI decision-making as a priority governance
-   requirement.  GRP's HEM integration implements a protocol-
-   level oversight boundary consistent with Item 23.
+   Emerging AI governance frameworks in multiple jurisdictions
+   identify human oversight of autonomous AI decision-making as a
+   priority governance requirement.  GRP's HEM integration implements
+   a protocol-level oversight boundary consistent with these
+   requirements.
 
 B.3.  SOOS Companion Drafts
 

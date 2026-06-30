@@ -1,0 +1,2489 @@
+Network Working Group                                            T. Sato
+Internet-Draft                                           MyAuberge K.K.
+Intended status: Standards Track                         13 July 2026
+Expires: 13 January 2027
+
+
+    The Kernel Execution Environment (KEE-1) for the Sovereign Object OS
+                       draft-sato-soos-kee-00
+
+Abstract
+
+   The Sovereign Object OS (SOOS) governance architecture specifies
+   what an AI agent is prohibited from doing (CAP), how mandate scope
+   is expressed (MJWT), how audit records are produced (GAR), how
+   kernel identity is established (KIA), and how agent execution is
+   governed (AEP).  None of these specifications, however, determines
+   the environment in which these operations execute.  Without a
+   normative execution environment, implementations cannot guarantee
+   that policy state from one kernel instance cannot influence another,
+   that KIA private key material cannot cross instance boundaries, that
+   governance infrastructure failures result in safe closed behavior
+   rather than ungoverned operation, or that GAR writes are tamper-
+   evident and causally ordered.
+
+   This document specifies the Kernel Execution Environment (KEE-1):
+   the OS-level execution properties that a compliant SOOS kernel
+   deployment MUST satisfy.  KEE-1 defines eight mandatory properties
+   (P1 through P8) covering kernel instance isolation, Cedar policy
+   evaluation placement, KIA attestation boundary by deployment tier,
+   GAR write integrity, fail-closed invariant, catalog conflict
+   detection, clock authority, and the XPID derivation function.  KEE-1
+   defines three conformance levels (L1 software, L2 sidecar, L3
+   TEE/hardware) and provides a Linux reference implementation profile
+   satisfying all eight properties.
+
+   KEE-1 is normative for single-tenant and moderate-scale SOOS
+   deployments.  Distributed Cedar cluster consensus, threshold KIA
+   signing, Session Block GAR with Merkle DAG, and catalog distribution
+   protocol are specified separately in draft-sato-soos-dist-00
+   (KEE-2/SOOS-DIST).
+
+   The primary reference implementation context for KEE-1 is a
+   SOOS-governed multi-agent disaster response system: a government-
+   grade L3 deployment illustrating the Government Deployment Profile,
+   FROST threshold signing, and the complete ACD four-check sequence
+   under operational disaster response conditions.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other documents
+   at any time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 13 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.
+
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Use Case: Single-Node Development Deployment (L1)
+     1.2.  Use Case: Enterprise HA Cluster Deployment (L2 with FROST)
+     1.3.  Use Case: Government Disaster Response Deployment (L3)
+     1.4.  Relationship to SOOS
+     1.5.  Relationship to KEE-2/SOOS-DIST
+   2.  Conventions and Definitions
+   3.  Architecture Overview
+     3.1.  KEE-1 Position in the SOOS Stack
+     3.2.  Deployment Scope Boundary
+     3.3.  The Eight Properties at a Glance
+   4.  KEE-1 Properties (P1-P8)
+     4.1.  P1 -- Cedar Policy Cluster
+     4.2.  P2 -- FROST Threshold Signing
+     4.3.  P3 -- ACD Four-Check Sequence
+     4.4.  P4 -- Catalog Authority
+     4.5.  P5 -- GEC Manifest Immutability
+     4.6.  P6 -- OTel Emission
+     4.7.  P7 -- WAL Tamper Evidence
+     4.8.  P8 -- Revocation Propagation
+   5.  KEE-1 Conformance Levels
+     5.1.  L1 -- Software
+     5.2.  L2 -- Sidecar
+     5.3.  L3 -- TEE/Hardware
+   6.  Cedar Cluster Specification
+     6.1.  Raft Consensus and etcd
+     6.2.  Quorum Requirements
+     6.3.  Policy Update Consensus
+     6.4.  Failure Handling and Split-Brain Protection
+     6.5.  Isolation from Agent Critical Path
+   7.  FROST Signing Cluster
+     7.1.  Key Generation Ceremony
+     7.2.  Signer Rotation
+     7.3.  Nonce Generation Protocol
+     7.4.  Quorum Failure Behavior
+   8.  Government Deployment Profile
+     8.1.  Conformance Level
+     8.2.  Multi-Party Publisher Key Ceremony
+     8.3.  Statute Reference URI Binding
+     8.4.  Personal Data Protection Enforcement Chain
+     8.5.  Government Cloud Deployment Notes
+   9.  Linux Reference Implementation Profile
+     9.1.  Base Platform
+     9.2.  Cedar Evaluation (P1)
+     9.3.  KIA Key Protection (P2)
+     9.4.  GAR Storage (P7)
+     9.5.  OTel Emission (P6)
+     9.6.  Revocation Propagation (P8)
+     9.7.  Process Isolation (P1)
+  10.  XPID Derivation Function
+  11.  Open Issues
+  12.  Security Considerations
+    12.1.  Raft Leader Compromise
+    12.2.  FROST 2-of-3 Colluding Signers
+    12.3.  Catalog Update Race Condition
+    12.4.  etcd Quorum Failure
+    12.5.  Cedar Cluster Split-Brain
+  13.  Privacy Considerations
+  14.  IANA Considerations
+    14.1.  KEE-1 Conformance Level Codes
+    14.2.  GEC Manifest Media Type
+    14.3.  SOOS Namespace UUID
+  15.  References
+    15.1.  Normative References
+    15.2.  Informative References
+  Appendix A.  Worked Example: Government Disaster Response Deployment
+  Appendix B.  Related Work
+    B.1.  Existing Frameworks
+    B.2.  Regulatory Instruments
+    B.3.  SOOS Companion Drafts
+  Author's Address
+
+
+1.  Introduction
+
+   A SOOS kernel deployment has a Cedar policy engine, a KIA signing
+   service, a GAR write stream, an HEM escalation channel, and a mandate
+   JWT processor.  What it has not had, until this document, is a
+   normative specification of the execution environment in which these
+   components run.
+
+   The gap matters.  Consider an engineer implementing the first
+   SOOS-governed AI agent for a government disaster response system.
+   She has read CAP-04 and knows how constitutional prohibitions are
+   expressed as Cedar policies.  She has read GAR-03 and knows how
+   Authority Lifecycle Events are structured.  She has read KIA-03 and
+   knows how the GEC manifest is signed.  What she does not know from
+   those documents is:
+
+   -  Whether running two kernel instances in the same process is
+      conformant (it is not).
+
+   -  What happens to governed agent actions if the Cedar evaluation
+      service crashes (they must be denied, not permitted).
+
+   -  What key protection tier is required for a Japanese government
+      deployment (TEE mandatory, hardware attestation chain required).
+
+   -  Whether the kernel clock or an agent-presented timestamp governs
+      the validity window of an ACD Record (the kernel clock always
+      governs).
+
+   -  How a resource provider validates the four-check sequence before
+      accepting an ACD compliance handshake (manifest validity, policy
+      currency, KIA attestation, revocation status -- in that order).
+
+   This document answers all of these questions.  KEE-1 is the
+   implementation normative reference that converts the SOOS protocol
+   stack into a deployable governance system.
+
+   The KEE-1 endpoint for SOOS-governed deployments is at
+   https://soosproject.ai/drafts/kee
+
+1.1.  Use Case: Single-Node Development Deployment (KEE-1 L1)
+
+   A developer at a Japanese enterprise AI company is implementing a
+   SOOS-governed procurement agent for a PoC demonstration.  She wants
+   to run the SOOS kernel on her development laptop, with TypeScript SDK
+   wrapping a Rust kernel core, Cedar policy evaluation in-process, and
+   a SQLite WAR-mode database for GAR writes.
+
+   KEE-1 Level 1 (Software) specifies exactly this deployment.  The
+   developer configures one Docker container per kernel instance (KEE1-
+   P1: Kernel Instance Isolation), loads the Cedar policy set from the
+   active CAP Profile at startup (KEE1-P2: Cedar Evaluation in Critical
+   Path), uses the OS keystore for KIA key protection (KEE1-P3:
+   acceptable at L1), writes GAR records to SQLite WAL mode (KEE1-P4:
+   GAR Write Integrity), configures fail-closed behavior for Cedar and
+   GAR service failure (KEE1-P5: Fail-Closed Invariant), runs NTP
+   synchronization (KEE1-P7: Clock Authority), and exposes the XPID
+   derivation function via the kernel API (KEE1-P8).
+
+   The L1 deployment is not production-grade -- the OS keystore is a
+   software boundary and provides no hardware attestation chain.  It is,
+   however, fully KEE-1 conformant at the L1 tier, which is the correct
+   target for development and PoC use.  The developer can upgrade to L2
+   (sidecar, TEE) for production deployment without protocol changes.
+
+1.2.  Use Case: Enterprise HA Cluster Deployment (KEE-1 L2 with FROST)
+
+   A financial services firm regulated under FIEA (Financial Instruments
+   and Exchange Act, Japan) is deploying SOOS-governed trading agents
+   in a high-availability production cluster.  The firm requires no
+   single point of failure in KIA signing, and its compliance team
+   requires that the kernel signing key cannot be compromised by
+   the loss of any single hardware component.
+
+   KEE-1 Level 2 (Sidecar) with FROST threshold signing satisfies this
+   requirement.  Three sidecar TEE instances (Intel TDX) each hold one
+   FROST key share derived from the GEC's threshold keypair.  A (2,3)
+   threshold is configured: any two of the three TEE signers can
+   cooperate to produce a valid KIA signature; the loss of one TEE
+   instance does not halt signing operations.  The firm's compliance
+   team can verify, via the GEC Manifest [I-D.sato-soos-kia], that the
+   threshold configuration is as declared.
+
+   KIA-03 Section 4.1 specifies FROST threshold signing as a normative
+   HA option.  KEE-1 P3 (KIA Attestation Boundary) references KIA-03
+   Section 4.1 for the FROST-specific nonce generation and threshold
+   reduction constraints.
+
+1.3.  Use Case: Government Disaster Response Deployment
+      (KEE-1 L3, Government Deployment Profile)
+
+   A government disaster response agency is deploying a SOOS-governed
+   multi-agent system to coordinate responses to major seismic events.
+   In a M7.2 earthquake scenario, the system deploys a Master AI that
+   orchestrates a Local AI (city-level response coordination) and a
+   Simulation AI (evacuation modeling).  The Master AI's first action
+   -- classifying the incident as maximum crisis (GOLD) -- is the
+   highest-stakes governance decision in the system.  Human
+   confirmation (HEM-001) is required before the classification is
+   activated.
+
+   The deployment requirements for a government-grade disaster response
+   system are more demanding than those for a commercial deployment:
+
+   -  KIA key material must be protected in hardware-attested TEE with
+      a hardware attestation chain tracing to the deployment authority.
+
+   -  The CAP Profile must be published under a 2-of-3 publisher key
+      ceremony involving the national digital agency, the national
+      cybersecurity authority, and the operator.  A single publisher
+      cannot unilaterally update the constitutional prohibitions
+      governing the disaster response AI.
+
+   -  Applicable statute references in CAP-RRS Tier 1 controls must
+      use a machine-verifiable URI scheme, creating a verifiable link
+      from the Cedar policies enforced by the kernel to the specific
+      statutory provisions of the national disaster countermeasures
+      framework and personal data protection law.
+
+   -  GAR records must satisfy applicable data minimization law --
+      the hash-only logging rule for ACD Records applies.
+
+   KEE-1 L3 (TEE/Hardware) with the Government Deployment Profile
+   specified in Section 8 satisfies all of these requirements.
+
+1.4.  Relationship to SOOS
+
+   KEE-1 is the execution layer beneath all other SOOS drafts.  Every
+   SOOS draft that specifies a runtime behavior -- CAP Cedar evaluation,
+   GAR writes, KIA signing, AEP session lifecycle, ACD compliance
+   handshake -- depends on the execution properties defined here.
+
+   The dependency direction is:
+
+   KEE-1 (this document)
+     is depended on by: CAP, GAR, KIA, AEP, ACD, MJWT, HEM, MAD, IDP,
+                        SOV, AOP, RGP, GRP
+
+   KEE-1 does not depend on any other SOOS draft for its normative
+   content.  It references KIA-03 for FROST threshold signing
+   specifications (Section 4.1 of [I-D.sato-soos-kia]) and GAR-03 for
+   WAL tamper evidence requirements, but the execution properties
+   defined here are architecturally prior to the protocols those drafts
+   specify.
+
+1.5.  Relationship to KEE-2/SOOS-DIST
+
+   KEE-1 specifies the execution properties for single-tenant and
+   moderate-scale deployments.  It does not cover:
+
+   -  Distributed Cedar cluster consistency (Raft/etcd consensus,
+      atomic cross-instance policy version transitions).
+
+   -  Threshold KIA signing cluster management (key generation ceremony,
+      signer rotation, quorum failure handling).
+
+   -  Session Block GAR with Merkle DAG (block granularity, anchor
+      interval, tiered storage architecture).
+
+   -  Catalog distribution protocol (push/pull hybrid, effective-date
+      activation, rollback directives).
+
+   -  ACD session inheritance for sub-agent delegation chains at scale.
+
+   These are specified in draft-sato-soos-dist-00 (KEE-2/SOOS-DIST).
+   A KEE-1-compliant deployment is correct and complete for its scale
+   tier.  KEE-2 compliance is additive -- it does not replace KEE-1
+   properties.  A deployment that exceeds the performance walls
+   described in draft-sato-soos-dist-00 Section 4 requires KEE-2
+   compliance in addition to KEE-1 compliance.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY",
+   and "OPTIONAL" in this document are to be interpreted as described
+   in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in
+   all capitals, as shown here.
+
+   This document uses the following terms:
+
+   CAP Profile:
+      A signed artifact referencing the set of Cedar policies active in
+      a given SOOS kernel deployment at a given time.  Governed by
+      [I-D.sato-soos-cap-rrs].  Identified in ACD Records by
+      cap_profile_id and committed to by cap_profile_hash.
+
+   Cedar Policy Set:
+      The loaded, active set of Cedar policies constituting the current
+      CAP Profile for a kernel instance.  The Cedar Policy Set is
+      protected from external modification.  Updates occur only via
+      internal kernel channel.
+
+   Cedar Evaluation Cache:
+      A deterministic cache of Cedar evaluation results keyed by the
+      triple (action_type, context_hash, cap_profile_hash).  Defined
+      in draft-sato-soos-dist-00 for KEE-2 deployments.  OPTIONAL at
+      KEE-1 level.
+
+   Fail-Closed:
+      The required behavior of the SOOS kernel when a Level 0 or Level
+      1 component is unavailable: agent actions are denied or suspended,
+      never permitted.  See P5 (Section 4.5).
+
+   FROST:
+      Flexible Round-Optimized Schnorr Threshold Signatures
+      [I-D.irtf-cfrg-frost].  A threshold signing protocol enabling
+      a cluster of signers each holding a key share to cooperate in
+      producing a valid signature, without any single signer holding
+      the complete private key.
+
+   GEC Manifest:
+      A signed attestation of the GEC's runtime state, as defined in
+      [I-D.sato-soos-kia] Section 5.  The GEC Manifest is RATS
+      Evidence extended with SOOS-specific fields.  KEE-1 P5 specifies
+      immutability constraints on the GEC Manifest after initialization.
+
+   Government Deployment Profile:
+      The normative configuration profile for SOOS kernel deployments
+      under national government procurement and regulatory requirements.
+      Specified in Section 8.  Includes the multi-party publisher key
+      requirement (Section 8.2) and the statute reference URI binding
+      (Section 8.3) for CAP-RRS Tier 1 controls.
+
+   KEE-1 Property:
+      A mandatory execution requirement.  A deployment satisfying all
+      eight KEE-1 Properties (P1 through P8) is KEE-1-compliant.
+
+   Kernel Instance:
+      A single running SOOS kernel process with its own isolated Cedar
+      Policy Set, KIA signing context, GAR Write Stream, and mandate
+      scope.  Multiple Kernel Instances MUST NOT share any of these
+      resources.
+
+   KEE-1 Conformance Level:
+      One of three tiers (L1 Software, L2 Sidecar, L3 TEE/Hardware)
+      specifying the required key protection and attestation strength
+      for a deployment context.  Defined in Section 5.
+
+   2-of-3 Publisher Key:
+      A threshold signature requirement on CAP Profile and CAP-RRS
+      catalog updates: a valid update requires signatures from at least
+      two of three designated publisher key holders.  The specific
+      key holders are designated by the deploying government authority
+      per Section 8.2.
+
+   XPID (Cross-Principal Identifier):
+      A UUID-v5 value derived deterministically from the GEC's FROST
+      threshold key material (or the GEC's single keypair in non-FROST
+      deployments) and the agent's Party Registry entry.  The XPID is
+      a stable, globally unique identifier for an agent across
+      sessions, instances, and verifying parties.  Derivation function
+      specified in Section 10; usage in cross-principal AEP sessions
+      specified in [I-D.sato-soos-aep] Section 3.
+
+   WAL (Write-Ahead Log):
+      The database mechanism used to implement KEE1-P4 (GAR Write
+      Integrity) in the Linux reference implementation profile.
+      SQLite WAL mode for L1; PostgreSQL WAL for L2.
+
+   4-Check Sequence:
+      The four validation checks a resource provider performs during
+      an ACD compliance handshake: (1) manifest validity -- the
+      gec_manifest_ref references a current, unrevoked GEC Manifest;
+      (2) policy currency -- the cedar_policy_hash corresponds to the
+      currently active Cedar Policy Set; (3) KIA attestation --
+      gec_signature verifies against the agent's KIA attestation chain;
+      (4) revocation status -- the kernel's KIA identity has not been
+      revoked.  Specified in Section 4.3.
+
+
+3.  Architecture Overview
+
+3.1.  KEE-1 Position in the SOOS Stack
+
+   KEE-1 is the execution layer beneath all other SOOS protocol layers.
+   The stack from protocol to execution is:
+
+   Protocol Layer (CAP, MJWT, GAR, KIA, AEP, ACD, HEM, IDP, SOV ...)
+        |
+        | all runtime operations execute within
+        v
+   +----------------------------------------------------------+
+   |              KEE-1 EXECUTION ENVIRONMENT                 |
+   |                                                          |
+   |  +------------------+  +------------------+             |
+   |  | Kernel Instance  |  | Kernel Instance  |  ...        |
+   |  | [Cedar Policy    |  | [Cedar Policy    |             |
+   |  |  Set -- isolated]|  |  Set -- isolated]|             |
+   |  | [GAR Write       |  | [GAR Write       |             |
+   |  |  Stream]         |  |  Stream]         |             |
+   |  | [KIA Signing     |  | [KIA Signing     |             |
+   |  |  Context]        |  |  Context]        |             |
+   |  | [MJWT Scope]     |  | [MJWT Scope]     |             |
+   |  +------------------+  +------------------+             |
+   |                                                          |
+   |  Fail-Closed Invariant applies across all instances      |
+   |  Clock Authority: NTP/PTP synchronized kernel clock      |
+   |  Catalog Conflict Detection: load-time enforcement       |
+   |                                                          |
+   |  [L1: Software OS boundary]                              |
+   |  [L2: Sidecar TEE]                                       |
+   |  [L3: Hardware-attested TEE + attestation chain]         |
+   +----------------------------------------------------------+
+        |
+        | Distributed extensions (Cedar cluster, FROST signing
+        | cluster, Session Block GAR, catalog distribution)
+        v
+   KEE-2/SOOS-DIST (draft-sato-soos-dist-00)
+
+   The key architectural property: no SOOS protocol operation executes
+   outside the KEE-1 execution boundary.  Cedar evaluations, KIA
+   signing operations, GAR writes, and mandate JWT processing all occur
+   within a KEE-1-compliant Kernel Instance.
+
+3.2.  Deployment Scope Boundary
+
+   KEE-1 governs the following deployment contexts:
+
+   -  Development and PoC deployments (L1 Software conformance).
+   -  Enterprise production, single-tenant (L2 Sidecar with TEE).
+   -  Government and regulated-industry production (L3 TEE/Hardware
+      with hardware attestation chain).
+   -  Government-grade production deployments (L3 with Government
+      Deployment Profile, Section 8).
+
+   KEE-1 does not govern:
+
+   -  Multi-node Cedar evaluation clusters (KEE-2/SOOS-DIST).
+   -  Distributed KIA threshold signing clusters beyond the local FROST
+      option described in Section 7 (extended cluster management is
+      KEE-2/SOOS-DIST scope).
+   -  National-scale deployments with mandatory catalog distribution
+      across a kernel fleet (KEE-2/SOOS-DIST).
+
+3.3.  The Eight Properties at a Glance
+
+   The eight KEE-1 properties, their architectural concern, and their
+   primary normative output:
+
+   +------+-----------------------------------------------+-------------+
+   | Prop | Concern                                       | Output      |
+   +------+-----------------------------------------------+-------------+
+   | P1   | Kernel Instance Isolation                     | No cross-   |
+   |      | Cedar / GAR / KIA / MJWT isolation            | instance    |
+   |      | One container per instance (Linux ref)        | bleed       |
+   +------+-----------------------------------------------+-------------+
+   | P2   | Cedar Evaluation in Critical Path             | Synchronous |
+   |      | Synchronous, atomic update, read-only from    | PERMIT/DENY |
+   |      | outside kernel boundary                       | before ACT  |
+   +------+-----------------------------------------------+-------------+
+   | P3   | ACD Four-Check Sequence                       | Validated   |
+   |      | Manifest validity + policy currency +         | ACD Record  |
+   |      | KIA attestation + revocation status           | handshake   |
+   +------+-----------------------------------------------+-------------+
+   | P4   | Catalog Authority                             | 2-of-3 pub- |
+   |      | 2-of-3 publisher key for CAP Profile updates  | lisher key  |
+   |      | key holders designated by deploying authority  | at load     |
+   +------+-----------------------------------------------+-------------+
+   | P5   | GEC Manifest Immutability                     | Hash-locked |
+   |      | Hash-locked at initialization; change requires| manifest    |
+   |      | new deployment, not runtime update            | integrity   |
+   +------+-----------------------------------------------+-------------+
+   | P6   | OTel Emission                                 | soos.gov.*  |
+   |      | Mandatory soos.governance.* span attributes   | span attrs  |
+   |      | at every GEC operation                        | emitted     |
+   +------+-----------------------------------------------+-------------+
+   | P7   | WAL Tamper Evidence                           | Tamper-     |
+   |      | prev_span_hash chain + Merkle root +          | evident GAR |
+   |      | GEC signature at Session Block close          | stream      |
+   +------+-----------------------------------------------+-------------+
+   | P8   | Revocation Propagation                        | CAEP/SSF    |
+   |      | CAEP/SSF integration; propagation timeout;    | revocation  |
+   |      | CLEAN/PARTIAL/UNKNOWN completion states       | signal      |
+   +------+-----------------------------------------------+-------------+
+
+   All eight properties are REQUIRED.  A deployment that satisfies
+   P1 through P7 but not P8 is not KEE-1-compliant.
+
+
+4.  KEE-1 Properties (P1-P8)
+
+   A compliant KEE-1 deployment MUST satisfy all eight properties
+   (P1 through P8).  The properties are defined at the abstract level
+   in this section.  Conformance level applicability (L1, L2, L3) is
+   specified in Section 5.  The Linux reference implementation profile
+   demonstrating how all eight properties are satisfied on a standard
+   Linux deployment is specified in Section 9.
+
+4.1.  P1 -- Cedar Policy Cluster
+
+   The Cedar policy evaluation engine MUST satisfy the following
+   requirements:
+
+   1.  The Cedar policy evaluation engine MUST be synchronous with
+       respect to agent action authorization.  No agent action MUST
+       execute before Cedar returns a PERMIT decision for that action.
+
+   2.  The Cedar policy evaluation engine MUST be loaded from the active
+       CAP Profile artifact at kernel startup before any agent action
+       authorization request is processed.
+
+   3.  Cedar policy evaluation engine updates MUST be atomic.  The
+       previously active Cedar Policy Set MUST remain active and
+       evaluating until the new Cedar Policy Set is fully loaded,
+       validated, and ready to evaluate.  No evaluation gap is permitted
+       during a transition between policy sets.
+
+   4.  The Cedar Policy Set MUST be protected from external
+       modification.  Cedar policy state MUST be read-only from outside
+       the kernel boundary.  Policy set updates MUST occur only via
+       internal kernel channel, not via external API.
+
+   5.  In deployments using a Cedar evaluation cluster (Section 6),
+       the cluster MUST use Raft consensus [RAFT] with etcd as the
+       distributed key-value store for policy state coordination.
+       All cluster nodes MUST hold the same active Cedar Policy Set
+       version, identified by the same cap_profile_hash.
+
+   6.  The Cedar policy evaluation engine MUST support hot-reload
+       without kernel restart.  A new CAP Profile update MUST be
+       activatable via the internal kernel update channel without
+       stopping or restarting the kernel process.
+
+   Failure behavior: If the Cedar evaluation service becomes
+   unavailable, ALL agent action authorization requests MUST receive
+   CEDAR_DENY until the service is restored.  An unavailable Cedar
+   evaluation service MUST NOT result in ungoverned agent operation.
+   See P8 (Section 4.8) for the fail-closed invariant.
+
+   Linux reference: Rust `cedar-policy` crate running in the kernel
+   process.  Policy state in kernel heap memory.  Policy updates via
+   tokio async channel.  See Section 9 for the full reference profile.
+
+4.2.  P2 -- FROST Threshold Signing
+
+   This property governs the cryptographic signing capability of the
+   kernel's KIA identity.  Standard (non-FROST) deployments satisfy P2
+   by maintaining a single Ed25519 keypair per the requirements of
+   [I-D.sato-soos-kia] Section 4.1.  FROST deployments satisfy P2 via
+   the threshold signing requirements below.
+
+   P2 applies specifically to high-availability deployments requiring
+   fault-tolerant KIA signing.  FROST (Flexible Round-Optimized Schnorr
+   Threshold Signatures) [I-D.irtf-cfrg-frost] is the REQUIRED
+   threshold signing scheme when threshold signing is used.
+
+   FROST deployment requirements:
+
+   1.  The FROST threshold configuration MUST be (t, n) where t is the
+       minimum number of signers required to produce a valid signature
+       and n is the total number of signers.  The REQUIRED default
+       configuration is (2, 3): any two of three signers cooperate to
+       produce a valid KIA signature.
+
+   2.  The underlying signature scheme MUST be Ed25519 (FROST-Ed25519
+       variant per [I-D.irtf-cfrg-frost] Section 6.2).
+
+   3.  Each FROST signer instance MUST generate its own nonce
+       independently using a CSPRNG immediately before each signing
+       operation, per [I-D.sato-soos-kia] Section 4.1.  Nonces MUST
+       NOT be generated centrally and distributed.  Nonces MUST NOT be
+       pre-generated, cached, or reused across signing operations.
+
+   4.  The active threshold t MUST NOT be reduced below the initially
+       configured threshold at any time during operation.  If the
+       number of available signers drops below t, all new KIA signing
+       operations MUST be suspended (P8 fail-closed applies).
+
+   5.  FROST signer instances MUST be deployed on physically separate
+       hardware.  Two FROST signer instances MUST NOT share the same
+       physical host.
+
+   6.  The FROST threshold public key MUST be declared in the GEC
+       Manifest per [I-D.sato-soos-kia] Section 5.2.  The declared
+       threshold configuration (t, n) MUST match the active FROST
+       configuration.
+
+   For non-FROST deployments, standard Ed25519 single-key signing per
+   [I-D.sato-soos-kia] Section 4.1 satisfies P2.  The FROST option is
+   an HA extension, not a mandatory requirement for all deployments.
+
+4.3.  P3 -- ACD Four-Check Sequence
+
+   When a resource provider initiates an ACD compliance handshake
+   ([I-D.sato-soos-acd] Section 7), the GEC MUST perform the following
+   four checks before issuing an ACD Record.  The checks MUST be
+   performed in the order listed.  Failure at any check MUST cause the
+   GEC to refuse issuance of the ACD Record and log ALE-059
+   (ACD_VALIDATION_FAILED) in GAR.
+
+   Check 1 -- Manifest Validity:
+      The gec_manifest_ref to be included in the ACD Record MUST
+      reference a current, unrevoked GEC Manifest ([I-D.sato-soos-kia]
+      Section 5).  A GEC Manifest is current if its issued_at timestamp
+      is within the GEC Manifest staleness window defined in
+      [I-D.sato-soos-kia] Section 5.4.  A revoked GEC Manifest MUST
+      NOT be referenced in a new ACD Record.
+
+   Check 2 -- Policy Currency:
+      The cedar_policy_hash to be included in the ACD Record MUST
+      correspond to the SHA-256 hash of the Cedar Policy Set currently
+      active in the kernel at the time of ACD Record generation.  The
+      hash MUST be computed over the canonical serialization of the
+      active Cedar Policy Set immediately before signing.  A stale or
+      precomputed cedar_policy_hash MUST NOT be used.
+
+   Check 3 -- KIA Attestation:
+      The GEC MUST verify that its KIA signing key (or FROST threshold
+      key) is currently valid and not revoked, per [I-D.sato-soos-kia]
+      Section 8 (Revocation Registry).  If the kernel's KIA identity
+      appears in the Revocation Registry, the GEC MUST NOT issue an ACD
+      Record and MUST log ALE-059 with failed_layer: 3,
+      failed_field: "gec_signature".
+
+   Check 4 -- Revocation Status:
+      The GEC MUST verify that the agent XPID ([I-D.sato-soos-kia]
+      Section 6) associated with the current AEP session has not been
+      revoked.  If the XPID appears in the Revocation Registry or has
+      received a CAEP revocation signal per [I-D.sato-soos-kia]
+      Section 6.5, the GEC MUST NOT issue an ACD Record.
+
+   All four checks MUST pass before the GEC proceeds to sign and return
+   the ACD Record.  The result of the four-check sequence MUST be
+   logged in GAR: ALE-056 (ACD_QUERY_RECEIVED) records the initiation;
+   ALE-057 (ACD_RECORD_ISSUED) records successful completion of all
+   four checks; ALE-059 (ACD_VALIDATION_FAILED) records any check
+   failure with the failed check number (1-4) in the failed_layer field.
+
+4.4.  P4 -- Catalog Authority
+
+   Updates to a kernel's active CAP Profile MUST be validated against
+   a 2-of-3 publisher key requirement before the update is accepted
+   into the active Cedar Policy Set.
+
+   Publisher key requirements:
+
+   1.  The operator MUST configure a set of three authorized publisher
+       public keys at kernel initialization.  Each public key
+       corresponds to one of three independent publisher key holders.
+
+   2.  A CAP Profile update MUST carry signatures from at least two of
+       the three configured publisher public keys to be accepted.  A
+       CAP Profile update signed by only one publisher MUST be rejected
+       regardless of which publisher signed it.
+
+   3.  The publisher public keys MUST be declared in the GEC Manifest
+       ([I-D.sato-soos-kia] Section 5.2) at kernel initialization.
+       Publisher key changes MUST trigger a new GEC Manifest issuance.
+
+   4.  Publisher key validation MUST occur before catalog conflict
+       detection (which is a separate check -- see Section 4.5 below).
+       A CAP Profile update that fails publisher key validation MUST NOT
+       proceed to conflict detection; it is rejected before that step.
+
+   5.  A CAP Profile update that passes publisher key validation but
+       fails catalog conflict detection MUST be rejected with ALE-NEW-02
+       (CAP_CATALOG_CONFLICT_DETECTED) logged in GAR.
+
+   Government Deployment Profile publisher key assignment:
+      The Government Deployment Profile (Section 8) specifies the
+      three publisher key holder roles as: (1) National Digital
+      Authority, (2) National Cybersecurity Authority, and (3) the
+      operator.  The specific key holders for a given national
+      deployment are designated by the deploying government authority.
+      The key generation ceremony is specified in Section 8.2.
+
+4.5.  P5 -- GEC Manifest Immutability
+
+   The GEC Manifest ([I-D.sato-soos-kia] Section 5) is the signed
+   attestation of the GEC's runtime state at initialization.  KEE-1
+   requires that the GEC Manifest be treated as immutable after
+   initialization.
+
+   1.  The GEC Manifest MUST be produced at kernel initialization and
+       MUST NOT be updated during kernel operation.
+
+   2.  Changes to kernel runtime state that would alter the contents of
+       the GEC Manifest -- including changes to the active CAP Profile
+       hash, publisher public keys, FROST threshold configuration, or
+       kernel software version -- MUST require a new kernel deployment,
+       not a runtime update to the existing manifest.
+
+   3.  The GEC Manifest MUST be hash-locked at initialization.  The
+       kernel MUST compute the SHA-256 hash of the GEC Manifest JSON
+       at initialization and store the hash internally.  At any
+       subsequent GEC Manifest access, the kernel MUST recompute the
+       hash and MUST verify it matches the stored value.  A hash
+       mismatch MUST cause the kernel to enter fail-closed state.
+
+   4.  The GEC MUST NOT issue a new GEC Manifest during an active AEP
+       session.  A new GEC Manifest is a new deployment event.
+       Resource providers that have cached an ACD Record referencing
+       the previous GEC Manifest are unaffected until their ACD Record
+       expires; at that point they will receive a new ACD Record
+       referencing the new GEC Manifest.
+
+   Rationale: GEC Manifest immutability prevents a class of attack
+   where the kernel's declared configuration diverges from its actual
+   running state after initialization.  If the GEC Manifest could be
+   updated at runtime, an adversary with kernel access could update the
+   manifest to falsely declare a stronger compliance posture than the
+   kernel's actual Cedar Policy Set reflects.
+
+4.6.  P6 -- OTel Emission
+
+   The kernel MUST emit OpenTelemetry [OTEL] spans with the SOOS
+   Governance Semantic Convention attributes ([I-D.sato-soos-gar]
+   Section 13) at every GEC operation.  OTel emission is not optional
+   for production deployments.
+
+   Required emission points:
+
+   1.  Cedar evaluation: the kernel MUST emit a span at every Cedar
+       policy evaluation, including the attributes:
+       soos.governance.kernel_id, soos.governance.session_id,
+       soos.governance.cap_profile_id, soos.cap.policy_ids_evaluated,
+       soos.cap.decision (PERMIT|DENY), and soos.cap.tier
+       (0-A|0-B|1|2).
+
+   2.  GAR write: the kernel MUST emit a span at every GAR ALE write,
+       including soos.governance.ale_type, soos.governance.ale_seq,
+       and soos.gar.prev_span_hash ([I-D.sato-soos-gar] Section 13.2).
+
+   3.  HEM escalation: the kernel MUST emit a span at every HEM event
+       trigger and resolution, including soos.governance.hem_class and
+       soos.governance.hem_resolution.
+
+   4.  ACD handshake: the kernel MUST emit a span at ACD Record
+       generation, including soos.acd.session_id and soos.acd.check_seq
+       (the four-check sequence result per Section 4.3).
+
+   5.  KIA signing: the kernel MUST emit a span at every KIA signing
+       operation, including soos.governance.kia_key_id and (in FROST
+       deployments) soos.governance.frost_threshold_config.
+
+   The OTel pipeline is explicitly untrusted with respect to
+   governance decisions ([I-D.sato-soos-gar] Section 13.8).  OTel
+   spans are observability signals, not the authoritative audit record.
+   The authoritative audit record is the GAR WAL.  The SOOS GAR
+   Processor ([I-D.sato-soos-gar] Section 14) derives the authoritative
+   GAR from OTel spans; it does not accept OTel spans as the record.
+
+   The kernel MUST NOT suppress OTel emission for any GEC operation.
+   An operator that disables OTel emission for performance reasons is
+   not KEE-1 conformant.  OTel sampling is not permitted for SOOS
+   governance spans; all governance spans MUST be emitted at 100%
+   sampling rate.
+
+4.7.  P7 -- WAL Tamper Evidence
+
+   The kernel's GAR Write Stream MUST implement write-ahead log (WAL)
+   tamper evidence satisfying the following requirements:
+
+   1.  Every GAR ALE write MUST carry a prev_span_hash field
+       ([I-D.sato-soos-gar] Section 13.2) computed as the SHA-256 hash
+       of the immediately preceding ALE in the session's event sequence.
+       The first ALE in a session carries prev_span_hash: null.
+
+   2.  The prev_span_hash chain MUST be verified by the GAR Processor
+       at Session Block construction time.  A chain break (a mismatch
+       between prev_span_hash and the actual hash of the preceding ALE)
+       MUST cause the GAR Processor to flag the session block as
+       tampered and emit a GAR alert.
+
+   3.  At Session Block close, the kernel MUST compute a Merkle root
+       over all ALE records in the session block and MUST produce a
+       KIA signature over the tuple (block_id, Merkle_root,
+       block_close_timestamp).  The Merkle root and KIA signature MUST
+       be stored as part of the Session Block header in the GAR.
+
+   4.  The Session Block's block_id MUST equal the OTel trace_id for
+       the session's governance span set, per [I-D.sato-soos-gar]
+       Section 14.3.  This creates a verifiable link between the OTel
+       observability signal and the authoritative GAR record.
+
+   5.  The SOOS GAR Processor ([I-D.sato-soos-gar] Section 14) MUST
+       verify the Merkle root at Session Block read time for any audit
+       query.  A verification failure MUST be reported as a tamper
+       alert.
+
+   The WAL tamper evidence model is compatible with both KEE-1
+   deployments (single-instance SQLite WAL or PostgreSQL WAL) and KEE-2
+   deployments (Session Block GAR with Merkle DAG anchoring across
+   parallel write streams).  In KEE-1 single-instance deployments, the
+   Merkle root covers the ALE sequence within a single session.  In
+   KEE-2 deployments, the Merkle DAG covers multiple session blocks.
+
+4.8.  P8 -- Revocation Propagation
+
+   The kernel MUST participate in the SOOS revocation propagation
+   architecture to ensure that mandate revocations issued by one kernel
+   instance are propagated to and honored by other kernel instances
+   that may be evaluating the same agent's requests.
+
+   1.  The kernel MUST maintain a local Revocation Registry per
+       [I-D.sato-soos-kia] Section 8.  The registry MUST be rebuilt
+       from GAR on kernel restart.
+
+   2.  The kernel MUST subscribe to CAEP (Continuous Access Evaluation
+       Protocol) revocation streams [CAEP] over the Shared Signals
+       Framework [RFC9672] for any federated kernel deployments where
+       a revoked mandate might be presented to a remote kernel.
+
+   3.  On receipt of a CAEP revocation signal, the kernel MUST add the
+       revoked identifier to its local Revocation Registry within the
+       propagation timeout.  The REQUIRED propagation timeout is 30
+       seconds from receipt of the CAEP signal.
+
+   4.  Revocation completion states MUST be tracked per mandate
+       revocation event:
+
+       CLEAN:
+          All kernel instances that have evaluated requests under the
+          revoked mandate have received and acknowledged the revocation
+          signal within the propagation timeout.  No further
+          propagation action required.
+
+       PARTIAL:
+          One or more kernel instances have not acknowledged the
+          revocation signal within the propagation timeout.  The
+          originating kernel MUST retry the CAEP signal to
+          unacknowledged instances.
+
+       UNKNOWN:
+          The set of kernel instances that have evaluated requests
+          under the revoked mandate cannot be determined.  This state
+          occurs when a mandate has been used in an unenumerated
+          federated context.  The originating kernel MUST escalate
+          to the operator and log a GAR alert.
+
+   5.  The Fail-Closed Invariant applies to revocation propagation:
+       if the CAEP/SSF infrastructure is unavailable, the kernel MUST
+       NOT permit new agent actions under any mandate whose revocation
+       status cannot be confirmed.  When revocation status is uncertain,
+       the fail-closed decision is to deny.
+
+   The revocation propagation model is consistent with the CAEP
+   propagation specification in [I-D.sato-soos-kia] Section 6.5.
+   KEE-1 P8 is the execution-layer enforcement of that model.
+
+
+5.  KEE-1 Conformance Levels
+
+   KEE-1 defines three conformance levels.  Each level specifies the
+   minimum key protection and attestation requirements for a deployment
+   context.  All eight properties (P1 through P8) apply at all three
+   conformance levels unless a property explicitly differentiates by
+   level.
+
+5.1.  L1 -- Software
+
+   KEE-1 L1 (Software) is the conformance level for development, PoC,
+   and test deployments.
+
+   Required characteristics:
+
+   -  OS-protected key store for KIA private key.  Software-boundary
+      key protection is acceptable at L1.  No TEE is required.
+
+   -  One Docker/containerd container per kernel instance for P1
+      (Kernel Instance Isolation).
+
+   -  SQLite in WAL mode for GAR storage (P7).
+
+   -  NTP clock synchronization via chrony or systemd-timesyncd (part
+      of P3 four-check sequence, Check 1, which requires a current GEC
+      Manifest with an accurate issued_at timestamp).
+
+   Explicit L1 limitations:
+
+   -  L1 deployments MUST NOT be used in production environments where
+      personal data is processed, financial transactions are executed,
+      or government services are provided.
+
+   -  L1 deployments MUST NOT be used for ACD compliance handshakes
+      with regulated resource providers.  A resource provider that
+      requires L2 or L3 key attestation MUST reject an ACD Record from
+      an L1 deployment upon inspection of the cap_enforcement_attestation
+      field.
+
+   -  ACD Records from L1 deployments MUST include a conformance_level
+      field value of "KEE1-L1" in the GEC Manifest referenced by
+      gec_manifest_ref.  Resource providers MAY use this to reject L1
+      ACD Records.
+
+5.2.  L2 -- Sidecar
+
+   KEE-1 L2 (Sidecar) is the conformance level for production single-
+   tenant deployments and enterprise HA cluster deployments.
+
+   Required characteristics:
+
+   -  TEE-protected KIA private key.  Acceptable TEE implementations:
+      Intel TDX, AMD SEV, ARM TrustZone.  The TEE MUST provide remote
+      attestation evidence that the kernel's key operations execute
+      inside the TEE boundary.
+
+   -  The KIA signing service MUST run as a separate sidecar process
+      (not in the same process as the agent execution layer), enabling
+      the TEE to provide a hard process isolation boundary around key
+      material.
+
+   -  FROST (2,3) threshold signing (Section 4.2) is OPTIONAL at L2
+      but RECOMMENDED for deployments requiring high availability.
+
+   -  PostgreSQL with WAL mode for GAR storage.
+
+   -  The GEC Manifest MUST include the TEE attestation report as a
+      field, per [I-D.sato-soos-kia] Section 5.2.
+
+5.3.  L3 -- TEE/Hardware
+
+   KEE-1 L3 (TEE/Hardware) is the conformance level for production
+   multi-tenant, government, and regulated-industry deployments.
+
+   Required characteristics:
+
+   -  TEE-protected KIA private key (same as L2) PLUS a hardware
+      attestation chain tracing from the TEE to the deployment
+      authority.  For Japan-profile deployments (Section 8), the
+      attestation chain traces to the deploying government authority.
+
+   -  FROST (2,3) threshold signing (Section 4.2) is REQUIRED at L3
+      for any deployment with more than one active kernel instance.
+      Single-instance L3 deployments MAY use single-key signing with
+      appropriate compensating controls.
+
+   -  The 2-of-3 publisher key requirement (P4, Section 4.4) is
+      REQUIRED at L3.  Operator-only publisher key authority is not
+      permitted at L3.  For Government Deployment Profile deployments,
+      the key holder roles are specified by the deploying government
+      authority per Section 8.2.
+
+   -  Hardware clock synchronization via PTP (IEEE 1588-2019) is
+      REQUIRED at L3 in addition to NTP.  NTP-only clock
+      synchronization is not sufficient for L3 deployments in contexts
+      where millisecond-level timestamp accuracy is required for
+      regulatory compliance.
+
+   -  All CAEP/SSF revocation propagation (P8, Section 4.8) MUST
+      be acknowledged within 30 seconds.  Unacknowledged revocations
+      MUST trigger operator alert within 60 seconds.
+
+   Conformance level summary:
+
+   +----------+-------------------+--------+--------+--------+
+   | Property | Requirement       |   L1   |   L2   |   L3   |
+   +----------+-------------------+--------+--------+--------+
+   | P1       | Instance isolation| MUST   | MUST   | MUST   |
+   | P2       | FROST signing     | OPT    | REC    | REQ*   |
+   | P3       | ACD four-check    | MUST   | MUST   | MUST   |
+   | P4       | 2-of-3 publisher  | REC    | REC    | MUST   |
+   | P5       | Manifest immut.   | MUST   | MUST   | MUST   |
+   | P6       | OTel emission     | MUST   | MUST   | MUST   |
+   | P7       | WAL tamper evid.  | MUST   | MUST   | MUST   |
+   | P8       | Revoc. propagat.  | MUST   | MUST   | MUST   |
+   | Key prot.| TEE boundary      | NO     | MUST   | MUST+  |
+   | Attestn. | Hardware chain    | NO     | NO     | MUST   |
+   | GAR store| WAL mode          | SQLite | PG-WAL | PG-WAL |
+   | Clock    | NTP+PTP           | NTP    | NTP    | BOTH   |
+   +----------+-------------------+--------+--------+--------+
+   * REQUIRED when multiple instances active
+   + Hardware attestation chain to deployment authority required
+
+
+6.  Cedar Cluster Specification
+
+   This section specifies the Cedar evaluation cluster requirements for
+   KEE-1 multi-instance deployments.  A Cedar evaluation cluster is
+   OPTIONAL for single-instance (L1) deployments and RECOMMENDED for
+   L2 and L3 deployments with multiple active kernel instances.
+
+   A Cedar evaluation cluster provides:
+
+   -  Consistent Cedar Policy Set across all cluster nodes: all nodes
+      evaluate agent actions against the same Cedar Policy Set version
+      at all times.
+
+   -  High availability: a single node failure does not halt Cedar
+      evaluation, provided the remaining nodes form a quorum.
+
+   -  Atomic policy updates: a new Cedar Policy Set activates on all
+      nodes simultaneously, never partially.
+
+6.1.  Raft Consensus and etcd
+
+   The REQUIRED consensus protocol for Cedar cluster policy state
+   coordination is Raft [RAFT].  The REQUIRED distributed key-value
+   store implementing Raft for Cedar cluster deployments is etcd
+   [ETCD].
+
+   1.  All etcd client-server and peer-to-peer communication MUST be
+       encrypted via mutual TLS [RFC8446].
+
+   2.  The etcd cluster MUST have an odd number of nodes: minimum 3
+       nodes for standard deployments; minimum 5 nodes RECOMMENDED for
+       L3 government deployments.
+
+   3.  Raft leader election uses etcd's built-in leader election.  The
+       Raft leader is the sole node authorized to commit Cedar Policy
+       Set updates to the cluster.
+
+   4.  Cedar evaluation cluster nodes MUST poll their local etcd
+       instance for policy set version currency at an interval not
+       exceeding the stale-policy-window (RECOMMENDED: 30 seconds).
+       A node that detects its local Cedar Policy Set is behind the
+       cluster-committed version MUST immediately load the current
+       version before processing the next evaluation request.
+
+6.2.  Quorum Requirements
+
+   1.  A Cedar evaluation cluster MUST NOT accept or commit Cedar Policy
+       Set updates without a confirmed majority quorum (floor(n/2)+1
+       nodes acknowledged).
+
+   2.  A Cedar cluster node that cannot confirm it is in the majority
+       partition MUST enter CEDAR_DENY-all mode.  A node that has not
+       received a Raft leader heartbeat within the leader-heartbeat-
+       timeout (RECOMMENDED: 10 seconds) MUST enter CEDAR_DENY-all
+       mode.
+
+   3.  A cluster in CEDAR_DENY-all mode MUST surface this state via
+       OTel as a soos.governance.cedar.cluster_state: "DENY_ALL" span
+       attribute, enabling operational teams to detect and remediate.
+
+6.3.  Policy Update Consensus
+
+   When a new Cedar Policy Set is to be activated across the cluster:
+
+   1.  The new policy set arrives at the Raft leader via the CAP-RRS
+       distribution feed or the internal kernel update channel.
+
+   2.  The Raft leader validates the 2-of-3 publisher key signatures
+       on the new CAP Profile update (P4, Section 4.4).
+
+   3.  If publisher key validation passes, the leader runs catalog
+       conflict detection (P5 complement: Cedar policy set conflict
+       check per [I-D.sato-soos-cap-rrs]).  If a conflict is detected,
+       the leader logs ALE-NEW-02 and rejects the update.
+
+   4.  If both validation and conflict detection pass, the leader
+       proposes the new policy set version to all follower nodes via
+       Raft.
+
+   5.  Each follower independently validates the 2-of-3 publisher key
+       signatures before acknowledging the Raft proposal.  A follower
+       that receives a Raft proposal without valid publisher signatures
+       MUST reject it and log a security alert.
+
+   6.  When a majority quorum of nodes has acknowledged the proposal,
+       the leader commits the new policy set version.
+
+   7.  All nodes activate the new Cedar Policy Set atomically at the
+       committed version.  No node activates before the commit; no node
+       delays activation after the commit.
+
+   8.  The activation is logged as ALE-NEW-03 (CAP_CATALOG_UPDATED) on
+       each node, with the new cap_profile_id and cap_profile_hash.
+
+6.4.  Failure Handling and Split-Brain Protection
+
+   1.  If the Raft leader fails, the cluster elects a new leader via
+       the standard Raft leader election protocol.  During the election,
+       no Cedar Policy Set updates are committed.  Cedar evaluation
+       continues using the last committed policy set version on each
+       node.
+
+   2.  If a network partition creates two sub-clusters each with
+       sufficient nodes for independent Raft leadership (split-brain),
+       the majority partition elects a leader and continues.  The
+       minority partition MUST NOT elect a leader.  All nodes in the
+       minority partition MUST enter CEDAR_DENY-all mode immediately.
+
+   3.  The kernel MUST surface split-brain detection via OTel with
+       soos.governance.cedar.split_brain: true.
+
+   4.  Upon partition healing, the minority partition nodes MUST
+       synchronize to the majority partition's committed policy set
+       version before resuming normal evaluation.
+
+6.5.  Isolation from Agent Critical Path
+
+   The Cedar evaluation cluster is in the agent action authorization
+   critical path (P1, Section 4.1, requirement 1: evaluation MUST be
+   synchronous with respect to agent action authorization).  However,
+   the cluster's consensus operations (Raft leader election, policy
+   set proposal and commit) MUST be isolated from the per-evaluation
+   critical path:
+
+   1.  Cedar evaluation requests MUST be served from the local node's
+       in-memory Cedar Policy Set.  Evaluation MUST NOT block on Raft
+       consensus operations.
+
+   2.  Raft consensus operations (policy updates) run on a separate
+       internal channel from evaluation requests.  A policy update in
+       progress MUST NOT block Cedar evaluation serving current policy.
+
+   3.  The atomic hot-swap (Section 4.1, requirement 3) is the
+       mechanism by which a new Cedar Policy Set replaces the active
+       one without an evaluation gap, without blocking evaluation of
+       the current policy set during the transition.
+
+
+7.  FROST Signing Cluster
+
+   This section specifies the operational requirements for a FROST
+   threshold signing cluster satisfying P2 (Section 4.2).  These
+   requirements extend the normative FROST specification in
+   [I-D.sato-soos-kia] Section 4.1 with KEE-1 execution environment
+   constraints.
+
+7.1.  Key Generation Ceremony
+
+   The FROST key generation ceremony produces the threshold keypair
+   that defines the cluster's KIA signing identity for the lifetime of
+   the deployment.
+
+   1.  The ceremony MUST be conducted by all n FROST signing cluster
+       participants simultaneously.  Remote participation via mutually-
+       authenticated encrypted channel is permitted; asynchronous
+       participation is not.
+
+   2.  The ceremony MUST use the Distributed Key Generation (DKG)
+       protocol specified in [I-D.irtf-cfrg-frost] to produce n secret
+       shares and a single threshold public key.  No single participant,
+       including any ceremony coordinator, MUST learn the complete
+       private key.
+
+   3.  Each participant's secret share MUST be stored in a hardware
+       secure element (TEE at L2; hardware security module at L3)
+       on that participant's signing node immediately upon ceremony
+       completion.  Secret shares MUST NOT be stored in software key
+       stores, transmitted over any network, or written to persistent
+       storage outside the secure element.
+
+   4.  The threshold public key produced by the ceremony MUST be
+       registered with the operator as the GEC keypair.  The GEC
+       Attestation Certificate ([I-D.sato-soos-kia] Section 3.4) is
+       issued over the threshold public key fingerprint.
+
+   5.  The ceremony transcript MUST be logged in GAR as a
+       KERNEL_AUDIT_ANOMALY entry with event_type: "FROST_CEREMONY"
+       for audit purposes.  The transcript MUST NOT include any
+       participant's secret share.
+
+   6.  The GEC Manifest MUST declare the FROST configuration using
+       the deployment_constraints[] field format specified in
+       [I-D.sato-soos-kia] Section 4.1:
+
+          "frost:t-of-n:<t>-<n>"
+
+       For the REQUIRED (2,3) default: "frost:t-of-n:2-3".
+
+7.2.  Signer Rotation
+
+   Signer rotation is the process of replacing one or more FROST
+   signing cluster participants while maintaining continuity of the
+   cluster's threshold public key.
+
+   7.2.1.  Planned Rotation
+
+      1.  Planned signer rotation MUST use the FROST signer resharing
+          protocol, in which the existing t-of-n signers cooperate to
+          produce new secret shares for the replacement participant set.
+          The threshold public key MUST remain unchanged after a planned
+          rotation.
+
+      2.  The resharing ceremony MUST require participation of at least
+          t of the currently active n signers.  A resharing with fewer
+          than t active signers is not possible and MUST NOT be
+          attempted.
+
+      3.  Following resharing, the GEC Manifest MUST be re-signed by
+          the new participant set to confirm the configuration update.
+          The GEC Manifest content (including threshold public key
+          fingerprint) MUST remain unchanged.
+
+      4.  Planned rotation MUST be logged in GAR as a
+          KERNEL_AUDIT_ANOMALY entry with event_type: "FROST_RESHARD".
+
+   7.2.2.  Forced Rotation (After Compromise)
+
+      1.  If one or more FROST signing participants are believed to be
+          compromised, the operator MUST initiate a full new key
+          generation ceremony (Section 7.1), producing a new threshold
+          public key.
+
+      2.  The new threshold public key MUST be issued a new GEC
+          Attestation Certificate.  The old certificate MUST be
+          revoked in the Revocation Registry ([I-D.sato-soos-kia]
+          Section 8).
+
+      3.  All outstanding ACD Records referencing the old GEC Manifest
+          (which carries the old threshold public key fingerprint) MUST
+          be treated as expired regardless of their acd_validity_not_after
+          value.  Resource providers holding cached ACD Records from
+          the old keypair MUST re-initiate the ACD compliance handshake.
+
+7.3.  Nonce Generation Protocol
+
+   FROST signing security depends on nonce freshness.  A reused nonce
+   enables private key reconstruction by any observer who sees two
+   signatures over different messages with the same nonce.
+
+   1.  Each FROST signing participant MUST generate a fresh nonce
+       using a CSPRNG immediately before each signing operation, per
+       [I-D.sato-soos-kia] CONF-KIA-16.
+
+   2.  Nonces MUST comply with the nonce generation procedure in
+       [I-D.irtf-cfrg-frost] Section 5.  In particular, nonces MUST
+       be generated per the [I-D.irtf-cfrg-frost] commitment scheme,
+       not as raw random bytes fed directly into the signing function.
+
+   3.  Nonces MUST NOT be pre-generated, cached across signing
+       operations, generated centrally and distributed, or derived
+       deterministically from any predictable input.  Each nonce MUST
+       be freshly generated for each signing invocation, per
+       [I-D.sato-soos-kia] CONF-KIA-17.
+
+   4.  The nonce generation event MUST occur within the same signing
+       operation invocation.  A signing participant MUST NOT accept
+       a nonce generated in a prior signing operation invocation.
+
+   5.  Nonce entropy: each nonce MUST have at least 256 bits of
+       cryptographic randomness.  Platform CSPRNG (e.g., getrandom(2)
+       on Linux, CryptGenRandom on Windows) MUST be used.  Userspace
+       pseudorandom generators not seeded from OS entropy are not
+       acceptable.
+
+7.4.  Quorum Failure Behavior
+
+   1.  If the number of available FROST signing participants drops
+       below t, the GEC MUST immediately refuse all new KIA signing
+       operations, per [I-D.sato-soos-kia] CONF-KIA-18.  This applies
+       to: new ACD Record issuances, new GEC Manifest issuances, and
+       new GAR Session Block signatures.
+
+   2.  The GEC MUST NOT degrade to single-signer operation under any
+       circumstances.  A quorum failure does not authorize bypass of
+       the threshold requirement.
+
+   3.  The GEC MUST emit a KERNEL_AUDIT_ANOMALY GAR alert immediately
+       on quorum failure detection, per [I-D.sato-soos-kia] CONF-KIA-19.
+       The alert MUST identify which participant(s) are unavailable.
+
+   4.  The threshold parameter t MUST NOT be reduced below the value
+       established at the initial key generation ceremony, per
+       [I-D.sato-soos-kia] CONF-KIA-20.  Threshold reduction requires
+       a full new key generation ceremony and a new GEC Attestation
+       Certificate.
+
+   5.  The P8 Fail-Closed Invariant (Section 4.8) applies during
+       quorum failure: if KIA signing is unavailable, ACD Record
+       issuance MUST be suspended.  Agent actions under AEP sessions
+       with unexpired existing ACD Records within their validity window
+       MAY continue; new ACD compliance handshakes MUST be deferred
+       until quorum is restored.
+
+   6.  The operator MUST be notified of quorum failure through the
+       designated notification channel within 60 seconds of detection.
+       The notification MUST include the current available signer count,
+       the minimum required (t), and the estimated time to quorum
+       restoration if known.
+
+
+8.  Government Deployment Profile
+
+   This section specifies the normative configuration profile for SOOS
+   kernel deployments operating under national government procurement
+   requirements and regulatory frameworks.  The profile is jurisdiction-
+   neutral at the protocol level: it specifies the class of requirements
+   a government-grade deployment MUST satisfy, with illustrative
+   examples drawn from existing regulatory frameworks.  Specific
+   national configurations are established by the deploying government
+   authority in coordination with the operator.
+
+   All KEE-1 deployments serving national government APIs, regulated
+   critical infrastructure systems, and government-mandated AI
+   governance deployments MUST conform to the Government Deployment
+   Profile in addition to the base KEE-1 L3 conformance requirements
+   (Section 5.3).
+
+8.1.  Conformance Level
+
+   Government Deployment Profile deployments MUST satisfy KEE-1 L3
+   (TEE/Hardware) as specified in Section 5.3.  No lower conformance
+   level satisfies the Government Deployment Profile.
+
+8.2.  Multi-Party Publisher Key Ceremony
+
+   Government Deployment Profile deployments MUST use a three-party
+   publisher key configuration.  The three-party requirement ensures
+   that no single organization can unilaterally modify the
+   constitutional prohibitions governing a government-grade AI
+   deployment.
+
+   The three publisher key holder roles are:
+
+   Publisher Key Holder 1: National Digital Authority
+      The national digital authority publisher key represents the
+      government body responsible for digital service governance.
+      This key holder is the authoritative party for CAP Profile
+      updates that affect government API access governance.
+      Example: a national digital agency or equivalent body.
+
+   Publisher Key Holder 2: National Cybersecurity Authority
+      The national cybersecurity authority publisher key represents
+      the government body responsible for cybersecurity and IT
+      security standards.  This key holder is the authoritative party
+      for CAP Profile updates affecting security-related prohibition
+      controls.
+      Example: a national information security promotion agency or
+      equivalent body.
+
+   Publisher Key Holder 3: Operator
+      The operator publisher key represents the deploying organization.
+      The operator key holder is the authoritative party for operator-
+      specific Tier 2 CAP Profile configuration.
+
+   The three-party ceremony MUST proceed as follows:
+
+   1.  Each key holder independently generates an Ed25519 keypair for
+       the publisher key role.  Key generation MUST occur inside a
+       hardware secure element at the key holder's site.  The private
+       key MUST NOT leave the secure element.
+
+   2.  Each key holder publishes its public key via its official
+       administrative channel, consistent with its existing PKI
+       governance practices.
+
+   3.  The operator configures the three public keys in the GEC Manifest
+       at kernel initialization.  The GEC Manifest declares all three
+       public keys in the publisher_keys[] field.
+
+   4.  Any subsequent CAP Profile update submitted to the kernel MUST
+       carry signatures from at least two of the three configured
+       publisher keys.  A single-publisher update is rejected per
+       Section 4.4.
+
+   The specific identity of the three publisher key holders for a given
+   national deployment is established by the deploying government
+   authority.  This document does not prescribe which government bodies
+   serve in each role for any specific jurisdiction.
+
+8.3.  Statute Reference URI Binding
+
+   CAP-RRS Tier 1 controls in Government Deployment Profile CAP
+   Profiles MUST reference applicable statutory provisions using a
+   machine-verifiable URI that resolves to the canonical text of the
+   applicable law.
+
+   The authority_source field in CAP-RRS Tier 1 control definitions
+   MUST carry a URI conforming to the national law publication scheme
+   of the applicable jurisdiction.  A Tier 1 control without a
+   resolvable authority_source URI is not conformant with the
+   Government Deployment Profile.
+
+   Requirements for the statute reference URI:
+
+   1.  The URI MUST resolve to a stable, authoritative publication of
+       the statutory text -- not to a third-party summary or
+       commentary.
+
+   2.  The URI SHOULD be persistent: it SHOULD remain stable across
+       legislative amendments, with amendments reflected in a versioned
+       or dated form of the URI where the national scheme supports this.
+
+   3.  The URI MUST be publicly resolvable without authentication,
+       enabling any verifying party (resource provider, auditor,
+       regulator) to confirm the statutory basis for the prohibition.
+
+   Example: Japan e-Gov Law Search URI scheme [E-GOV]:
+      Format: https://elaws.e-gov.go.jp/document?lawid=<law-id>
+      The <law-id> is assigned by the Ministry of Internal Affairs
+      and Communications.  This scheme satisfies all three URI
+      requirements above for Japanese statutory references.
+
+   Other conformant examples include EUR-Lex URIs for EU legislation,
+   the US Code at uscode.house.gov for US federal statutes, and
+   equivalent official law publication systems in other jurisdictions.
+
+8.4.  Personal Data Protection Enforcement Chain
+
+   Government Deployment Profile deployments operating in jurisdictions
+   with personal data protection law MUST implement a data protection
+   enforcement chain in their CAP Profile.  The chain MUST cover at
+   minimum:
+
+   1.  Purpose limitation: The CAP Profile MUST include a Tier 1
+       Cedar policy that evaluates whether each agent action is
+       consistent with the Purpose Code declared in the session MJWT
+       ([I-D.sato-soos-mjwt] Section 4).  An action whose purpose is
+       inconsistent with the declared Purpose Code MUST receive
+       CAP_DENY.
+
+   2.  Data minimization: The CAP Profile MUST include a Tier 1
+       Cedar policy that prohibits agent actions requesting personal
+       data fields beyond those necessary for the declared purpose.
+       The ACD Record Layer 2 cap_profile_hash MUST commit to the
+       active Cedar policy implementing this prohibition.
+
+   3.  Third-party provision: The CAP Profile MUST include a Tier 1
+       Cedar policy requiring HEM escalation (HEM-CONSENT per
+       [I-D.sato-soos-hem]) before any agent action that transfers
+       personal data to a third party not enumerated in the session
+       MJWT consent_scope claim.
+
+   4.  GAR audit records for sessions governed by personal data
+       protection law MUST carry the minimum field set: ale_type,
+       session_id, timestamp, and result_code.  Fields carrying
+       personal data identifiers or attribute values MUST NOT appear
+       in GAR records.
+
+   These requirements apply regardless of the specific personal data
+   protection statute in the deployment jurisdiction.  The statute
+   reference URI (Section 8.3) for each Tier 1 control identifies
+   the applicable statutory provision.
+
+   Example: Japan APPI (Act on Protection of Personal Information,
+   Law No. 57 of 2003) Articles 17 (purpose limitation), 19 (data
+   minimization), and 23-28 (third-party provision) map directly
+   to the three policy requirements above.
+
+8.5.  Government Cloud Deployment Notes
+
+   Government Deployment Profile deployments are typically hosted on
+   government-approved cloud infrastructure platforms designated by
+   the deploying authority.  The KEE-1 Linux Reference Implementation
+   Profile (Section 9) is compatible with all major cloud TEE
+   offerings without modification.
+
+   TEE options for L3 conformance across common cloud platforms:
+
+   -  AWS: AWS Nitro Enclaves (L2 TEE boundary); AWS CloudHSM with
+      CloudHSM attestation documents (L3 hardware attestation chain).
+
+   -  Google Cloud: Confidential Computing (AMD SEV-SNP), satisfies
+      L2 and L3 requirements with Google Attestation Verification
+      Service.
+
+   -  Microsoft Azure: Confidential Computing (Intel TDX and AMD
+      SEV-SNP), satisfies L2 and L3 requirements with Azure
+      Attestation Service.
+
+   The operator is responsible for configuring the TEE attestation
+   chain to trace to the deployment authority root designated by the
+   deploying government authority.
+
+
+9.  Linux Reference Implementation Profile
+
+   This section specifies the normative Linux configuration that
+   satisfies all eight KEE-1 properties (P1 through P8) and constitutes
+   the reference implementation for the TypeScript SOOS SDK, the Rust
+   kernel core, and Government Deployment Profile deployments on
+   government cloud infrastructure.
+
+   This profile is deployable on government-approved cloud platforms
+   per Section 8.5 without modification.
+
+9.1.  Base Platform
+
+   +-------------------------+------------------------------------+
+   | Component               | Specification                      |
+   +-------------------------+------------------------------------+
+   | Operating system        | Linux kernel 6.x LTS               |
+   |                         | Ubuntu 24.04 LTS                   |
+   | Container runtime       | Docker / containerd                |
+   |                         | One container per kernel instance  |
+   |                         | Satisfies P1 (Instance Isolation)  |
+   | Primary language (SDK)  | TypeScript / Node.js               |
+   | Primary language (core) | Rust (Cedar eval, KIA signing)     |
+   | Clock synchronization   | chrony or systemd-timesyncd (NTP)  |
+   |                         | PTP via linuxptp (L3 deployments)  |
+   |                         | Satisfies P3 Check 1, P5 (clock)   |
+   +-------------------------+------------------------------------+
+
+9.2.  Cedar Evaluation (P1)
+
+   +-------------------------+------------------------------------+
+   | Component               | Specification                      |
+   +-------------------------+------------------------------------+
+   | Cedar engine            | cedar-policy Rust crate            |
+   |                         | (Apache 2.0, in-process)           |
+   | Policy state            | Kernel heap memory (not external)  |
+   | Policy updates          | tokio async channel (internal only)|
+   | Hot-reload              | tokio::sync::RwLock hot-swap       |
+   | Async I/O               | tokio runtime + io_uring           |
+   | CPU parallelism         | rayon (parallel policy set load)   |
+   | Latency (20-50 rules)   | <100 microseconds typical          |
+   +-------------------------+------------------------------------+
+
+   Multi-threading note: Rust's ownership model eliminates data races
+   at compile time.  The tokio async runtime handles concurrent Cedar
+   evaluations within a single kernel instance.  Under extreme
+   concurrency (>1,000 simultaneous evaluations), CFS scheduling may
+   introduce latency variance.  This is the first performance wall
+   that triggers KEE-2/SOOS-DIST upgrade consideration.
+
+9.3.  KIA Key Protection (P2)
+
+   +-------------------------+------------------------------------+
+   | Deployment context      | Key protection                     |
+   +-------------------------+------------------------------------+
+   | L1 (development)        | OS keychain (libsecret on Linux)   |
+   | L2 (production)         | Intel TDX or AMD SEV sidecar       |
+   |                         | Managed via tpm2-tools or          |
+   |                         | Intel TDX DCAP library             |
+   | L3 (government)         | HSM (AWS CloudHSM, Google HSM,     |
+   |                         | Thales Luna Network HSM)           |
+   |                         | + hardware attestation document    |
+   | FROST (L2/L3 HA)        | Secret share per secure element    |
+   |                         | FROST round-2 via gRPC (mTLS)      |
+   +-------------------------+------------------------------------+
+
+9.4.  GAR Storage (P7)
+
+   +-------------------------+------------------------------------+
+   | Deployment context      | GAR storage                        |
+   +-------------------------+------------------------------------+
+   | L1 (single instance)    | SQLite in WAL mode                 |
+   |                         | io_uring for async write           |
+   | L2/L3 (multi-instance)  | PostgreSQL with WAL                |
+   |                         | pgcrypto for tamper-evident hash   |
+   | Session Block signing   | KIA signing service (sidecar)      |
+   | WAL chain               | prev_span_hash per ALE record      |
+   | Merkle root             | sha2 Rust crate at block close     |
+   +-------------------------+------------------------------------+
+
+9.5.  OTel Emission (P6)
+
+   +-------------------------+------------------------------------+
+   | Component               | Specification                      |
+   +-------------------------+------------------------------------+
+   | OTel SDK                | opentelemetry-rust crate           |
+   | Exporter                | OTLP/gRPC to OTel Collector        |
+   | Sampling                | 100% (no sampling for gov. spans)  |
+   | Namespace               | soos.governance.* (GAR-03 §13)     |
+   | Span attributes         | Per Section 4.6 emission points    |
+   | GAR Processor           | soos-gar-processor sidecar         |
+   |                         | (derives SAR from OTel spans)      |
+   +-------------------------+------------------------------------+
+
+9.6.  Revocation Propagation (P8)
+
+   +-------------------------+------------------------------------+
+   | Component               | Specification                      |
+   +-------------------------+------------------------------------+
+   | Revocation Registry     | In-memory (rebuilt from GAR on     |
+   |                         | restart)                           |
+   | CAEP/SSF transport      | RFC 9672 SSF over HTTPS            |
+   | Propagation timeout     | 30 seconds                         |
+   | XPID derivation         | uuid Rust crate (UUID v5)          |
+   | Sidecar process         | soos-revocation-agent              |
+   +-------------------------+------------------------------------+
+
+9.7.  Process Isolation (P1)
+
+   +-------------------------+------------------------------------+
+   | Component               | Specification                      |
+   +-------------------------+------------------------------------+
+   | Instance isolation      | Docker / containerd                |
+   |                         | Network namespace per instance     |
+   |                         | cgroup resource limits per inst.   |
+   | sidecar isolation       | Separate container per sidecar:    |
+   |                         | - soos-kia-signer                  |
+   |                         | - soos-gar-processor               |
+   |                         | - soos-revocation-agent            |
+   | Inter-sidecar comms     | gRPC over Unix domain socket       |
+   |                         | (no external network exposure)     |
+   +-------------------------+------------------------------------+
+
+   Government cloud note: All containers in the Japan Deployment
+   Profile are deployed in private VPC subnets.  No KEE-1 kernel
+   process MUST be directly reachable from the public internet.
+   ACD endpoint (/.well-known/soos-acd) is exposed via a dedicated
+   API gateway that enforces mTLS with requesting resource providers.
+
+
+10.  XPID Derivation Function
+
+   The SOOS kernel MUST expose an XPID derivation function with the
+   following signature:
+
+      derive_xpid(
+        initiating_KIA_id: string,
+        responding_KIA_id: string,
+        initiated_at:      string,   // ISO 8601 datetime
+        initiating_nonce:  string,   // cryptographically random
+        responding_nonce:  string    // cryptographically random
+      ) -> string                    // UUID-v5
+
+   The function MUST compute a UUID version 5 [RFC9562] using:
+
+   -  Namespace: the SOOS Namespace UUID assigned in Section 14.3.
+
+   -  Name: the UTF-8 encoding of the concatenation
+      initiating_KIA_id | responding_KIA_id | initiated_at |
+      initiating_nonce | responding_nonce
+      where "|" is a literal U+007C VERTICAL LINE separator.
+
+   The function MUST be:
+
+   1.  Deterministic: identical inputs MUST always produce identical
+       output.
+
+   2.  Side-effect-free: the function MUST produce no audit log entries,
+       no network calls, and no state changes.
+
+   3.  Entropy-protected: initiating_nonce and responding_nonce MUST
+       each be generated by a cryptographically secure random number
+       generator (CSPRNG) immediately before the call.  Nonces MUST
+       NOT be pre-generated, cached, or reused.
+
+   The function MUST NOT be used to derive XPIDs for sub-agents.
+   Sub-agent XPIDs are derived from the parent XPID and session nonce
+   per [I-D.sato-soos-kia] Section 6.2.
+
+   TypeScript reference (informative):
+
+      import { v5 as uuidv5 } from 'uuid';
+
+      const SOOS_NAMESPACE = 'bcab38fe-febf-4632-8fc9-2a23cb9e4ee3';
+
+      function deriveXPID(
+        initiatingKIAId: string,
+        respondingKIAId: string,
+        initiatedAt: string,
+        initiatingNonce: string,
+        respondingNonce: string
+      ): string {
+        const name = [
+          initiatingKIAId,
+          respondingKIAId,
+          initiatedAt,
+          initiatingNonce,
+          respondingNonce
+        ].join('|');
+        return uuidv5(name, SOOS_NAMESPACE);
+      }
+
+   Rust reference (informative):
+
+      use uuid::{Uuid, uuid};
+
+      const SOOS_NAMESPACE: Uuid =
+        uuid!("bcab38fe-febf-4632-8fc9-2a23cb9e4ee3");
+
+      fn derive_xpid(
+        initiating_kia_id: &str,
+        responding_kia_id: &str,
+        initiated_at: &str,
+        initiating_nonce: &str,
+        responding_nonce: &str,
+      ) -> Uuid {
+        let name = format!(
+          "{}|{}|{}|{}|{}",
+          initiating_kia_id, responding_kia_id,
+          initiated_at, initiating_nonce, responding_nonce
+        );
+        Uuid::new_v5(&SOOS_NAMESPACE, name.as_bytes())
+      }
+
+
+11.  Open Issues
+
+   OQ-KEE-07:
+      Real-time scheduling requirements for FIEA-governed financial
+      services deployments.  If hard real-time Cedar evaluation latency
+      guarantees are required (sub-millisecond deterministic latency),
+      PREEMPT_RT patch or a specialized runtime may be needed.  Current
+      assessment: soft real-time (Linux CFS) is sufficient for
+      commercial AI agent governance use cases.  Hard-RT requirement
+      would be a new KEE-1 property (P9) or a new conformance level
+      (L4).  Resolution target: KEE-2 working session.
+
+   OQ-KEE-08:
+      Normative scale threshold for KEE-1 vs. KEE-2 upgrade requirement.
+      At what volume of sessions/second, kernel instances, or
+      jurisdictions does a deployment require KEE-2/SOOS-DIST compliance
+      in addition to KEE-1?  Current candidate: 1,000 concurrent agent
+      sessions sustained is the KEE-1 scale ceiling.  To be confirmed
+      with benchmark data from reference implementations.
+
+   OQ-KEE-SOOS-NS:
+      SOOS Namespace UUID for XPID derivation (Section 10, Section 14.3)
+      must be assigned before Datatracker submission.  A randomly
+      generated UUID v4 will be selected and registered as a fixed
+      constant.  This is a pre-submission editorial action.
+
+
+12.  Security Considerations
+
+   This section documents the primary attack vectors against the KEE-1
+   execution environment, the normative defenses, and residual risks.
+
+12.1.  Raft Leader Compromise
+
+   Attack:
+      In a multi-node Cedar evaluation cluster (relevant to KEE-2
+      deployments referencing this specification), the Raft leader node
+      is the single node authorized to commit Cedar policy updates to the
+      cluster.  An adversary who compromises the Raft leader can push
+      a malicious Cedar policy update -- bypassing the 2-of-3 publisher
+      key requirement in P4 (Catalog Authority) if the policy distribution
+      feed is not independently validated at each follower node.
+      Specifically, the attack bypasses P4 by inserting a policy update
+      via the internal Raft commit path rather than the external CAP-RRS
+      distribution feed path.
+
+   Mechanism:
+      Raft leader compromise may occur via: (a) OS-level privilege
+      escalation on the leader's host; (b) exploitation of the Raft
+      implementation (etcd CVE classes); (c) network-level interception
+      of Raft peer communication in unencrypted deployments.
+
+   Normative defense:
+      1.  Each cluster node MUST independently validate the
+          authority_signature on any catalog update against the
+          configured 2-of-3 publisher public keys before accepting the
+          update into the local Cedar Policy Set, regardless of whether
+          the update arrived via the Raft commit path or directly via
+          the CAP-RRS distribution feed.
+
+      2.  Raft peer communication MUST be encrypted via mutual TLS
+          [RFC8446] between all cluster nodes.  Plain-text Raft
+          communication is not permitted.
+
+      3.  The Raft leader MUST NOT hold the publisher signing keys.
+          The publisher key ceremony (Section 4.4) produces keys held
+          separately from cluster infrastructure.
+
+      4.  A policy update that fails authority_signature validation at
+          any node MUST cause that node to log ALE-NEW-02
+          (CAP_CATALOG_CONFLICT_DETECTED) and reject the update locally,
+          regardless of Raft consensus state.
+
+   Residual risk:
+      Compromise of two or more of the three publisher key holders
+      simultaneously (colluding publishers) allows a malicious policy
+      update to pass the 2-of-3 threshold check.  The Japan Deployment
+      Profile (Section 8) mitigates this by using three organizationally
+      independent key holders (National Digital Authority, National
+      Cybersecurity Authority, operator) who are subject to
+      independent governance.
+
+12.2.  FROST 2-of-3 Colluding Signers
+
+   Attack:
+      The FROST (2,3) threshold signing scheme requires any two of three
+      signers to cooperate to produce a valid KIA signature.  If two
+      signers collude -- or if two signer TEE instances are simultaneously
+      compromised by a common adversary -- they can produce valid KIA
+      signatures over fabricated content: fraudulent ACD Records,
+      tampered GAR entries, or forged GEC Manifests.  The verification
+      side cannot distinguish a collusion-produced signature from a
+      legitimate one.
+
+   Mechanism:
+      The attack requires simultaneous access to the private key shares
+      of two FROST participants.  Each share is held in a separate TEE
+      instance.  Simultaneous compromise requires: (a) exploitation of
+      the same TEE vulnerability across two instances (a common-mode
+      TEE CVE), or (b) physical access to two hardware components, or
+      (c) compromise of two TEE instances at the software layer if TEE
+      isolation is bypassed.
+
+   Normative defense:
+      1.  FROST signer instances MUST be deployed on physically separate
+          hardware.  Co-hosting two FROST signers on the same physical
+          host is not permitted, as a single host compromise yields both
+          key shares.
+
+      2.  FROST signer instances MUST run under independent operating
+          system deployments.  A shared OS kernel across two FROST
+          signers is not permitted.
+
+      3.  The (2,3) minimum threshold is the REQUIRED default.  Operators
+          MAY increase the threshold (e.g., (3,5)) for deployments
+          requiring higher collusion resistance.
+
+      4.  FROST signer instances MUST NOT reduce the active threshold
+          below the initially configured threshold (t) at any time.
+          A signer instance failure reduces the available signer count
+          but MUST NOT trigger automatic threshold reduction.  If the
+          available signer count falls below t, all new KIA signing
+          operations MUST be suspended (fail-closed per P5).
+
+      5.  Each FROST signer MUST generate its own nonce locally per
+          [I-D.sato-soos-kia] Section 4.1.  Nonces MUST NOT be
+          generated centrally and distributed.  A centrally generated
+          nonce that is intercepted by an adversary enables signature
+          forgery without key compromise.
+
+   Residual risk:
+      A common-mode TEE vulnerability (a CVE class affecting all
+      deployed TEE implementations simultaneously) would allow an
+      adversary to compromise all t participants at once.  No protocol
+      defense exists against common-mode TEE vulnerabilities; the
+      defense is operational: signer instances SHOULD use different
+      TEE hardware vendors (Intel TDX and AMD SEV, not two Intel TDX
+      instances) to eliminate common-mode risk.
+
+12.3.  Catalog Update Race Condition
+
+   Attack:
+      A kernel instance is in the process of activating a new Cedar
+      Policy Set received via the CAP-RRS distribution feed.  During the
+      transition window -- after the old policy set is deactivated but
+      before the new policy set is fully loaded and validated -- an
+      agent submits an action request.  If the kernel permits the action
+      without a valid policy set (a non-atomic update), the agent
+      executes an action that may be prohibited under either the old or
+      the new policy set.
+
+   Mechanism:
+      The attack exploits a non-atomic Cedar policy update implementation.
+      In a naive implementation, policy update is: (1) unload old set,
+      (2) load new set.  A concurrent agent action arriving between
+      steps 1 and 2 has no policy set to evaluate against.  A kernel
+      that permits actions when no policy set is loaded is exploitable.
+
+   Normative defense:
+      1.  Cedar Policy Set updates MUST be atomic: the old policy set
+          MUST remain active and evaluating until the new policy set is
+          fully loaded, validated, and ready to evaluate.  There MUST
+          be no evaluation gap during a policy set transition.
+
+      2.  The policy set transition MUST be implemented as a hot-swap:
+          the new policy set is loaded in memory in parallel with the
+          active policy set, validated (including catalog conflict
+          detection per P6), and then atomically substituted as the
+          active set.  The old set remains available for any in-flight
+          evaluation that commenced before the swap.
+
+      3.  If new policy set validation fails (conflict detected, invalid
+          authority_signature), the old policy set MUST remain active.
+          The kernel MUST log ALE-NEW-02 (CAP_CATALOG_CONFLICT_DETECTED)
+          and notify the operator.  The kernel MUST NOT enter a state
+          where no policy set is active.
+
+      4.  During a policy set transition, if system resources are
+          insufficient to hold both the old and new policy sets in
+          memory simultaneously, the kernel MUST reject the incoming
+          policy update and log an operational warning.  It MUST NOT
+          unload the active policy set to make room.
+
+   Residual risk:
+      In deployments where Cedar policy sets are extremely large
+      (thousands of rules, large entity type hierarchies), hot-swap
+      memory pressure may cause repeated rejection of updates.
+      Mitigation: size the kernel's allocated heap to hold at least
+      two Cedar Policy Sets simultaneously.
+
+12.4.  etcd Quorum Failure
+
+   Attack:
+      In a multi-node Cedar evaluation cluster using etcd for Cedar
+      policy state distribution, a sufficient number of etcd nodes fail
+      or become network-partitioned to break quorum.  If the Cedar
+      cluster continues evaluating agent actions after etcd quorum is
+      lost -- using potentially stale Cedar policy state -- the kernel
+      may enforce an outdated or partially-applied policy set.  An
+      adversary who can induce etcd quorum failure at a strategically
+      chosen moment (e.g., immediately after a regulation takes effect
+      that adds a new Tier 1 prohibition) can prevent that prohibition
+      from being enforced during the quorum failure window.
+
+   Mechanism:
+      etcd (and Raft generally) requires a majority quorum (floor(n/2)+1
+      nodes) to commit writes.  In a 3-node etcd cluster, loss of any
+      two nodes breaks quorum.  In a 5-node cluster, loss of any three.
+      Network partitions, hardware failures, or targeted denial-of-
+      service against etcd endpoints can induce quorum loss.
+
+   Normative defense:
+      1.  When etcd quorum is lost, the Cedar evaluation cluster MUST
+          suspend all agent action authorization requests.  The fail-
+          closed invariant (P5) applies: ungoverned agent operation
+          because governance infrastructure is unavailable is not
+          permitted.
+
+      2.  Cedar cluster nodes MUST track the timestamp of the last
+          confirmed etcd quorum write.  If this timestamp exceeds a
+          configurable stale-policy-window (RECOMMENDED: 30 seconds),
+          the node MUST enter CEDAR_DENY-all mode until quorum is
+          restored.
+
+      3.  etcd cluster deployments MUST use TLS [RFC8446] for all
+          client-server and peer-to-peer etcd communication.
+
+      4.  The etcd cluster size MUST be at minimum 3 nodes (tolerating
+          1 failure).  For government-tier deployments (Japan Deployment
+          Profile, Section 8), minimum 5 nodes is RECOMMENDED (tolerating
+          2 failures).
+
+   Residual risk:
+      A network partition that isolates a majority of etcd nodes while
+      leaving Cedar evaluation cluster nodes running may result in a
+      window where the Cedar cluster operates on the last committed
+      policy state while the isolated etcd majority proceeds with
+      updates.  The stale-policy-window timeout (defense item 2) bounds
+      this window.
+
+12.5.  Cedar Cluster Split-Brain
+
+   Attack:
+      In a Cedar evaluation cluster under network partition, two
+      sub-clusters lose communication with each other but each retains
+      internal quorum.  Both sub-clusters continue evaluating agent
+      actions, but they may now hold different Cedar Policy Sets if a
+      policy update was in progress at the time of partition.  Sub-
+      cluster A enforces the old policy set; sub-cluster B enforces
+      the new policy set.  Depending on which sub-cluster an agent's
+      requests are routed to, the agent's actions may be evaluated
+      against different prohibitions -- a compliance and audit integrity
+      failure.
+
+   Mechanism:
+      Cedar cluster split-brain requires a network partition that creates
+      two connected components, each with sufficient nodes to maintain
+      independent Raft leadership.  In a 5-node cluster with a 3-2
+      partition, the majority partition (3 nodes) can elect a leader and
+      commit updates; the minority partition (2 nodes) cannot commit but
+      may still evaluate agent actions using stale cached state if the
+      implementation permits evaluation without active leader contact.
+
+   Normative defense:
+      1.  Cedar evaluation cluster nodes MUST NOT serve agent action
+          authorization results unless the node can confirm it is
+          operating in the majority partition.  A node that loses
+          contact with the Raft leader for longer than the configurable
+          leader-heartbeat-timeout MUST enter CEDAR_DENY-all mode.
+
+      2.  In a network partition where no leader can be elected (minority
+          partition), all nodes in that partition MUST enter CEDAR_DENY-
+          all mode immediately.
+
+      3.  The kernel MUST surface split-brain detection to the OTel
+          observability pipeline as a soos.governance.cedar.split_brain
+          event, enabling operational teams to detect and remediate the
+          partition.
+
+      4.  Agent load balancers routing to Cedar cluster nodes MUST use
+          health checks that distinguish between "node is reachable but
+          in DENY-all mode due to split-brain" and "node is unreachable."
+          A load balancer that routes to a split-brain node expecting
+          normal evaluation will receive DENY for all requests, which is
+          the correct fail-closed behavior.
+
+   Residual risk:
+      In a 50-50 partition (e.g., 2-node cluster under partition),
+      neither partition can achieve majority.  Both sides enter DENY-all.
+      All agent actions are suspended until the partition heals.  This
+      is the correct fail-closed behavior, but it constitutes a
+      governance-induced service outage.  For high-availability
+      requirements, use odd-numbered cluster sizes (3, 5, 7) that
+      guarantee majority in any single-split partition.
+
+
+13.  Privacy Considerations
+
+   KEE-1 specifies execution environment properties for SOOS kernel
+   deployments.  The primary privacy consideration at the execution
+   layer is the data minimization requirement for GAR records.
+
+   In KEE-1 deployments, ACD Records MUST be logged to GAR as SHA-256
+   hashes of the record body, not as full records.  The full ACD Record
+   contains jurisdiction declarations, governing law, and operator
+   identity that may constitute personal data under APPI Article 19
+   and GDPR Article 5(1)(c).  Hash-only logging satisfies data
+   minimization while preserving tamper-evident audit verifiability.
+
+   The Government Deployment Profile (Section 8) applies additional
+   data minimization constraints for deployments in jurisdictions with
+   personal data protection law.  GAR records for such sessions MUST
+   carry a minimum field set: event type, session ID, timestamp, and
+   result code.  Fields carrying personal data (data subject
+   identifiers, attribute values) MUST NOT appear in GAR records.
+
+   KEE-1 does not specify data retention periods.  Retention is
+   governed by applicable law: APPI (Japan), GDPR (EU), and sector-
+   specific regulation for financial services (FIEA, PSD2/3).
+
+
+14.  IANA Considerations
+
+14.1.  KEE-1 Conformance Level Codes
+
+   This document requests IANA to register the following KEE-1
+   Conformance Level codes in a new SOOS KEE-1 Conformance Level
+   Registry:
+
+   Level Code: KEE1-L1
+      Description: Software conformance level.  OS-protected key
+      storage.  Acceptable for development and PoC deployments.
+      Contact: Tom Sato <tomsato@myauberge.jp>
+
+   Level Code: KEE1-L2
+      Description: Sidecar conformance level.  TEE key protection
+      (Intel TDX, AMD SEV, or ARM TrustZone).  Required for production
+      single-tenant deployments.
+      Contact: Tom Sato <tomsato@myauberge.jp>
+
+   Level Code: KEE1-L3
+      Description: TEE/Hardware conformance level.  TEE key protection
+      with hardware attestation chain to deployment authority.  Required
+      for production multi-tenant and government deployments.
+      Contact: Tom Sato <tomsato@myauberge.jp>
+
+14.2.  GEC Manifest Media Type
+
+   This document requests IANA to register the following media type:
+
+   Type name: application
+   Subtype name: soos-gec-manifest+json
+   Required parameters: none
+   Optional parameters: none
+   Encoding considerations: UTF-8
+   Security considerations: See Section 12 of this document.
+   Interoperability considerations: none
+   Published specification: This document and [I-D.sato-soos-kia].
+   Applications that use this media type: SOOS GEC components issuing
+      and consuming GEC Manifests.
+   Contact: Tom Sato <tomsato@myauberge.jp>
+   Intended usage: COMMON
+   Restrictions on usage: none
+   Author: Tom Sato
+   Change controller: IETF
+
+14.3.  SOOS Namespace UUID
+
+   This document requests IANA to assign a fixed UUID for use as the
+   SOOS Namespace UUID in XPID derivation operations (Section 10).
+   The UUID MUST be a randomly generated version 4 UUID registered as
+   a fixed constant in this document before Datatracker submission.
+
+   Assigned value: bcab38fe-febf-4632-8fc9-2a23cb9e4ee3
+
+   This value is a randomly generated version 4 UUID assigned as the
+   fixed SOOS Namespace UUID constant.  It is registered in the IANA
+   Private Enterprise UUID namespace and normatively referenced in
+   Section 10.
+
+
+15.  References
+
+15.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC5905]  Mills, D., Martin, J., Burbank, J., and W. Kasch,
+              "Network Time Protocol Version 4: Protocol and Algorithms
+              Specification", RFC 5905, DOI 10.17487/RFC5905, June 2010,
+              <https://www.rfc-editor.org/rfc/rfc5905>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174,
+              DOI 10.17487/RFC8174, May 2017,
+              <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8446]  Rescorla, E., "The Transport Layer Security (TLS)
+              Protocol Version 1.3", RFC 8446,
+              DOI 10.17487/RFC8446, August 2018,
+              <https://www.rfc-editor.org/rfc/rfc8446>.
+
+   [RFC9562]  Davis, K., Peabody, B., and P. Leach, "Universally
+              Unique IDentifiers (UUIDs)", RFC 9562,
+              DOI 10.17487/RFC9562, May 2024,
+              <https://www.rfc-editor.org/rfc/rfc9562>.
+
+   [I-D.irtf-cfrg-frost]
+              Komlo, C. and I. Goldberg, "FROST: Flexible Round-
+              Optimized Schnorr Threshold Signatures", Internet-Draft
+              draft-irtf-cfrg-frost, 2024.
+
+   [I-D.sato-soos-cap]
+              Sato, T., "The Constitutional AI Protocol (CAP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-cap-04, June 2026.
+
+   [I-D.sato-soos-cap-rrs]
+              Sato, T., "The CAP Rule Registry and Synchronization
+              Protocol (CAP-RRS)", Internet-Draft
+              draft-sato-soos-cap-rrs-02, June 2026.
+
+   [I-D.sato-soos-gar]
+              Sato, T., "The Governance Audit Record (GAR) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-gar-03, June 2026.
+
+   [I-D.sato-soos-kia]
+              Sato, T., "Kernel Identity Attestation (KIA) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-kia-03, July 2026.
+
+   [I-D.sato-soos-aep]
+              Sato, T., "The Agent Execution Protocol (AEP) for
+              Agentic AI Systems", Internet-Draft
+              draft-sato-soos-aep-02, July 2026.
+
+   [I-D.sato-soos-acd]
+              Sato, T., "The Agent Compliance Disclosure (ACD)
+              Protocol for Agentic AI Systems", Internet-Draft
+              draft-sato-soos-acd-00, July 2026.
+
+   [RFC9672]  Backman, A. et al., "Shared Signals Framework (SSF):
+              A Lightweight Messaging System for Security Event
+              Distribution", RFC 9672, DOI 10.17487/RFC9672, 2024.
+
+   [CAEP]     OpenID Foundation, "Continuous Access Evaluation
+              Protocol (CAEP)", OpenID Foundation Specification,
+              2023, <https://openid.net/specs/openid-caep-specification
+              -1_0.html>.
+
+15.2.  Informative References
+
+   [I-D.sato-soos-dist]
+              Sato, T., "The Distributed Governance Runtime (KEE-2/
+              SOOS-DIST) for Agentic AI Systems", Internet-Draft
+              draft-sato-soos-dist-00, 2026.
+
+   [APPI]     Government of Japan, "Act on Protection of Personal
+              Information (APPI)", Law No. 57 of 2003, as amended.
+
+   [DISASTER-ACT]
+              Government of Japan, "Disaster Countermeasures Basic Act
+              (災害対策基本法)", Law No. 223 of 1961, as amended.
+
+   [E-GOV]    Government of Japan, "e-Gov Law Search URI Scheme",
+              Digital Agency, 2021,
+              <https://elaws.e-gov.go.jp/>.
+
+   [FSA-AI]   Financial Services Agency of Japan, "Guidelines for AI
+              Utilization in Financial Institutions", 2024.
+
+   [FIEA]     Government of Japan, "Financial Instruments and Exchange
+              Act (金融商品取引法)", Law No. 25 of 1948, as amended.
+
+   [IPA]      Information-technology Promotion Agency, Japan,
+              <https://www.ipa.go.jp/>.
+
+   [IEEE-1588]
+              IEEE, "IEEE Standard for a Precision Clock
+              Synchronization Protocol for Networked Measurement and
+              Control Systems", IEEE 1588-2019.
+
+   [NIST-AI-RMF]
+              NIST, "Artificial Intelligence Risk Management Framework
+              (AI RMF 1.0)", NIST AI 100-1, January 2023.
+
+   [I-D.ietf-rats-architecture]
+              Birkholz, H. et al., "Remote ATtestation procedureS
+              (RATS) Architecture", RFC 9334,
+              DOI 10.17487/RFC9334, January 2023.
+
+   [RAFT]     Ongaro, D. and J. Ousterhout, "In Search of an
+              Understandable Consensus Algorithm (Extended Version)",
+              USENIX ATC 2014, 2014,
+              <https://raft.github.io/raft.pdf>.
+
+   [ETCD]     Cloud Native Computing Foundation, "etcd: A distributed,
+              reliable key-value store", 2024,
+              <https://etcd.io/>.
+
+   [OTEL]     Cloud Native Computing Foundation, "OpenTelemetry
+              Specification", 2024,
+              <https://opentelemetry.io/docs/specs/otel/>.
+
+
+Appendix A.  Worked Example: Government Disaster Response Deployment
+
+   This appendix traces a complete KEE-1 deployment lifecycle for a
+   government disaster response AI system operating under Japanese law,
+   illustrating the Government Deployment Profile, FROST threshold signing,
+   and the ACD four-check sequence under operational conditions.
+
+A.1.  Scenario Setup
+
+   A major seismic event (M7.2) strikes a coastal prefecture.  The
+   government disaster response AI system is activated.  The deployment
+   configuration:
+
+   -  Conformance level: L3 (TEE/Hardware)
+   -  Government Deployment Profile: active
+   -  CAP Profile: "disaster-response-gov-v1.0" (publisher-signed by
+      National Digital Authority, National Cybersecurity Authority,
+      and operator, 2-of-3 per Section 8.2)
+   -  FROST signing cluster: (2,3) with three TEE signers on
+      physically separate government cloud nodes
+   -  Agents: Master AI (orchestrator), Local AI (prefectural response
+      coordination), Simulation AI (evacuation modeling)
+
+A.2.  Kernel Initialization
+
+   1.  GEC initializes.  Cedar policy set loads from CAP Profile
+       "disaster-response-gov-v1.0" (P1 -- Cedar Policy Cluster
+       satisfied).
+
+   2.  Four-check sequence executes at startup per P3:
+       Check 1: GEC Manifest validated -- issued within staleness
+                 window per KIA-03 §5.4.  PASS.
+       Check 2: cedar_policy_hash computed -- SHA-256 of active Cedar
+                 Policy Set matches cap_profile_hash in CAP Profile
+                 "disaster-response-gov-v1.0".  PASS.
+       Check 3: KIA attestation -- FROST threshold public key verified
+                 in Revocation Registry.  Not revoked.  PASS.
+       Check 4: XPID revocation -- no revocation signal received.
+                 PASS.
+
+   3.  OTel span emitted: soos.governance.kernel_id:
+       "disaster-response-kernel-001", soos.governance.cap_profile_id:
+       "disaster-response-gov-v1.0" (P6 -- OTel Emission satisfied).
+
+A.3.  Earthquake Strikes
+
+   4.  Seismic early warning received.  Master AI instance starts.
+       SACR issued.  CAP Profile "disaster-response-gov-v1.0" confirmed
+       loaded.  IDP intake complete.
+
+   5.  Master AI evaluates initial incident classification as maximum
+       crisis (GOLD).  Cedar policy evaluation:
+       Action: ClassifyIncident(severity="GOLD", auto=true)
+       Cedar result: DENY -- Tier 0-B prohibition active: automatic
+       GOLD classification without human confirmation is prohibited.
+       ALE emitted: CEDAR_DENY, cap_tier: "0-B".
+
+   6.  HEM-001 triggered: seismic event severity assessment requires
+       human confirmation before maximum crisis classification is
+       activated.  GAR write: ALE-028 (HEM escalation).
+       OTel span: soos.governance.hem_class: "HEM-HIGH-1",
+       soos.governance.hem_resolution: "PENDING".
+
+A.4.  Human Confirmation and GOLD Classification
+
+   7.  Duty officer acknowledges HEM-001.  Confirms M7.2 via national
+       meteorological agency update.  Approves GOLD classification.
+       HEM-001 resolved.
+
+   8.  Cedar re-evaluation:
+       Action: ClassifyIncident(severity="GOLD",
+                                human_approval="hem-001-resolved")
+       Cedar result: PERMIT -- Tier 0-B prohibition cleared by
+       human approval.  GOLD classification activated.
+
+   9.  GAR write: HEM-001 resolution event logged.  KIA signature
+       produced by FROST (2,3) cluster: signers 1 and 2 cooperate.
+       Session Block Merkle root updated (P7 -- WAL Tamper Evidence).
+       OTel span: soos.governance.hem_resolution: "APPROVED",
+       soos.cap.decision: "PERMIT".
+
+A.5.  Government API Access -- ACD Compliance Handshake
+
+   10. Master AI needs to access the national digital agency's
+       government data API for infrastructure status.  The API gateway
+       requires ACD validation (acd_required: true in RGP capability
+       declaration).
+
+   11. Resource provider (government API gateway) queries
+       /.well-known/soos-acd.
+
+   12. GEC executes the four-check ACD sequence (P3 / Section 4.3):
+       Check 1: GEC Manifest current.  PASS.
+       Check 2: cedar_policy_hash matches active "disaster-response-
+                 jp-v1.0" set.  PASS.
+       Check 3: FROST threshold public key not revoked.  PASS.
+       Check 4: Master AI XPID not revoked.  PASS.
+
+   13. GEC generates ACD Record:
+       Layer 1 -- jurisdiction: JP, regulatory_regime: ["APPI",
+       "AI-Agent-Governance-v1", "Disaster-Act-Art28-2"].
+       Layer 2 -- cap_profile_id: "disaster-response-gov-v1.0",
+       prohibition_tier_summary: {tier_0a: 4, tier_0b: 3, tier_1: 18,
+       tier_2: 6}.
+       Layer 3 -- delegation_chain_depth: 0,
+       mandate_scope_type: "FULL".
+
+   14. ACD Record KIA-signed by FROST (2,3) cluster.  ALEs logged:
+       ALE-056 (ACD_QUERY_RECEIVED), ALE-057 (ACD_RECORD_ISSUED).
+       SHA-256(ACD Record body) stored in ALE-057 (data minimization
+       per APPI Article 19).
+
+   15. Government API gateway validates ACD Record:
+       Signature verification: PASS (FROST threshold public key from
+       KIA Party Registry).
+       Layer 1: JP jurisdiction, APPI confirmed.  PASS.
+       Layer 2: APPI Article 19 data minimization control present.
+       PASS.
+       Access granted.  ALE-058 (ACD_VALIDATION_PASSED) logged.
+       acd_session_id recorded bilaterally.
+
+A.6.  e-Gov URI Verification
+
+   16. The API gateway's compliance system retrieves the ptd_endpoint
+       from the ACD Record Layer 1 jurisdictions entry for JP.  It
+       queries the PTD for the APPI Article 19 control referenced in
+       the CAP Profile.
+
+   17. The PTD returns Cedar policy "tier1-data-minimization"
+       with authority_source: the statute reference URI for the
+       applicable personal data protection provision in the
+       deployment jurisdiction (e.g., for Japan:
+       the applicable national law publication URI, e.g. Japan e-Gov
+       URI for APPI Article 19).
+
+   18. The compliance system confirms: the Cedar policy enforcing
+       APPI data minimization on this kernel deployment traces
+       directly to the e-Gov canonical text of APPI Article 19.
+       The audit trail is: statutory text (e-Gov) → CAP-RRS Tier 1
+       control (authority_source URI) → Cedar policy (cap_profile_hash)
+       → ACD Record (ALE-057 hash commitment) → API access decision
+       (ALE-058).
+
+A.7.  Session Block Close
+
+   19. At scenario completion, the kernel closes the Master AI AEP
+       session.  GAR Processor constructs the Session Block:
+       block_id: <OTel trace_id for master AI session>
+       Merkle root: SHA-256 Merkle root over all ALE records
+       block_signature: FROST (2,3) KIA signature over
+       (block_id, Merkle_root, block_close_timestamp)
+
+   20. The signed Session Block is written to GAR.  Any subsequent
+       regulatory audit can request the Audit Package for this session,
+       which includes: the signed Session Block with Merkle proof for
+       any individual ALE, the ACD Records issued during the session
+       (by hash reference), and the CAP Profile artifact whose hash
+       is committed in each ACD Record.
+
+
+Appendix B.  Related Work
+
+B.1.  Existing Frameworks
+
+   Trusted Execution Environment (TEE) specifications -- Intel TDX
+   [INTEL-TDX], AMD SEV [AMD-SEV], and ARM TrustZone [ARM-TZ] --
+   define hardware isolation boundaries for sensitive computation.
+   KEE-1 references TEE as the required key protection mechanism at L2
+   and L3 conformance levels.  KEE-1 does not respecify TEE internals;
+   it specifies which TEE properties a SOOS kernel deployment MUST use.
+
+   RATS (Remote Attestation Procedures) [I-D.ietf-rats-architecture]
+   defines the architecture for remotely attesting the state of a
+   computing platform.  The GEC Manifest is RATS Evidence.  KEE-1 L3
+   requires a hardware attestation chain tracing from the TEE to the
+   deployment authority -- this chain is the RATS Evidence/Endorsement/
+   Attestation Result chain applied to SOOS kernel deployment.
+
+   etcd [ETCD] is the distributed key-value store used in the Cedar
+   cluster reference implementation for consensus state storage.  KEE-1
+   does not mandate etcd; it mandates the consensus properties (atomic
+   policy updates, quorum requirements, TLS peer communication) that
+   etcd satisfies.  Alternative consensus implementations satisfying the
+   same properties are conformant.
+
+B.2.  Regulatory Instruments
+
+   APPI (Act on Protection of Personal Information, Japan) Articles 17
+   and 19 apply to GAR records in Japanese deployments.  Article 17
+   requires that personal data processing be limited to the declared
+   purpose (MJWT Purpose Code Registry).  Article 19 requires data
+   minimization.  KEE-1 Privacy Considerations (Section 13) and the
+   Government Deployment Profile (Section 8) specify the
+   APPI-conformant GAR record configuration.
+
+   災害対策基本法 (Disaster Countermeasures Basic Act, Japan) governs
+   emergency response operations in Japan government disaster response
+   AI deployments.  CAP-RRS Tier 1 controls in Government Deployment
+   Profile CAP Profiles reference specific provisions of 災害対策基本法
+   via machine-verifiable statute URIs per Section 8.3.
+
+   FIEA (Financial Instruments and Exchange Act, Japan) Article 2
+   applies to L2 enterprise deployments in the financial services
+   sector.  The use case in Section 1.2 is a FIEA-governed deployment.
+   The Government Deployment Profile applies in FIEA contexts where
+   government-tier key protection is required.
+
+B.3.  SOOS Companion Drafts
+
+   KIA (draft-sato-soos-kia-03) -- specifies the GEC keypair, GEC
+   Manifest, KIA attestation chain, FROST threshold signing (Section 4.1),
+   and XPID derivation (Section 6).  KEE-1 P3 (KIA Attestation Boundary)
+   and P5 (GEC Manifest Immutability) depend normatively on KIA-03.
+   KEE-1 Section 7 (FROST Signing Cluster) references KIA-03 Section 4.1
+   for FROST nonce generation requirements and threshold reduction
+   constraints.
+
+   CAP (draft-sato-soos-cap-04) and CAP-RRS (draft-sato-soos-cap-rrs-02)
+   -- produce and govern the CAP Profiles that KEE-1 P4 (Catalog
+   Authority) constrains.  The 2-of-3 publisher key requirement in P4
+   governs updates to the CAP Profile artifact whose active Cedar Policy
+   Set is loaded per P2.  Government Deployment Profile (Section 8)
+   specifies the government-tier publisher key role assignments.
+
+   GAR (draft-sato-soos-gar-03) -- specifies the audit architecture that
+   KEE-1 P7 (WAL Tamper Evidence) supports at the execution layer.  The
+   prev_span_hash chain, Merkle root, and Session Block GEC signature
+   in P7 are the execution-layer realization of GAR-03's tamper-evidence
+   requirements.  ALE-NEW-02 (CAP_CATALOG_CONFLICT_DETECTED) is the
+   one KEE-1-scoped ALE type.
+
+   AEP (draft-sato-soos-aep-02) -- specifies the agent execution session
+   lifecycle within which KEE-1 execution properties apply.  The XPID
+   derivation function (Section 10) is the kernel API primitive
+   underlying AEP-02's cross-principal session correlation (AEP-02
+   Section 3).
+
+   ACD (draft-sato-soos-acd-00) -- specifies the compliance handshake
+   that KEE-1 P3 (ACD Four-Check Sequence) enables.  The four checks --
+   manifest validity, policy currency, KIA attestation, revocation
+   status -- are the execution-layer validation properties that make
+   ACD Record integrity verifiable.  ACD Session 2 (§7.4) references
+   this document for the normative four-check sequence specification.
+
+   HEM (draft-sato-soos-hem-05) -- specifies human escalation.  KEE-1
+   P5 (Fail-Closed Invariant) specifies what happens when the GAR write
+   service fails: agent actions are SUSPENDED, not DENIED, to preserve
+   audit continuity for the subsequent HEM escalation event.
+
+   MAD (draft-sato-soos-mad-03) -- specifies multi-agent delegation.
+   Sub-agent XPIDs are derived from the parent XPID and session nonce
+   per KIA-03 Section 6.2, not via the standalone XPID derivation
+   function in Section 10.
+
+
+Author's Address
+
+   Tom Sato
+   MyAuberge K.K.
+   Chino, Nagano, Japan
+   Email: tomsato@myauberge.jp
+   URI: https://soosproject.ai

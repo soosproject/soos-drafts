@@ -242,7 +242,7 @@ Table of Contents
    (administrative transformation) program.  The API must comply with
    the Act on Protection of Personal Information (APPI), the Basic Act
    on the Advancement of Utilizing Public and Private Data, and emerging
-   AI governance guidelines from the Cabinet Office AI Rincho.
+   AI governance guidelines applicable to agentic systems.
 
    Any AI agent requesting access to the API must present a verifiable
    declaration of its compliance posture before access is granted.  The
@@ -256,7 +256,7 @@ Table of Contents
    the gateway queries the agent's /.well-known/soos-acd endpoint.  The
    ACD Record returned carries a jurisdictions array entry for ISO
    3166-1 "JP" with a regulatory_regime entry referencing the APPI and
-   Cabinet Office AI Rincho Item 23 (AI_AGENT_OPERATION Purpose Code
+   applicable AI governance guidelines (AI_AGENT_OPERATION Purpose Code
    from the MJWT Purpose Code Registry).  The CAP Profile referenced in
    Layer 2 includes Tier 1 controls mapped to APPI Articles 17-27.  The
    デジタル庁 gateway validates the KIA signature, confirms APPI
@@ -404,7 +404,7 @@ Table of Contents
    The operator's GEC generates an ACD Record in response to a human-
    initiated query (ALE-061: ACD_HUMAN_QUERY).  The record covers the
    jurisdictions array entry for ISO "JP", referencing the regulatory
-   regime FIEA Article 2 and the Cabinet Office AI Rincho.  The cap_
+   regime FIEA Article 2 and applicable AI governance guidelines.  The cap_
    profile_id identifies the signed CAP Profile active during the
    inspection period.  The gar_audit_endpoint in Layer 3 provides the
    regulator with direct access to the GAR audit package for the period.
@@ -738,7 +738,7 @@ Table of Contents
 
       regulatory_regime:
          REQUIRED.  Array of strings.  Legal instruments applicable in
-         this jurisdiction (e.g., ["APPI", "AI-Rincho-Item-23"]).
+         this jurisdiction (e.g., ["APPI", "AI-Agent-Governance-v1"]).
 
       ptd_endpoint:
          REQUIRED.  URI.  Endpoint for full Policy Transparency
@@ -894,12 +894,12 @@ Table of Contents
                     e4d290ab1c23",
      "governing_law": "Japanese Civil Code; Act on Protection of
                        Personal Information (APPI) Law No. 57 of 2003;
-                       Cabinet Office AI Rincho",
+                       Applicable AI governance guidelines",
      "primary_jurisdiction": "JP",
      "jurisdictions": [
        {
          "jurisdiction_code": "JP",
-         "regulatory_regime": ["APPI", "AI-Rincho-Item-23",
+         "regulatory_regime": ["APPI", "AI-Agent-Governance-v1",
                                "Basic-Act-Public-Private-Data"],
          "ptd_endpoint": "https://kernel.myauberge.jp/ptd/jp"
        }
@@ -936,7 +936,8 @@ Table of Contents
      "gec_signature": "<JWS detached signature>",
      "delegation_chain_depth": 0,
      "parent_kernel_id": null,
-     "mandate_scope_type": "FULL"
+     "mandate_scope_type": "FULL",
+     "mjwt_jti": "3f7a1c2e-9d44-4b81-b6e2-a0c839f51d77"
    }
 
 
@@ -1183,7 +1184,8 @@ Table of Contents
    -  The resource provider itself (for its own compliance audit).
    -  The deploying organization's internal audit team.
    -  A regulator with statutory authority to inspect AI audit records
-      (e.g., FSA under FIEA Article 2, Cabinet Office under AI Rincho).
+      (e.g., FSA under FIEA Article 2, a designated supervisory
+      authority under applicable AI governance regulation).
 
    An Audit Principal MUST authenticate to the gar_audit_endpoint
    using a credential accepted by the operator.  The GEC logs every
@@ -1839,7 +1841,7 @@ A.2.  Resource Provider Compliance Gate (January 3, 2026)
 
    4.  ACD Record generated and KIA-signed. Layer 1 JP jurisdiction
        entry carries regulatory_regime: ["FIEA-Art2", "APPI",
-       "AI-Rincho-Item-23"]. Layer 2 prohibition_tier_summary:
+       "AI-Agent-Governance-v1"]. Layer 2 prohibition_tier_summary:
        {tier_0b: 2 (including market manipulation prohibition),
        tier_1: 12}. Layer 3 gar_audit_endpoint:
        "https://kernel.myauberge.jp/gar/audit". mjwt_jti:
